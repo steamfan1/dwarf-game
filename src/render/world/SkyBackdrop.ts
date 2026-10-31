@@ -28,9 +28,15 @@ export class SkyBackdrop {
     scene.cameras.main.setBackgroundColor(colors.bottom);
   }
 
-  /** Stretch over the visible area. `zoom` is the camera zoom (device pixels per world pixel). */
+  /**
+   * Stretch over the whole screen. `zoom` is the camera zoom (device pixels per world
+   * pixel). The image doesn't scroll, but the camera still zooms it around the screen's
+   * centre, so it is placed where that zoom maps it onto the screen's corner.
+   */
   fit(canvasWidth: number, canvasHeight: number, zoom: number): void {
-    this.image.setDisplaySize(canvasWidth / zoom, canvasHeight / zoom);
+    const width = canvasWidth / zoom;
+    const height = canvasHeight / zoom;
+    this.image.setPosition((canvasWidth - width) / 2, (canvasHeight - height) / 2).setDisplaySize(width, height);
   }
 
   destroy(): void {

@@ -46,7 +46,9 @@ export function DebugPanel() {
         <dt>{t('debug.cursor')}</dt>
         <dd>{stats?.cursorTile ? `${stats.cursorTile.x}, ${stats.cursorTile.y}` : '—'}</dd>
         <dt>{t('debug.chunks')}</dt>
-        <dd>{stats ? stats.chunksDrawn : '—'}</dd>
+        <dd data-testid="debug-chunks">{stats ? stats.chunksDrawn : '—'}</dd>
+        <dt>{t('debug.chunkLayers')}</dt>
+        <dd>{stats ? stats.chunkLayers : '—'}</dd>
         <dt>{t('debug.seed')}</dt>
         <dd>{world?.seed ?? '—'}</dd>
       </dl>

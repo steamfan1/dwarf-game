@@ -6,13 +6,19 @@
  *  - mouse wheel (or + / -) to zoom between the whole-number zoom levels, keeping the
  *    point under the pointer in place.
  *
- * The camera's zoom is always a whole number of device pixels per world pixel and its
- * scroll is snapped to device pixels, so the pixel art stays crisp (see core/viewport.ts).
- * Camera movement runs on real time, so it works while the game is paused.
+ * The camera's zoom is always a whole number of device pixels per world pixel and the
+ * view's corner is snapped to device pixels, so the pixel art stays crisp (see
+ * core/viewport.ts). Camera movement runs on real time, so it works while the game is
+ * paused.
+ *
+ * Positions here are the world position of the view's top-left corner. Phaser's camera
+ * keeps its default origin (the centre), because Phaser computes the visible area
+ * (`worldView`, which tilemap culling relies on) as if zoom happens around the centre;
+ * `apply()` converts the corner into Phaser's scroll value.
  */
 import * as Phaser from 'phaser';
 import { DEFAULT_ZOOM, TILE_SIZE, ZOOM_LEVELS } from '../config';
-import { clampScroll, edgeDirection, scrollAfterZoom, snapToDevicePixel, stepZoom } from '../core/cameraMath';
+import { clampScroll, edgeDirection, phaserScroll, scrollAfterZoom, snapToDevicePixel, stepZoom } from '../core/cameraMath';
 import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
 import { deviceZoom } from '../core/viewport';
@@ -44,8 +50,12 @@ export class CameraController {
 
   /** CSS pixels per world pixel, one of ZOOM_LEVELS. */
   private zoomLevel = DEFAULT_ZOOM;
-  private scrollX = 0;
-  private scrollY = 0;
+  /** World position of the view's top-left corner, before snapping. */
+  private left = 0;
+  private top = 0;
+  /** The same corner snapped to device pixels: what is actually on screen. */
+  private shownLeft = 0;
+  private shownTop = 0;
   private dragFrom: { x: number; y: number } | null = null;
   /**
    * Where the mouse is, for edge panning, taken from the browser's own pointer events
@@ -75,7 +85,6 @@ export class CameraController {
     this.dpr = dpr;
     this.worldWidth = worldTiles.width * TILE_SIZE;
     this.worldHeight = worldTiles.height * TILE_SIZE;
-    this.camera.setOrigin(0, 0);
     this.listen();
   }
 
@@ -91,14 +100,14 @@ export class CameraController {
   /** The visible part of the world, in world pixels. */
   get view(): CameraView {
     const scale = this.scale;
-    return { x: this.camera.scrollX, y: this.camera.scrollY, width: this.scene.scale.width / scale, height: this.scene.scale.height / scale };
+    return { x: this.shownLeft, y: this.shownTop, width: this.scene.scale.width / scale, height: this.scene.scale.height / scale };
   }
 
   /** Centre the view on a tile. */
   centerOnTile(tileX: number, tileY: number): void {
     const scale = this.scale;
-    this.scrollX = (tileX + 0.5) * TILE_SIZE - this.scene.scale.width / scale / 2;
-    this.scrollY = (tileY + 0.5) * TILE_SIZE - this.scene.scale.height / scale / 2;
+    this.left = (tileX + 0.5) * TILE_SIZE - this.scene.scale.width / scale / 2;
+    this.top = (tileY + 0.5) * TILE_SIZE - this.scene.scale.height / scale / 2;
     this.apply();
   }
 
@@ -110,19 +119,19 @@ export class CameraController {
     const before = this.scale;
     this.zoomLevel = next;
     const after = this.scale;
-    this.scrollX = scrollAfterZoom(this.scrollX, at.x, before, after);
-    this.scrollY = scrollAfterZoom(this.scrollY, at.y, before, after);
+    this.left = scrollAfterZoom(this.left, at.x, before, after);
+    this.top = scrollAfterZoom(this.top, at.y, before, after);
     this.apply();
   }
 
   /** Keep the same centre after the canvas is resized or the pixel ratio changes. */
   handleResize(previousWidth: number, previousHeight: number, previousScale: number): void {
     this.canvasRect = null;
-    const centreX = this.scrollX + previousWidth / previousScale / 2;
-    const centreY = this.scrollY + previousHeight / previousScale / 2;
+    const centreX = this.left + previousWidth / previousScale / 2;
+    const centreY = this.top + previousHeight / previousScale / 2;
     const scale = this.scale;
-    this.scrollX = centreX - this.scene.scale.width / scale / 2;
-    this.scrollY = centreY - this.scene.scale.height / scale / 2;
+    this.left = centreX - this.scene.scale.width / scale / 2;
+    this.top = centreY - this.scene.scale.height / scale / 2;
     this.apply();
   }
 
@@ -141,8 +150,8 @@ export class CameraController {
     if (dx !== 0 || dy !== 0) {
       const length = Math.hypot(dx, dy);
       const speed = (PAN_SPEED * (this.shiftHeld ? FAST_MULTIPLIER : 1)) / this.zoomLevel;
-      this.scrollX += (dx / length) * speed * seconds;
-      this.scrollY += (dy / length) * speed * seconds;
+      this.left += (dx / length) * speed * seconds;
+      this.top += (dy / length) * speed * seconds;
     }
     this.apply();
   }
@@ -170,12 +179,13 @@ export class CameraController {
 
   private apply(): void {
     const scale = this.scale;
-    const viewWidth = this.scene.scale.width / scale;
-    const viewHeight = this.scene.scale.height / scale;
-    this.scrollX = clampScroll(this.scrollX, viewWidth, this.worldWidth);
-    this.scrollY = clampScroll(this.scrollY, viewHeight, this.worldHeight);
+    const { width, height } = this.scene.scale;
+    this.left = clampScroll(this.left, width / scale, this.worldWidth);
+    this.top = clampScroll(this.top, height / scale, this.worldHeight);
+    this.shownLeft = snapToDevicePixel(this.left, scale);
+    this.shownTop = snapToDevicePixel(this.top, scale);
     this.camera.setZoom(scale);
-    this.camera.setScroll(snapToDevicePixel(this.scrollX, scale), snapToDevicePixel(this.scrollY, scale));
+    this.camera.setScroll(phaserScroll(this.shownLeft, width, scale), phaserScroll(this.shownTop, height, scale));
   }
 
   private listen(): void {
@@ -183,8 +193,8 @@ export class CameraController {
     const onMove = (pointer: Phaser.Input.Pointer): void => {
       if (!this.dragFrom) return;
       const scale = this.scale;
-      this.scrollX -= (pointer.x - this.dragFrom.x) / scale;
-      this.scrollY -= (pointer.y - this.dragFrom.y) / scale;
+      this.left -= (pointer.x - this.dragFrom.x) / scale;
+      this.top -= (pointer.y - this.dragFrom.y) / scale;
       this.dragFrom = { x: pointer.x, y: pointer.y };
     };
     const onDown = (pointer: Phaser.Input.Pointer): void => {

@@ -25,6 +25,8 @@ export interface DebugStats {
   /** Tile under the pointer, if any. */
   cursorTile: { x: number; y: number } | null;
   chunksDrawn: number;
+  /** Chunk layer pairs created so far (drawn + waiting in the pool). */
+  chunkLayers: number;
 }
 
 /** What's under the pointer, shown in the HUD. */

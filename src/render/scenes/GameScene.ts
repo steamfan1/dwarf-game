@@ -3,8 +3,8 @@
  *
  * Each animation frame it:
  *   1. hands the frame's real time to the session, which runs 0..n fixed simulation ticks;
- *   2. moves the camera (real time, so it works while paused) and shows only the chunks
- *      in view;
+ *   2. moves the camera (real time, so it works while paused) and gives tilemap layers
+ *      to the chunks in view (see WorldView);
  *   3. updates the tile cursor, the minimap's view box and, if open, the debug overlay.
  *
  * Changes in the world arrive as events (TileChanged, ExploredChanged) and redraw only
@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
     this.cameraControl = new CameraController(this, world, context.input, context.settings, () => gameContext().dpr);
     this.cameraControl.centerOnTile(session.sim.hearth.x, session.sim.hearth.y - 2);
     this.lastSize = { width: this.scale.width, height: this.scale.height, scale: this.cameraControl.scale };
+    this.worldView.cull(this.cameraControl.view);
 
     this.cleanup.push(
       session.bus.on('TileChanged', ({ x, y }) => {
@@ -254,6 +255,7 @@ export class GameScene extends Phaser.Scene {
       },
       cursorTile: this.hovered,
       chunksDrawn: this.worldView.drawnChunks,
+      chunkLayers: this.worldView.pooledChunks,
     });
   }
 

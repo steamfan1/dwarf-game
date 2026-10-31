@@ -110,6 +110,7 @@
   "debug.camera": "Camera",
   "debug.cursor": "Cursor",
   "debug.chunks": "Chunks drawn",
+  "debug.chunkLayers": "Chunk layers made",
   "debug.seed": "Seed",
   "debug.paused": "paused ({reasons})",
   "debug.running": "{speed}×"

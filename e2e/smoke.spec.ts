@@ -3,6 +3,7 @@
  * first. Any console error or uncaught exception fails the test (see fixtures.ts).
  */
 import { createWorld, expect, readNumber, test } from './fixtures';
+import { decodePng, pixelAt } from './png';
 
 test('a new world: terrain, digging, camera, minimap, pause and menus', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
@@ -13,7 +14,24 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   await createWorld(page, { seed: 'smoke-test' });
   await expect(page.getByTestId('minimap')).toBeVisible();
   await page.waitForTimeout(800);
-  await page.screenshot({ path: testInfo.outputPath('2-world.png') });
+  const world = decodePng(await page.screenshot({ path: testInfo.outputPath('2-world.png') }));
+
+  // The camera starts centred two tiles above the Hearth, which stands on flat ground, at
+  // the default zoom (one tile is 32 CSS pixels). Check the picture itself: ground is drawn
+  // on both sides of the Hearth, and sky above it. Sky is blue (much more blue than red);
+  // dirt, clay, stone and grass are not.
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
+  const tile = 32;
+  const blueness = (x: number, y: number): number => {
+    const [red, , blue] = pixelAt(world, x, y);
+    return blue - red;
+  };
+  const groundY = centre.y + 6 * tile; // the middle of the third row below the surface
+  for (const dx of [-6, 6]) {
+    expect(blueness(centre.x + dx * tile, groundY), `ground ${dx} tiles from the Hearth`).toBeLessThan(30);
+  }
+  expect(blueness(centre.x, centre.y - 7 * tile), 'sky above the Hearth').toBeGreaterThan(40);
 
   // The debug overlay (backtick) shows the simulation tick. It advances at 20 a second
   // when the browser keeps up; CI's software renderer can be much slower than that, and
@@ -35,11 +53,8 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   await page.waitForTimeout(800);
   await expect(page.getByTestId('debug-camera')).toHaveText(settled ?? '');
 
-  // The camera starts centred two tiles above the Hearth, which stands on the ground, so
-  // the dirt three columns right and two rows down from the surface is 96 and 160 CSS
-  // pixels from the centre of a 1280x720 view at the default zoom (2 device px per world px).
-  const viewport = page.viewportSize()!;
-  const dirt = { x: viewport.width / 2 + 3 * 16 * 2, y: viewport.height / 2 + 5 * 16 * 2 };
+  // The dirt three columns right of the Hearth and two rows below the surface.
+  const dirt = { x: centre.x + 3 * tile, y: centre.y + 5 * tile };
   await page.mouse.move(dirt.x, dirt.y);
   const readout = page.getByTestId('hover-title');
   await expect(readout).toHaveText(/Dirt|Clay|Stone/);

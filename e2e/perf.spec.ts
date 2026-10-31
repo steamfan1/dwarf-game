@@ -1,18 +1,18 @@
 /**
  * Performance probe (diagnostics, not a pass/fail check on speed).
  *
- * It measures the frame rate in a few situations and records a CPU profile and a Chrome
- * trace of the camera panning. CI renders WebGL in software (SwiftShader), which is far
- * slower than any real graphics card, so the numbers are only useful for comparing runs
- * and for finding where the time goes. Results go to perf.json in the test's output
- * folder and to the test's annotations; the test fails only on console errors.
+ * It measures the frame rate in a few situations and records a CPU profile of the camera
+ * panning. CI renders WebGL in software (SwiftShader), which is far slower than any real
+ * graphics card: there, almost all of a frame is spent filling pixels, and script takes
+ * a few milliseconds. So the numbers are only useful for comparing runs and for finding
+ * where the time goes. Results go to perf.json in the test's output folder and to the
+ * test's annotations; the test fails only on console errors.
  *
  * On the dev server, where `window.debug.app` exists, it also hides one part of the
  * picture at a time (fog, blocks, walls, sky, HTML overlay) to show what each one costs.
  */
 import type { CDPSession, Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
-import { gzipSync } from 'node:zlib';
 import { expect, test } from './fixtures';
 
 interface FrameWindow {
@@ -110,7 +110,7 @@ async function setPartVisible(page: Page, part: string, visible: boolean): Promi
   );
 }
 
-test('performance probe', async ({ page, browser, browserErrors }, testInfo) => {
+test('performance probe', async ({ page, browserErrors }, testInfo) => {
   test.setTimeout(150_000);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
@@ -161,23 +161,10 @@ test('performance probe', async ({ page, browser, browserErrors }, testInfo) => 
   await page.keyboard.press('Equal');
   await page.waitForTimeout(300);
 
-  // A CPU profile and a Chrome trace (main thread, compositor and GPU process) of panning.
+  // A CPU profile of panning, to spot script hot spots. (A Chrome trace showed the rest of
+  // the time is SwiftShader drawing the frame, which the page then waits for.)
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 250 });
-  await browser.startTracing(page, {
-    categories: [
-      'devtools.timeline',
-      'disabled-by-default-devtools.timeline',
-      'disabled-by-default-devtools.timeline.frame',
-      'toplevel',
-      'v8.execute',
-      'blink',
-      'cc',
-      'viz',
-      'gpu',
-      'disabled-by-default-gpu.service',
-    ],
-  });
   await cdp.send('Profiler.start');
   windows.push(
     await measure(page, cdp, 'game, zoom 2, panning (profiled)', async () => {
@@ -187,9 +174,7 @@ test('performance probe', async ({ page, browser, browserErrors }, testInfo) => 
     }),
   );
   const { profile } = await cdp.send('Profiler.stop');
-  const trace = await browser.stopTracing();
   await writeFile(testInfo.outputPath('panning.cpuprofile'), JSON.stringify(profile));
-  await writeFile(testInfo.outputPath('panning-trace.json.gz'), gzipSync(trace));
 
   const report = { project: testInfo.project.name, renderer, windows };
   await writeFile(testInfo.outputPath('perf.json'), JSON.stringify(report, null, 2) + '\n');

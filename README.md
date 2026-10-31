@@ -113,11 +113,14 @@ e2e/               browser smoke tests (Playwright)
   world in about 50 to 100 ms inside a Web Worker behind a loading bar, then transfers the
   typed arrays back without copying them.
 - **Chunked rendering.** The world is split into 32 x 32 chunks, each drawn by its own
-  Phaser tilemap layers (walls, and blocks with liquids). Only chunks near the camera are
-  drawn, and digging a block redraws just that cell and its four neighbours. Block edges,
-  outlines and grass caps come from one generated terrain atlas.
+  Phaser tilemap layers (walls, and blocks with liquids). Only chunks near the camera have
+  layers: they come from a pool and are handed back when a chunk scrolls far out of view,
+  so memory depends on the screen size rather than the world size. Digging a block redraws
+  just that cell and its four neighbours. Block edges, outlines and grass caps come from
+  one generated terrain atlas.
 - **Fog of war** is a 400 x 200 texture (one pixel per tile) stretched over the world,
-  updated only where cells are revealed. Lighting joins it in Milestone 4.
+  updated only where cells are revealed, at most once per frame. Lighting joins it in
+  Milestone 4.
 - **Event bus.** Systems announce what happened on a typed bus (`core/EventBus.ts`,
   event list in `sim/events.ts`) instead of calling each other.
 - **HTML UI over the canvas.** Panels are Preact components styled with plain CSS

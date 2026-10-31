@@ -14,6 +14,16 @@ export function scrollAfterZoom(scroll: number, anchor: number, oldScale: number
   return scroll + anchor / oldScale - anchor / newScale;
 }
 
+/**
+ * Phaser zooms a camera around its centre, so its `scroll` is not the world position of
+ * the screen's left (or top) edge: zooming pushes part of the scrolled area off each side.
+ * This is the scroll that puts world position `edge` at the edge of a screen `screenSize`
+ * device pixels long, at `scale` device pixels per world pixel.
+ */
+export function phaserScroll(edge: number, screenSize: number, scale: number): number {
+  return edge - (screenSize - screenSize / scale) / 2;
+}
+
 /** Round a scroll position to whole device pixels, so pixel art never lands between pixels. */
 export function snapToDevicePixel(scroll: number, scale: number): number {
   return Math.round(scroll * scale) / scale;
@@ -57,3 +67,35 @@ export function cellsOnLine(x0: number, y0: number, x1: number, y1: number): Arr
     }
   }
 }
+
+/** An inclusive range of chunk columns and rows. Empty when cx1 < cx0 or cy1 < cy0. */
+export interface ChunkRange {
+  cx0: number;
+  cy0: number;
+  cx1: number;
+  cy1: number;
+}
+
+/**
+ * The chunks a view rectangle (world pixels), grown by `margin` pixels on every side,
+ * touches, clamped to a world of `cols` x `rows` chunks of `chunkPx` pixels.
+ */
+export function chunkRange(
+  view: { x: number; y: number; width: number; height: number },
+  chunkPx: number,
+  cols: number,
+  rows: number,
+  margin: number,
+): ChunkRange {
+  return {
+    cx0: Math.max(0, Math.floor((view.x - margin) / chunkPx)),
+    cy0: Math.max(0, Math.floor((view.y - margin) / chunkPx)),
+    cx1: Math.min(cols - 1, Math.floor((view.x + view.width + margin) / chunkPx)),
+    cy1: Math.min(rows - 1, Math.floor((view.y + view.height + margin) / chunkPx)),
+  };
+}
+
+export function inChunkRange(range: ChunkRange, cx: number, cy: number): boolean {
+  return cx >= range.cx0 && cx <= range.cx1 && cy >= range.cy0 && cy <= range.cy1;
+}
+

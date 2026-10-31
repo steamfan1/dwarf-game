@@ -1,16 +1,22 @@
 /**
- * Draws the world with Phaser tilemap layers: for every 32 x 32 chunk, one layer of
- * background walls and one of blocks and liquids.
+ * Draws the world with Phaser tilemap layers, one pair per 32 x 32 chunk: a layer of
+ * background walls and a layer of blocks and liquids in front of it.
  *
- *  - Only layers that overlap the camera are visible, so the renderer never touches the
- *    rest of the map.
- *  - When a cell changes, only that cell and its four neighbours (whose edge outlines may
- *    change) are redrawn; nothing else in the chunk, let alone the world, is touched.
+ * Only chunks near the camera have layers. They come from a pool: when a chunk scrolls
+ * into view it borrows a free pair (or a new one, if every pair is busy), which is moved
+ * into place and filled from the world; when it scrolls well out of view its pair goes
+ * back to the pool. So the number of layers (and of Phaser's per-cell tile objects)
+ * depends on the screen size, not on the size of the world, and the renderer never
+ * touches chunks that are out of sight.
+ *
+ * When a cell changes, only that cell and its four neighbours (whose edge outlines may
+ * change) are redrawn, and only if their chunks are on screen.
  */
 import * as Phaser from 'phaser';
 import { CHUNK_SIZE, TILE_SIZE } from '../../config';
+import { chunkRange, inChunkRange, type ChunkRange } from '../../core/cameraMath';
 import type { TileRegistry } from '../../sim/world/TileRegistry';
-import type { CellRect, World } from '../../sim/world/World';
+import type { World } from '../../sim/world/World';
 import { DEPTH } from '../depths';
 import { ATLAS_MARGIN, ATLAS_SPACING, backgroundFrameAt, foregroundFrameAt, type AtlasLayout } from './tileAtlas';
 
@@ -22,14 +28,26 @@ const NEIGHBOURHOOD: ReadonlyArray<[number, number]> = [
   [-1, 0],
 ];
 
+/** Chunks within this many world pixels of the view are drawn (filled a little ahead of time). */
+const SHOW_MARGIN = 4 * TILE_SIZE;
+/** Chunks keep their layers until they are this far out of view, so panning back and forth doesn't refill them. */
+const KEEP_MARGIN = CHUNK_SIZE * TILE_SIZE;
+
+interface ChunkLayers {
+  walls: Phaser.Tilemaps.TilemapLayer;
+  blocks: Phaser.Tilemaps.TilemapLayer;
+}
+
 export class WorldView {
   private readonly world: World;
   private readonly tiles: TileRegistry;
   private readonly layout: AtlasLayout;
   private readonly map: Phaser.Tilemaps.Tilemap;
-  private readonly walls: Phaser.Tilemaps.TilemapLayer[] = [];
-  private readonly blocks: Phaser.Tilemaps.TilemapLayer[] = [];
-  private visibleChunks = 0;
+  private readonly tileset: Phaser.Tilemaps.Tileset;
+  /** Layers in use, by chunk index. */
+  private readonly active = new Map<number, ChunkLayers>();
+  private readonly pool: ChunkLayers[] = [];
+  private layersCreated = 0;
 
   constructor(scene: Phaser.Scene, world: World, tiles: TileRegistry, layout: AtlasLayout, textureKey: string) {
     this.world = world;
@@ -38,26 +56,17 @@ export class WorldView {
     this.map = scene.make.tilemap({ tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, width: CHUNK_SIZE, height: CHUNK_SIZE });
     const tileset = this.map.addTilesetImage('terrain', textureKey, TILE_SIZE, TILE_SIZE, ATLAS_MARGIN, ATLAS_SPACING);
     if (!tileset) throw new Error('Could not create the terrain tileset');
-
-    const chunks = world.chunkCols * world.chunkRows;
-    for (let chunk = 0; chunk < chunks; chunk++) {
-      const cells = world.chunkCells(chunk);
-      const width = cells.x1 - cells.x0 + 1;
-      const height = cells.y1 - cells.y0 + 1;
-      const make = (name: string, depth: number): Phaser.Tilemaps.TilemapLayer => {
-        const layer = this.map.createBlankLayer(`${name}-${chunk}`, tileset, cells.x0 * TILE_SIZE, cells.y0 * TILE_SIZE, width, height);
-        if (!layer) throw new Error(`Could not create tilemap layer ${name}-${chunk}`);
-        return layer.setDepth(depth);
-      };
-      this.walls.push(make('walls', DEPTH.walls));
-      this.blocks.push(make('blocks', DEPTH.blocks));
-      this.drawRect(cells);
-    }
+    this.tileset = tileset;
   }
 
-  /** Number of chunks whose layers are currently drawn (for the debug overlay). */
+  /** Number of chunks currently drawn (for the debug overlay). */
   get drawnChunks(): number {
-    return this.visibleChunks;
+    return this.active.size;
+  }
+
+  /** Number of chunk layer pairs ever created, in use or pooled (for the debug overlay). */
+  get pooledChunks(): number {
+    return this.layersCreated;
   }
 
   /** Redraw a changed cell and the neighbours whose outlines depend on it. */
@@ -65,44 +74,80 @@ export class WorldView {
     for (const [dx, dy] of NEIGHBOURHOOD) {
       const cx = x + dx;
       const cy = y + dy;
-      if (this.world.inBounds(cx, cy)) this.drawCell(cx, cy);
+      if (!this.world.inBounds(cx, cy)) continue;
+      const layers = this.active.get(this.world.chunkIndex(cx, cy));
+      if (layers) this.drawCell(layers, cx, cy);
     }
   }
 
-  /** Show only the chunks that overlap the camera's view (world pixels), plus a one-chunk margin. */
+  /** Give layers to the chunks around the camera's view (world pixels) and take them back from far-away ones. */
   cull(view: { x: number; y: number; width: number; height: number }): void {
     const chunkPx = CHUNK_SIZE * TILE_SIZE;
-    const cx0 = Math.floor(view.x / chunkPx) - 1;
-    const cy0 = Math.floor(view.y / chunkPx) - 1;
-    const cx1 = Math.floor((view.x + view.width) / chunkPx) + 1;
-    const cy1 = Math.floor((view.y + view.height) / chunkPx) + 1;
-    let visible = 0;
-    for (let chunk = 0; chunk < this.blocks.length; chunk++) {
-      const cx = chunk % this.world.chunkCols;
-      const cy = Math.floor(chunk / this.world.chunkCols);
-      const show = cx >= cx0 && cx <= cx1 && cy >= cy0 && cy <= cy1;
-      this.walls[chunk]!.setVisible(show);
-      this.blocks[chunk]!.setVisible(show);
-      if (show) visible++;
+    const { chunkCols, chunkRows } = this.world;
+    const keep = chunkRange(view, chunkPx, chunkCols, chunkRows, KEEP_MARGIN);
+    for (const [chunk, layers] of this.active) {
+      if (!inChunkRange(keep, chunk % chunkCols, Math.floor(chunk / chunkCols))) this.release(chunk, layers);
     }
-    this.visibleChunks = visible;
+    const show = chunkRange(view, chunkPx, chunkCols, chunkRows, SHOW_MARGIN);
+    this.forEachChunk(show, (chunk) => {
+      if (!this.active.has(chunk)) this.assign(chunk);
+    });
   }
 
   destroy(): void {
+    this.active.clear();
+    this.pool.length = 0;
     this.map.destroy();
   }
 
-  private drawRect(cells: CellRect): void {
-    for (let y = cells.y0; y <= cells.y1; y++) {
-      for (let x = cells.x0; x <= cells.x1; x++) this.drawCell(x, y);
+  private forEachChunk(range: ChunkRange, visit: (chunk: number) => void): void {
+    for (let cy = range.cy0; cy <= range.cy1; cy++) {
+      for (let cx = range.cx0; cx <= range.cx1; cx++) visit(cy * this.world.chunkCols + cx);
     }
   }
 
-  private drawCell(x: number, y: number): void {
-    const chunk = this.world.chunkIndex(x, y);
+  private assign(chunk: number): void {
+    const layers = this.pool.pop() ?? this.createLayers();
+    const cells = this.world.chunkCells(chunk);
+    for (const layer of [layers.walls, layers.blocks]) layer.setPosition(cells.x0 * TILE_SIZE, cells.y0 * TILE_SIZE).setVisible(true);
+    this.active.set(chunk, layers);
+    // Fill every cell; cells past the edge of the world (in the last row and column of
+    // chunks, which are smaller) are cleared, since the layer may have drawn another chunk.
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const x = cells.x0 + lx;
+        const y = cells.y0 + ly;
+        if (x > cells.x1 || y > cells.y1) {
+          layers.walls.putTileAt(-1, lx, ly, false);
+          layers.blocks.putTileAt(-1, lx, ly, false);
+        } else {
+          this.drawCell(layers, x, y);
+        }
+      }
+    }
+  }
+
+  private release(chunk: number, layers: ChunkLayers): void {
+    layers.walls.setVisible(false);
+    layers.blocks.setVisible(false);
+    this.active.delete(chunk);
+    this.pool.push(layers);
+  }
+
+  private createLayers(): ChunkLayers {
+    const id = this.layersCreated++;
+    const make = (name: string, depth: number): Phaser.Tilemaps.TilemapLayer => {
+      const layer = this.map.createBlankLayer(`${name}-${id}`, this.tileset, 0, 0, CHUNK_SIZE, CHUNK_SIZE);
+      if (!layer) throw new Error(`Could not create tilemap layer ${name}-${id}`);
+      return layer.setDepth(depth);
+    };
+    return { walls: make('walls', DEPTH.walls), blocks: make('blocks', DEPTH.blocks) };
+  }
+
+  private drawCell(layers: ChunkLayers, x: number, y: number): void {
     const lx = x % CHUNK_SIZE;
     const ly = y % CHUNK_SIZE;
-    this.walls[chunk]!.putTileAt(backgroundFrameAt(this.world, this.layout, x, y), lx, ly, false);
-    this.blocks[chunk]!.putTileAt(foregroundFrameAt(this.world, this.tiles, this.layout, x, y), lx, ly, false);
+    layers.walls.putTileAt(backgroundFrameAt(this.world, this.layout, x, y), lx, ly, false);
+    layers.blocks.putTileAt(foregroundFrameAt(this.world, this.tiles, this.layout, x, y), lx, ly, false);
   }
 }
