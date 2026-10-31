@@ -51,7 +51,7 @@ export class TitleScene extends Phaser.Scene {
 
     this.walkers = [0, 1, 2].map((i) => ({
       sprite: this.add.sprite(0, 0, 'dwarf', 0).setOrigin(0.5, 1).play({ key: 'dwarfWalk', startFrame: i }),
-      x: -20 - i * 34,
+      x: 0,
       speed: WALKER_SPEED_PX_PER_S + i * 1.5,
     }));
 
@@ -65,6 +65,10 @@ export class TitleScene extends Phaser.Scene {
     });
 
     this.layout();
+    // Start the trio already on screen, spaced out and heading for the gate.
+    this.walkers.forEach((walker, i) => {
+      walker.x = Math.round(this.gateX * (0.2 + i * 0.16));
+    });
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this);

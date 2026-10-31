@@ -228,6 +228,11 @@ body {
 
 /* ---- In-game HUD ----------------------------------------------------------------- */
 
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
 .top-bar {
   position: absolute;
   top: 0.5em;
