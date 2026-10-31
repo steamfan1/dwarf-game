@@ -207,3 +207,13 @@ export function growRect(rect: CellRect, x: number, y: number): CellRect {
     y1: Math.max(rect.y1, y),
   };
 }
+
+/** The smallest rectangle covering both rectangles. */
+export function unionRect(a: CellRect, b: CellRect): CellRect {
+  return {
+    x0: Math.min(a.x0, b.x0),
+    y0: Math.min(a.y0, b.y0),
+    x1: Math.max(a.x1, b.x1),
+    y1: Math.max(a.y1, b.y1),
+  };
+}

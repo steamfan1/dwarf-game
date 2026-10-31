@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLAG_EXPLORED, World } from './World';
+import { FLAG_EXPLORED, unionRect, World } from './World';
 
 describe('World', () => {
   it('indexes cells row by row and checks bounds', () => {
@@ -46,5 +46,9 @@ describe('World', () => {
     expect(copy.biome).toBe('snow');
     expect(World.transferables(world.toSnapshot())).toHaveLength(6);
     expect(() => World.fromSnapshot({ ...world.toSnapshot(), fg: new Uint16Array(3) })).toThrow();
+  });
+
+  it('unions two cell rectangles', () => {
+    expect(unionRect({ x0: 2, y0: 5, x1: 4, y1: 6 }, { x0: 3, y0: 1, x1: 9, y1: 5 })).toEqual({ x0: 2, y0: 1, x1: 9, y1: 6 });
   });
 });

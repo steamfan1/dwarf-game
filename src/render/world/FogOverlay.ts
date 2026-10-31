@@ -6,10 +6,13 @@
  *
  * Unexplored cells are opaque; explored cells and open sky are clear. Milestone 4 adds
  * light levels (sunlight, torches) to the same texture.
+ *
+ * Changes are collected during a frame and uploaded once by `flush()`, so dragging a dig
+ * across many cells costs one texture upload per frame rather than one per cell.
  */
 import * as Phaser from 'phaser';
 import { TILE_SIZE } from '../../config';
-import type { CellRect, World } from '../../sim/world/World';
+import { unionRect, type CellRect, type World } from '../../sim/world/World';
 import { DEPTH } from '../depths';
 
 const FOG_RGB = [6, 7, 11] as const;
@@ -21,6 +24,8 @@ export class FogOverlay {
   private readonly texture: Phaser.Textures.CanvasTexture;
   private readonly pixels: ImageData;
   private readonly image: Phaser.GameObjects.Image;
+  /** Cells changed since the last upload. */
+  private dirty: CellRect | null = null;
 
   constructor(scene: Phaser.Scene, world: World, key = 'fog-of-war') {
     this.scene = scene;
@@ -38,10 +43,11 @@ export class FogOverlay {
       this.pixels.data[i * 4 + 2] = FOG_RGB[2];
     }
     this.update({ x0: 0, y0: 0, x1: world.width - 1, y1: world.height - 1 });
+    this.flush();
     this.image = scene.add.image(0, 0, key).setOrigin(0, 0).setScale(TILE_SIZE).setDepth(DEPTH.fog);
   }
 
-  /** Recompute a rectangle of cells and upload the texture. */
+  /** Recompute a rectangle of cells. The texture is uploaded by the next `flush()`. */
   update(rect: CellRect): void {
     const { world, pixels } = this;
     for (let y = rect.y0; y <= rect.y1; y++) {
@@ -49,9 +55,17 @@ export class FogOverlay {
         pixels.data[(y * world.width + x) * 4 + 3] = world.isVisible(x, y) ? 0 : 255;
       }
     }
+    this.dirty = this.dirty ? unionRect(this.dirty, rect) : { ...rect };
+  }
+
+  /** Upload the cells changed since the last call, if any. Call once per frame. */
+  flush(): void {
+    const rect = this.dirty;
+    if (!rect) return;
+    this.dirty = null;
     const width = rect.x1 - rect.x0 + 1;
     const height = rect.y1 - rect.y0 + 1;
-    this.texture.getContext().putImageData(pixels, 0, 0, rect.x0, rect.y0, width, height);
+    this.texture.getContext().putImageData(this.pixels, 0, 0, rect.x0, rect.y0, width, height);
     this.texture.refresh();
   }
 

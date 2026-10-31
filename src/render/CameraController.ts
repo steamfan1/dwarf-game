@@ -1,7 +1,7 @@
 /**
  * Moves the camera over the world:
  *  - WASD / arrow keys (rebindable), Shift to go faster;
- *  - resting the pointer at a screen edge, when "edge panning" is on in Settings;
+ *  - resting the mouse at a screen edge, when "edge panning" is on in Settings;
  *  - dragging with the middle mouse button;
  *  - mouse wheel (or + / -) to zoom between the whole-number zoom levels, keeping the
  *    point under the pointer in place.
@@ -47,8 +47,16 @@ export class CameraController {
   private scrollX = 0;
   private scrollY = 0;
   private dragFrom: { x: number; y: number } | null = null;
-  private pointerInside = false;
-  private pointer = { x: 0, y: 0 };
+  /**
+   * Where the mouse is, for edge panning, taken from the browser's own pointer events
+   * rather than from Phaser's pointer. Phaser only hears about the mouse while it moves
+   * over the canvas, so after a click on an HTML dialog its pointer can still read (0, 0),
+   * a screen corner, and the camera would drift off on its own. This is null until the
+   * mouse has really moved in the window, and again once it leaves the window.
+   */
+  private mouse: { clientX: number; clientY: number; overGame: boolean } | null = null;
+  /** The canvas's place on the page, cached between resizes. */
+  private canvasRect: DOMRect | null = null;
   private wheelTotal = 0;
   private shiftHeld = false;
   private readonly cleanup: Array<() => void> = [];
@@ -109,6 +117,7 @@ export class CameraController {
 
   /** Keep the same centre after the canvas is resized or the pixel ratio changes. */
   handleResize(previousWidth: number, previousHeight: number, previousScale: number): void {
+    this.canvasRect = null;
     const centreX = this.scrollX + previousWidth / previousScale / 2;
     const centreY = this.scrollY + previousHeight / previousScale / 2;
     const scale = this.scale;
@@ -123,10 +132,10 @@ export class CameraController {
     let dx = (this.input.isDown('panRight') ? 1 : 0) - (this.input.isDown('panLeft') ? 1 : 0);
     let dy = (this.input.isDown('panDown') ? 1 : 0) - (this.input.isDown('panUp') ? 1 : 0);
 
-    if (this.dragFrom === null && this.pointerInside && this.settings.get().edgePan && document.hasFocus()) {
-      const margin = EDGE_MARGIN * this.dpr();
-      dx = dx || edgeDirection(this.pointer.x, this.scene.scale.width, margin);
-      dy = dy || edgeDirection(this.pointer.y, this.scene.scale.height, margin);
+    const edge = this.edgePanDirection();
+    if (edge) {
+      dx = dx || edge.dx;
+      dy = dy || edge.dy;
     }
 
     if (dx !== 0 || dy !== 0) {
@@ -143,6 +152,22 @@ export class CameraController {
     this.cleanup.length = 0;
   }
 
+  /**
+   * Which way the mouse is pushing at the screen edges, or null when edge panning doesn't
+   * apply: it's off in Settings, the mouse isn't over the game (it's outside the window or
+   * over an HTML panel), a dialog is open, the window isn't focused, or a drag is going on.
+   */
+  private edgePanDirection(): { dx: number; dy: number } | null {
+    const mouse = this.mouse;
+    if (!mouse || !mouse.overGame || this.dragFrom !== null) return null;
+    if (!this.settings.get().edgePan || !this.input.allows('panLeft') || !document.hasFocus()) return null;
+    const rect = (this.canvasRect ??= this.scene.game.canvas.getBoundingClientRect());
+    return {
+      dx: edgeDirection(mouse.clientX - rect.left, rect.width, EDGE_MARGIN),
+      dy: edgeDirection(mouse.clientY - rect.top, rect.height, EDGE_MARGIN),
+    };
+  }
+
   private apply(): void {
     const scale = this.scale;
     const viewWidth = this.scene.scale.width / scale;
@@ -156,14 +181,11 @@ export class CameraController {
   private listen(): void {
     const input = this.scene.input;
     const onMove = (pointer: Phaser.Input.Pointer): void => {
-      this.pointerInside = true;
-      if (this.dragFrom) {
-        const scale = this.scale;
-        this.scrollX -= (pointer.x - this.dragFrom.x) / scale;
-        this.scrollY -= (pointer.y - this.dragFrom.y) / scale;
-        this.dragFrom = { x: pointer.x, y: pointer.y };
-      }
-      this.pointer = { x: pointer.x, y: pointer.y };
+      if (!this.dragFrom) return;
+      const scale = this.scale;
+      this.scrollX -= (pointer.x - this.dragFrom.x) / scale;
+      this.scrollY -= (pointer.y - this.dragFrom.y) / scale;
+      this.dragFrom = { x: pointer.x, y: pointer.y };
     };
     const onDown = (pointer: Phaser.Input.Pointer): void => {
       if (pointer.middleButtonDown()) this.dragFrom = { x: pointer.x, y: pointer.y };
@@ -181,26 +203,35 @@ export class CameraController {
       this.wheelTotal = 0;
       this.zoomBy(steps, { x: pointer.x, y: pointer.y });
     };
-    const onOut = (): void => {
-      this.pointerInside = false;
-    };
-    const onOver = (): void => {
-      this.pointerInside = true;
-    };
     input.on(Phaser.Input.Events.POINTER_MOVE, onMove);
     input.on(Phaser.Input.Events.POINTER_DOWN, onDown);
     input.on(Phaser.Input.Events.POINTER_UP, onUp);
     input.on(Phaser.Input.Events.POINTER_WHEEL, onWheel);
-    input.on(Phaser.Input.Events.GAME_OUT, onOut);
-    input.on(Phaser.Input.Events.GAME_OVER, onOver);
     this.cleanup.push(() => {
       input.off(Phaser.Input.Events.POINTER_MOVE, onMove);
       input.off(Phaser.Input.Events.POINTER_DOWN, onDown);
       input.off(Phaser.Input.Events.POINTER_UP, onUp);
       input.off(Phaser.Input.Events.POINTER_WHEEL, onWheel);
-      input.off(Phaser.Input.Events.GAME_OUT, onOut);
-      input.off(Phaser.Input.Events.GAME_OVER, onOver);
     });
+
+    // The mouse for edge panning (see `mouse`). Capture-phase listeners on the window see
+    // every mouse event, wherever it lands; touch and pen never pan at the edges.
+    const canvas = this.scene.game.canvas;
+    const onPointer = (event: PointerEvent): void => {
+      if (event.pointerType !== 'mouse') return;
+      this.mouse = { clientX: event.clientX, clientY: event.clientY, overGame: event.target === canvas };
+    };
+    const onMouseOut = (event: MouseEvent): void => {
+      // No related target means the mouse left the window altogether.
+      if (event.relatedTarget === null) this.mouse = null;
+    };
+    const listenerOptions = { capture: true, passive: true } as const;
+    for (const type of ['pointermove', 'pointerdown', 'pointerover'] as const) {
+      window.addEventListener(type, onPointer, listenerOptions);
+      this.cleanup.push(() => window.removeEventListener(type, onPointer, listenerOptions));
+    }
+    window.addEventListener('mouseout', onMouseOut, listenerOptions);
+    this.cleanup.push(() => window.removeEventListener('mouseout', onMouseOut, listenerOptions));
 
     this.cleanup.push(this.input.onPressed('zoomIn', () => this.zoomBy(1)));
     this.cleanup.push(this.input.onPressed('zoomOut', () => this.zoomBy(-1)));
@@ -211,7 +242,7 @@ export class CameraController {
     };
     const onBlur = (): void => {
       this.shiftHeld = false;
-      this.pointerInside = false;
+      this.mouse = null;
       this.dragFrom = null;
     };
     window.addEventListener('keydown', onKey);

@@ -70,6 +70,15 @@ export class InputActions {
     return this.downActions.has(action);
   }
 
+  /**
+   * Whether an action applies right now (input is on and the active filter allows it).
+   * Mouse controls that mirror a key, such as panning at the screen edge, ask this so
+   * they stop when the key would, for example while a dialog is open.
+   */
+  allows(action: Action): boolean {
+    return this.enabled && this.isActive(action);
+  }
+
   onPressed(action: Action, handler: () => void): () => void {
     let handlers = this.pressHandlers.get(action);
     if (!handlers) {

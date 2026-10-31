@@ -98,6 +98,16 @@ describe('InputActions', () => {
     expect(debugKey.prevented).toBe(true);
   });
 
+  it('reports which actions apply, for mouse controls that mirror keys', () => {
+    const input = new InputActions(DEFAULT_BINDINGS);
+    expect(input.allows('panLeft')).toBe(true);
+    input.setActiveFilter((action) => action !== 'panLeft');
+    expect(input.allows('panLeft')).toBe(false);
+    expect(input.allows('toggleDebug')).toBe(true);
+    input.setEnabled(false);
+    expect(input.allows('toggleDebug')).toBe(false);
+  });
+
   it('releases everything when disabled or on releaseAll (window blur)', () => {
     const input = new InputActions(DEFAULT_BINDINGS);
     input.handleKeyDown(key('KeyA'));

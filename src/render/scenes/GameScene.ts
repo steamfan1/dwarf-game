@@ -8,7 +8,7 @@
  *   3. updates the tile cursor, the minimap's view box and, if open, the debug overlay.
  *
  * Changes in the world arrive as events (TileChanged, ExploredChanged) and redraw only
- * the cells concerned.
+ * the cells concerned; the fog texture is uploaded at most once per frame.
  */
 import * as Phaser from 'phaser';
 import { gameContext } from '../../app/context';
@@ -114,6 +114,7 @@ export class GameScene extends Phaser.Scene {
 
     const view = this.cameraControl.view;
     this.worldView.cull(view);
+    this.fog.flush();
     this.sky.fit(this.scale.width, this.scale.height, this.cameraControl.scale);
     context.reportView({ x: view.x / TILE_SIZE, y: view.y / TILE_SIZE, width: view.width / TILE_SIZE, height: view.height / TILE_SIZE });
 
