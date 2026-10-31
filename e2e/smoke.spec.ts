@@ -1,32 +1,46 @@
 /**
  * Milestone 0 smoke test: boots the production build in a real browser and checks the
- * things a player would notice first, failing on any console error along the way.
+ * things a player would notice first. Any console error or uncaught exception fails the
+ * test. Every test also writes the full browser console to console.txt in its output
+ * folder, so CI failures can be diagnosed without a debugger.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 
-/** Collect console errors and uncaught exceptions for the whole test. */
-function watchForErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(`console.error: ${message.text()}`);
-  });
-  page.on('pageerror', (error) => errors.push(`uncaught: ${error.message}`));
-  return errors;
-}
+/** `browserErrors` collects console errors and uncaught exceptions for the whole test. */
+const test = base.extend<{ browserErrors: string[] }>({
+  browserErrors: async ({ page }, use, testInfo) => {
+    const everything: string[] = [];
+    const errors: string[] = [];
+    page.on('console', (message) => {
+      const line = `[${message.type()}] ${message.text()}`;
+      everything.push(line);
+      if (message.type() === 'error') errors.push(line);
+    });
+    page.on('pageerror', (error) => {
+      const line = `[uncaught] ${error.message}\n${error.stack ?? ''}`;
+      everything.push(line);
+      errors.push(line);
+    });
+    page.on('requestfailed', (request) => {
+      everything.push(`[request failed] ${request.url()} ${request.failure()?.errorText ?? ''}`);
+    });
+    await use(errors);
+    await writeFile(testInfo.outputPath('console.txt'), everything.join('\n') + '\n');
+  },
+});
 
 async function readTick(page: Page): Promise<number> {
   return Number(await page.getByTestId('debug-ticks').textContent());
 }
 
-test('title screen, new game, running simulation, pause, menu and settings', async ({ page }, testInfo) => {
-  const errors = watchForErrors(page);
-
+test('title screen, new game, running simulation, pause, menu and settings', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   const newGame = page.getByRole('button', { name: 'New game' });
   await expect(newGame).toBeVisible();
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'title');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath('1-title.png') });
 
   await newGame.click();
@@ -70,11 +84,10 @@ test('title screen, new game, running simulation, pause, menu and settings', asy
   await page.getByRole('button', { name: 'Quit to title' }).click();
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'title');
 
-  expect(errors, errors.join('\n')).toEqual([]);
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
-test('right-click and the mouse wheel are kept away from the browser', async ({ page }) => {
-  const errors = watchForErrors(page);
+test('right-click and the mouse wheel are kept away from the browser', async ({ page, browserErrors }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
 
@@ -87,29 +100,30 @@ test('right-click and the mouse wheel are kept away from the browser', async ({ 
     return { contextMenu: contextMenu.defaultPrevented, wheel: wheel.defaultPrevented };
   });
   expect(defaultPrevented).toEqual({ contextMenu: true, wheel: true });
-  expect(errors, errors.join('\n')).toEqual([]);
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
-test('high-DPI screens get a full-resolution canvas that follows window resizes', async ({ browser }, testInfo) => {
-  const context = await browser.newContext({ viewport: { width: 800, height: 500 }, deviceScaleFactor: 2 });
-  const page = await context.newPage();
-  const errors = watchForErrors(page);
-  await page.goto('./');
-  await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
+test.describe('on a high-DPI screen', () => {
+  test.use({ viewport: { width: 800, height: 500 }, deviceScaleFactor: 2 });
 
-  const canvasSize = () =>
-    page.locator('#game canvas').evaluate((canvas: HTMLCanvasElement) => ({
-      width: canvas.width,
-      height: canvas.height,
-      cssWidth: canvas.clientWidth,
-      cssHeight: canvas.clientHeight,
-    }));
+  test('the canvas renders at full resolution and follows window resizes', async ({ page, browserErrors }, testInfo) => {
+    await page.goto('./');
+    await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
 
-  await expect.poll(canvasSize).toEqual({ width: 1600, height: 1000, cssWidth: 800, cssHeight: 500 });
-  await page.setViewportSize({ width: 1000, height: 600 });
-  await expect.poll(canvasSize).toEqual({ width: 2000, height: 1200, cssWidth: 1000, cssHeight: 600 });
-  await page.screenshot({ path: testInfo.outputPath('4-title-hidpi.png') });
+    const canvasSize = () =>
+      page.locator('#game canvas').evaluate((canvas: HTMLCanvasElement) => ({
+        width: canvas.width,
+        height: canvas.height,
+        cssWidth: canvas.clientWidth,
+        cssHeight: canvas.clientHeight,
+      }));
 
-  expect(errors, errors.join('\n')).toEqual([]);
-  await context.close();
+    await expect.poll(canvasSize).toEqual({ width: 1600, height: 1000, cssWidth: 800, cssHeight: 500 });
+    await page.setViewportSize({ width: 1000, height: 600 });
+    await expect.poll(canvasSize).toEqual({ width: 2000, height: 1200, cssWidth: 1000, cssHeight: 600 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: testInfo.outputPath('4-title-hidpi.png') });
+
+    expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+  });
 });

@@ -47,10 +47,15 @@ jobs:
 
       - name: Upload the generated lockfile
         if: steps.install.outputs.generated == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-lock
           path: package-lock.json
+
+      - name: Report resolved versions
+        run: |
+          versions=$(node -e "const fs=require('fs');console.log(['phaser','vite','vitest','typescript','preact','@playwright/test'].map(n=>n+' '+JSON.parse(fs.readFileSync('node_modules/'+n+'/package.json','utf8')).version).join(', '))")
+          echo "::notice title=Resolved versions::$versions"
 
       - name: Type-check
         run: npm run typecheck
@@ -67,14 +72,12 @@ jobs:
       - name: Browser smoke test (fails on any console error)
         run: npm run smoke
 
-      - name: Upload smoke-test screenshots and report
+      - name: Upload smoke-test screenshots and console logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: smoke-results
-          path: |
-            test-results/
-            playwright-report/
+          path: test-results/
           if-no-files-found: ignore
 
       - name: Package the site for GitHub Pages
@@ -97,3 +100,51 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # Copies the smoke-test screenshots, browser console logs, results.json and (on the first
+  # run) the generated package-lock.json to the `ci-output` branch, replacing what was
+  # there. That makes them readable with plain git, for reviewing a run without opening
+  # the Actions page. The branch is never merged; it can be deleted at any time.
+  publish-output:
+    name: Publish test output to the ci-output branch
+    needs: check
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download smoke-test output
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: smoke-results
+          path: out/smoke
+
+      - name: Download the generated lockfile
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: package-lock
+          path: out
+
+      - name: Push to the ci-output branch
+        env:
+          TOKEN: ${{ github.token }}
+          CHECK_RESULT: ${{ needs.check.result }}
+        run: |
+          mkdir -p out
+          cd out
+          find . -type f \( -name '*.zip' -o -name '*.webm' \) -delete
+          {
+            echo "# CI output"
+            echo
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Check job result: ${CHECK_RESULT}"
+          } > README.md
+          git init -q -b ci-output
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "CI output for ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:ci-output

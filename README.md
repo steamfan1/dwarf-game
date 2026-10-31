@@ -124,7 +124,10 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails
   the test. Screenshots go to `test-results/`.
 - GitHub Actions runs type-checking, unit tests, the build and the smoke test on every
-  push (`.github/workflows/ci.yml`).
+  push (`.github/workflows/ci.yml`). Failures show up as annotations on the run, and each
+  run's screenshots, browser console logs and results are copied to the `ci-output`
+  branch so they can be reviewed with plain git. That branch is never merged and can be
+  deleted at any time.
 
 ## Debug tools
 

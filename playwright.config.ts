@@ -12,11 +12,14 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // In CI, failures also become GitHub annotations, and results.json summarises the run.
+  reporter: process.env.CI
+    ? [['list'], ['github'], ['json', { outputFile: 'test-results/results.json' }]]
+    : 'list',
   outputDir: 'test-results',
   use: {
     baseURL: `http://localhost:${PORT}/`,
-    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {
