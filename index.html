@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Dig, build, craft and defend with a small band of dwarves, then open the gate to the next world." />
+    <title>Gatewright</title>
+    <!-- Inline pixel-art favicon (a stone gate), so the build needs no image files. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='2' fill='%2314161c'/%3E%3Cpath d='M3 15V7h1V5h1V4h1V3h4v1h1v1h1v2h1v8h-3V8H9V7H7v1H6v7z' fill='%238d8f99'/%3E%3Cpath d='M6 15V8h1V7h2v1h1v7z' fill='%23f2a33a'/%3E%3C/svg%3E"
+    />
+    <style>
+      /* Minimal pre-load styling so there is no white flash before the CSS bundle loads. */
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; }
+    </style>
+  </head>
+  <body data-scene="boot">
+    <div id="app">
+      <!-- Phaser draws the world into this element's canvas. -->
+      <div id="game"></div>
+      <!-- HTML/CSS panels (menus, HUD, crafting, settings) layered over the canvas. -->
+      <div id="ui"></div>
+    </div>
+    <noscript>Gatewright needs JavaScript to run.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
