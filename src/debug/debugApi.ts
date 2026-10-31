@@ -38,7 +38,10 @@ export function installDebugApi(app: App): void {
       notYet('spawnItem', 3);
     },
     skipToNight: () => notYet('skipToNight', 4),
-    revealMap: () => notYet('revealMap', 1),
+    revealMap: () => {
+      if (app.revealMap()) console.info('Fog of war lifted over the whole map.');
+      else console.info('debug.revealMap() needs a running game: start a new world first.');
+    },
     setSpeed: (multiplier) => {
       if (!app.session) {
         console.info('debug.setSpeed() needs a running game: start a new game first.');

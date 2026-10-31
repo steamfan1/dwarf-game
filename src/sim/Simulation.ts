@@ -1,82 +1,102 @@
 /**
- * All game state that advances in fixed ticks.
+ * All game state that advances in fixed ticks, and the commands that change it.
  *
  * Pure TypeScript: no Phaser and no DOM, so it runs in unit tests and could move into a
  * worker. All randomness comes from `rng`, never Math.random(), so a world can be
  * replayed exactly from its seed and the player's orders.
  *
- * Milestone 0 holds only the tick counter and a placeholder walker that exercises the
- * fixed-timestep and interpolation pipeline end to end. The world, dwarves and job
- * system replace the walker from Milestone 1 on.
+ * Milestone 1: the generated world, the Hearth (the colony's home spot) and digging by
+ * click. From Milestone 2, dwarves do the digging through the job system instead.
  */
+import type { EventBus } from '../core/EventBus';
 import { Rng } from '../core/Rng';
+import type { GameEvents } from './events';
+import { AIR, type TileRegistry } from './world/TileRegistry';
+import type { World } from './world/World';
+
+export type DigResult =
+  | 'dug'
+  | 'out-of-bounds'
+  | 'unexplored'
+  | 'nothing-to-dig'
+  | 'indestructible'
+  | 'supports-hearth'
+  | 'supports-tree';
+
+/** Cells revealed around a freshly dug cell. */
+export const DIG_REVEAL_RADIUS = 2;
 
 export interface SimulationOptions {
-  seed: string;
+  world: World;
+  tiles: TileRegistry;
+  bus: EventBus<GameEvents>;
 }
 
 export class Simulation {
-  readonly seed: string;
+  readonly world: World;
+  readonly tiles: TileRegistry;
   readonly rng: Rng;
+  /** The colony's home: retreat point, Recall target and respawn spot in later milestones. */
+  readonly hearth: { x: number; y: number };
   /** Number of ticks simulated since the world began. */
   tick = 0;
-  readonly walker: PlaceholderWalker;
 
-  constructor(options: SimulationOptions) {
-    this.seed = options.seed;
-    this.rng = new Rng(options.seed);
-    this.walker = new PlaceholderWalker(this.rng.fork('walker'), 2, 14);
+  private readonly bus: EventBus<GameEvents>;
+  private readonly logTiles: ReadonlySet<number>;
+
+  constructor({ world, tiles, bus }: SimulationOptions) {
+    this.world = world;
+    this.tiles = tiles;
+    this.bus = bus;
+    this.rng = new Rng(`${world.seed}:simulation`);
+    this.hearth = { ...world.spawn };
+    this.logTiles = new Set(tiles.tiles.flatMap((t, i) => (t.art.style === 'log' ? [i] : [])));
   }
 
   /** Advance the world by exactly one tick (1/20 s of game time at 1x speed). */
   step(): void {
     this.tick++;
-    this.walker.step();
-  }
-}
-
-/**
- * Milestone 0 placeholder: paces between two points on flat ground, idling for a random
- * moment at each end. Positions are in tiles; `prevX` is the position one tick earlier,
- * which the renderer blends with `x` to draw smooth motion between ticks.
- * Removed in Milestone 2, when real dwarves arrive.
- */
-export class PlaceholderWalker {
-  static readonly SPEED_TILES_PER_TICK = 0.075;
-
-  x: number;
-  prevX: number;
-  direction: 1 | -1 = 1;
-  /** Ticks left to stand still before walking again. */
-  idleTicks = 0;
-
-  private readonly rng: Rng;
-  private readonly minX: number;
-  private readonly maxX: number;
-
-  constructor(rng: Rng, minX: number, maxX: number) {
-    this.rng = rng;
-    this.minX = minX;
-    this.maxX = maxX;
-    this.x = minX;
-    this.prevX = minX;
   }
 
-  get walking(): boolean {
-    return this.idleTicks === 0;
+  /** Why a cell can or can't be dug right now, without changing anything. */
+  canDig(x: number, y: number): DigResult {
+    const { world, tiles } = this;
+    if (!world.inBounds(x, y)) return 'out-of-bounds';
+    if (!world.isVisible(x, y)) return 'unexplored';
+    const tile = world.fg[world.index(x, y)];
+    if (!tiles.solid[tile]) return 'nothing-to-dig';
+    if (!tiles.diggable[tile]) return 'indestructible';
+    if (y === this.hearth.y + 1 && Math.abs(x - this.hearth.x) <= 1) return 'supports-hearth';
+    if (this.logTiles.has(world.fgAt(x, y - 1))) return 'supports-tree';
+    return 'dug';
   }
 
-  step(): void {
-    this.prevX = this.x;
-    if (this.idleTicks > 0) {
-      this.idleTicks--;
-      return;
+  /**
+   * Player command (Milestone 1): remove the block in a cell straight away. Decorations
+   * resting on it go too, and the cells around it are revealed.
+   */
+  dig(x: number, y: number): DigResult {
+    const result = this.canDig(x, y);
+    if (result !== 'dug') return result;
+
+    const { world, tiles } = this;
+    world.fg[world.index(x, y)] = AIR;
+    this.bus.emit('TileChanged', { x, y });
+
+    // Grass tufts, flowers and the like would float without the block under them.
+    const above = world.fgAt(x, y - 1);
+    if (y > 0 && !tiles.solid[above] && tiles.replaceable[above] && tiles.tiles[above]?.art.style === 'sprite') {
+      world.fg[world.index(x, y - 1)] = AIR;
+      this.bus.emit('TileChanged', { x, y: y - 1 });
     }
-    this.x += this.direction * PlaceholderWalker.SPEED_TILES_PER_TICK;
-    if (this.x >= this.maxX || this.x <= this.minX) {
-      this.x = Math.min(this.maxX, Math.max(this.minX, this.x));
-      this.direction = this.direction === 1 ? -1 : 1;
-      this.idleTicks = this.rng.int(10, 40);
-    }
+
+    const revealed = world.revealEllipse(x, y, DIG_REVEAL_RADIUS, DIG_REVEAL_RADIUS);
+    if (revealed) this.bus.emit('ExploredChanged', revealed);
+    return 'dug';
+  }
+
+  /** Debug: lift the fog of war everywhere. */
+  revealAll(): void {
+    this.bus.emit('ExploredChanged', this.world.revealAll());
   }
 }

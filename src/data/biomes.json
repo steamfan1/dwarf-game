@@ -1,0 +1,59 @@
+{
+  "biomes": [
+    {
+      "id": "temperate",
+      "name": "Temperate forest",
+      "description": "Rolling green hills, oak groves and quiet ponds. A gentle place to start.",
+      "surfaceTile": "grass",
+      "soilTile": "dirt",
+      "capTile": null,
+      "capDepth": [0, 0],
+      "trees": {
+        "log": "log",
+        "leaves": "leaves",
+        "shape": "broadleaf",
+        "chance": 0.17,
+        "minSpacing": 4,
+        "height": [4, 7]
+      },
+      "decorations": [
+        { "tile": "tall_grass", "chance": 0.28 },
+        { "tile": "flowers", "chance": 0.07 }
+      ],
+      "pools": {
+        "liquid": "water",
+        "frozenTop": null,
+        "shore": "sand",
+        "count": [2, 4]
+      },
+      "sky": { "top": "#4f86cf", "bottom": "#bfe0f2" }
+    },
+    {
+      "id": "snow",
+      "name": "Frozen north",
+      "description": "Steep snowfields, pine woods and frozen pools over a deep, cave-riddled rock.",
+      "surfaceTile": "snow",
+      "soilTile": "dirt",
+      "capTile": "snow",
+      "capDepth": [2, 4],
+      "trees": {
+        "log": "pine_log",
+        "leaves": "pine_leaves",
+        "shape": "conifer",
+        "chance": 0.15,
+        "minSpacing": 4,
+        "height": [3, 5]
+      },
+      "decorations": [
+        { "tile": "snow_shrub", "chance": 0.12 }
+      ],
+      "pools": {
+        "liquid": "water",
+        "frozenTop": "ice",
+        "shore": null,
+        "count": [2, 3]
+      },
+      "sky": { "top": "#6f8fb3", "bottom": "#e2eaf1" }
+    }
+  ]
+}

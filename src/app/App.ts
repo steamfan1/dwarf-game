@@ -18,15 +18,20 @@ import { installDebugApi } from '../debug/debugApi';
 import { installBrowserGuards } from '../platform/browserGuards';
 import { InputActions } from '../platform/InputActions';
 import { probeStorage, SafeKeyValueStore, storageIsPersistent } from '../platform/storage';
+import { generateWorldInWorker } from '../platform/worldgenClient';
 import { AudioService } from '../render/AudioService';
 import { createGame } from '../render/createGame';
+import { MinimapRenderer, type TileViewRect } from '../render/Minimap';
 import { SceneKeys } from '../render/scenes/keys';
 import { ViewportManager } from '../render/ViewportManager';
+import { BIOMES, TILES } from '../sim/content';
 import { GameSession } from '../sim/GameSession';
-import type { UiCommands, UiSound } from '../ui/commands';
-import { pushToast, uiState, type DebugStats } from '../ui/state';
+import { World } from '../sim/world/World';
+import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
+import { pushToast, uiState, type DebugStats, type HoverInfo } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
-import { provideGameContext, type GameContext } from './context';
+import { provideGameContext, type GameContext, type GameView } from './context';
+import { randomSeed, worldOptionsFromQuery } from './worldOptions';
 
 const SETTINGS_STORAGE_KEY = 'gatewright.settings';
 const SETTINGS_SAVE_DELAY_MS = 300;
@@ -52,6 +57,12 @@ export class App implements UiCommands, GameContext {
   private viewport: ViewportManager | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionCleanup: Array<() => void> = [];
+  private gameView: GameView | null = null;
+  private minimap: MinimapRenderer | null = null;
+  private minimapCanvas: HTMLCanvasElement | null = null;
+  private pendingReveal = false;
+  /** Bumped on every new game or quit, so a slow world generation can tell it was abandoned. */
+  private generation = 0;
 
   constructor(elements: AppElements) {
     this.elements = elements;
@@ -90,26 +101,50 @@ export class App implements UiCommands, GameContext {
     uiState.set({ screen: 'title' });
   }
 
+  worldReady(view: GameView): void {
+    this.gameView = view;
+    if (this.pendingReveal) {
+      this.pendingReveal = false;
+      this.session?.sim.revealAll();
+    }
+    uiState.set({ screen: 'game', loading: null });
+    this.audio?.play('gameStart');
+  }
+
+  reportView(view: TileViewRect): void {
+    if (!this.minimap || !uiState.get().minimapOpen) return;
+    this.minimap.setView(view);
+    this.minimap.draw();
+  }
+
+  reportHover(hover: HoverInfo | null): void {
+    uiState.set({ hover });
+  }
+
   reportDebugStats(stats: DebugStats): void {
     uiState.set({ debug: stats });
   }
 
   // ---- UiCommands --------------------------------------------------------------------
 
+  /** Open the New world dialog, preset from the page address if it names a seed or biome. */
   newGame(): void {
+    if (!this.game) return;
+    this.audio?.unlock();
+    uiState.set({ newWorld: worldOptionsFromQuery(window.location.search, BIOMES.ids, randomSeed) });
+  }
+
+  closeNewWorld(): void {
+    uiState.set({ newWorld: null });
+  }
+
+  createWorld(choice: NewWorldChoice): void {
     const game = this.game;
     if (!game) return;
     this.audio?.unlock();
+    uiState.set({ newWorld: null });
     this.endSession();
-
-    const session = new GameSession(randomSeed());
-    this.session = session;
-    this.sessionCleanup.push(session.bus.on('TimeChanged', (time) => uiState.set({ time })));
-    uiState.set({ screen: 'game', menuOpen: false, settingsOpen: false, time: session.time.state(), debug: null });
-
-    game.scene.stop(SceneKeys.title);
-    game.scene.start(SceneKeys.game);
-    this.audio?.play('gameStart');
+    void this.startWorld(game, choice);
   }
 
   quitToTitle(): void {
@@ -118,7 +153,20 @@ export class App implements UiCommands, GameContext {
     game.scene.stop(SceneKeys.game);
     this.endSession();
     game.scene.start(SceneKeys.title);
-    uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null });
+    uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null, hover: null, world: null });
+  }
+
+  centerCameraOn(tileX: number, tileY: number): void {
+    this.gameView?.centerOnTile(tileX, tileY);
+  }
+
+  attachMinimap(canvas: HTMLCanvasElement | null): void {
+    this.minimapCanvas = canvas;
+    this.minimap?.attach(canvas);
+  }
+
+  toggleMinimap(): void {
+    uiState.update((s) => ({ minimapOpen: !s.minimapOpen }));
   }
 
   togglePause(): void {
@@ -174,6 +222,60 @@ export class App implements UiCommands, GameContext {
     this.audio?.play(sound);
   }
 
+  /** Debug: lift the fog of war over the whole map. */
+  revealMap(): boolean {
+    if (!this.session) return false;
+    this.session.sim.revealAll();
+    return true;
+  }
+
+  // ---- Starting a world --------------------------------------------------------------------
+
+  /**
+   * Generate a world in the worker behind the loading screen, then hand it to the game
+   * scene. The title scene keeps animating behind the loading panel until the world is ready.
+   */
+  private async startWorld(game: Phaser.Game, options: NewWorldChoice): Promise<void> {
+    const generation = ++this.generation;
+    uiState.set({ screen: 'loading', loading: { stage: 'terrain', progress: 0 }, menuOpen: false, settingsOpen: false });
+    try {
+      const result = await generateWorldInWorker({ seed: options.seed, biome: options.biome }, (stage, progress) => {
+        if (generation === this.generation) uiState.set({ loading: { stage, progress } });
+      });
+      if (generation !== this.generation) return;
+      console.info(`World "${options.seed}" (${options.biome}) generated in ${result.stats.milliseconds} ms`, result.stats);
+
+      const session = new GameSession(World.fromSnapshot(result.snapshot), TILES);
+      this.session = session;
+      this.pendingReveal = options.reveal;
+      this.minimap = new MinimapRenderer(session.world, TILES, BIOMES.get(session.world.biome).sky);
+      this.minimap.attach(this.minimapCanvas);
+      const minimap = this.minimap;
+      this.sessionCleanup.push(
+        session.bus.on('TimeChanged', (time) => uiState.set({ time })),
+        session.bus.on('TileChanged', ({ x, y }) => minimap.updateCells({ x0: x, y0: y, x1: x, y1: y })),
+        session.bus.on('ExploredChanged', (rect) => minimap.updateCells(rect)),
+      );
+      uiState.set({
+        loading: { stage: 'building', progress: 0.97 },
+        time: session.time.state(),
+        debug: null,
+        hover: null,
+        world: { seed: options.seed, biomeName: BIOMES.get(options.biome).name },
+      });
+      // Let the loading screen show its last step before building the map blocks the thread briefly.
+      await nextFrame();
+      if (generation !== this.generation) return;
+      game.scene.stop(SceneKeys.title);
+      game.scene.start(SceneKeys.game);
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.endSession();
+      pushToast(t('loading.failed', { message: errorMessage(error) }), 'error', 9000);
+      uiState.set({ screen: 'title', loading: null });
+    }
+  }
+
   // ---- Wiring --------------------------------------------------------------------------
 
   private bootPhaser(): void {
@@ -221,6 +323,7 @@ export class App implements UiCommands, GameContext {
     this.input.onPressed('speed2', () => this.setSpeed(2));
     this.input.onPressed('speed3', () => this.setSpeed(3));
     this.input.onPressed('toggleDebug', () => this.toggleDebug());
+    this.input.onPressed('toggleMinimap', () => this.toggleMinimap());
     this.input.onPressed('cancel', () => this.cancel());
     this.input.attach(window);
   }
@@ -238,6 +341,9 @@ export class App implements UiCommands, GameContext {
     if (ui.settingsOpen) {
       this.playSound('uiClose');
       this.closeSettings();
+    } else if (ui.newWorld) {
+      this.playSound('uiClose');
+      this.closeNewWorld();
     } else if (ui.screen === 'game' && ui.menuOpen) {
       this.playSound('uiClose');
       this.closeMenu();
@@ -273,10 +379,14 @@ export class App implements UiCommands, GameContext {
   }
 
   private endSession(): void {
+    this.generation++;
     for (const cleanup of this.sessionCleanup) cleanup();
     this.sessionCleanup = [];
     this.session?.dispose();
     this.session = null;
+    this.gameView = null;
+    this.minimap = null;
+    this.pendingReveal = false;
   }
 }
 
@@ -284,10 +394,9 @@ function applyUiScale(scale: number): void {
   document.documentElement.style.setProperty('--ui-scale', String(scale));
 }
 
-/** A fresh world seed, e.g. "k3x9q1-2f8z0a". */
-function randomSeed(): string {
-  const words = crypto.getRandomValues(new Uint32Array(2));
-  return Array.from(words, (n) => n.toString(36)).join('-');
+/** Resolves after the browser has painted the next frame. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
 function hasWebGl(): boolean {

@@ -11,8 +11,20 @@ import type { Store } from '../core/Store';
 
 export type UiSound = 'uiClick' | 'uiOpen' | 'uiClose';
 
+/** What the New world dialog asks for. */
+export interface NewWorldChoice {
+  seed: string;
+  biome: string;
+  /** Lift the fog of war over the whole map (from ?reveal=1, for testing). */
+  reveal: boolean;
+}
+
 export interface UiCommands {
+  /** Open the New world dialog. */
   newGame(): void;
+  closeNewWorld(): void;
+  /** Generate a world and start playing in it. */
+  createWorld(choice: NewWorldChoice): void;
   quitToTitle(): void;
   togglePause(): void;
   setSpeed(speed: GameSpeed): void;
@@ -27,6 +39,11 @@ export interface UiCommands {
   /** Stop game keys from acting, e.g. while Settings waits for a new key binding. */
   setGameInputEnabled(enabled: boolean): void;
   playSound(sound: UiSound): void;
+  /** Minimap clicks: move the camera to a tile. */
+  centerCameraOn(tileX: number, tileY: number): void;
+  /** The minimap's canvas, when it is shown (null when hidden). */
+  attachMinimap(canvas: HTMLCanvasElement | null): void;
+  toggleMinimap(): void;
 }
 
 export const CommandsContext = createContext<UiCommands | null>(null);

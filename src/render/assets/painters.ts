@@ -6,7 +6,7 @@
  * Canvas 2D API, not Phaser, so they can be previewed or tested outside the game.
  * All art here is original to this project.
  */
-import type { Rng } from '../../core/Rng';
+import { Rng } from '../../core/Rng';
 import { drawPixelRows, mixColor, plot, type Palette } from './pixelArt';
 
 // ---- Dwarf --------------------------------------------------------------------------
@@ -273,6 +273,69 @@ export function paintGate(ctx: CanvasRenderingContext2D, rng: Rng): void {
   ctx.fillRect(GATE_CENTER_X - GATE_OUTER_RADIUS - 2, GATE_HEIGHT - 3, GATE_OUTER_RADIUS * 2 + 4, 3);
   ctx.fillStyle = STONE.light;
   ctx.fillRect(GATE_CENTER_X - GATE_OUTER_RADIUS - 2, GATE_HEIGHT - 3, GATE_OUTER_RADIUS * 2 + 4, 1);
+}
+
+// ---- The Hearth -------------------------------------------------------------------------
+
+export const HEARTH_WIDTH = 48;
+export const HEARTH_HEIGHT = 30;
+export const HEARTH_FRAMES = 3;
+
+function fillEllipse(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, color: string): void {
+  ctx.fillStyle = color;
+  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+      const dx = (x + 0.5 - cx) / rx;
+      const dy = (y + 0.5 - cy) / ry;
+      if (dx * dx + dy * dy <= 1) ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+/**
+ * The Hearth, the colony's home: a ring of stones around crossed logs and a fire.
+ * Three frames side by side; only the flames change between them.
+ */
+export function paintHearth(ctx: CanvasRenderingContext2D, rng: Rng): void {
+  const stoneXs = [5, 12, 19, 26, 33, 40];
+  for (let frame = 0; frame < HEARTH_FRAMES; frame++) {
+    const ox = frame * HEARTH_WIDTH;
+
+    // Glow on the ground behind the fire.
+    ctx.globalAlpha = 0.35;
+    fillEllipse(ctx, ox + 24, 25, 19, 5, '#f2a33a');
+    ctx.globalAlpha = 1;
+
+    // Crossed logs.
+    for (let i = 0; i < 18; i++) {
+      plot(ctx, ox + 15 + i, 22 - Math.floor(i / 4), '#5b3b22');
+      plot(ctx, ox + 15 + i, 23 - Math.floor(i / 4), '#7a5232');
+      plot(ctx, ox + 32 - i, 22 - Math.floor(i / 4), '#6b4528');
+      plot(ctx, ox + 32 - i, 23 - Math.floor(i / 4), '#8a603a');
+    }
+
+    // Flames: a rounded column per x, flickering differently in each frame.
+    const flicker = new Rng(`hearth-flame:${frame}`);
+    for (let x = 15; x <= 33; x++) {
+      const t = (x - 24) / 10;
+      const height = Math.max(0, (1 - t * t) * 15 * (0.72 + 0.28 * Math.sin(frame * 2.1 + x * 0.85)) + flicker.range(-1.5, 1.5));
+      for (let k = 0; k < height; k++) {
+        const y = 20 - k;
+        const heat = 1 - k / height - Math.abs(t) * 0.6;
+        const color = heat > 0.62 ? '#fff1b0' : heat > 0.42 ? '#ffd04f' : heat > 0.2 ? '#f59a2f' : '#d6542a';
+        plot(ctx, ox + x, y, color);
+      }
+    }
+    for (let s = 0; s < 3; s++) plot(ctx, ox + flicker.int(17, 31), flicker.int(1, 6), '#ffd27a');
+
+    // Stone ring in front.
+    stoneXs.forEach((sx, i) => {
+      const ry = i === 0 || i === stoneXs.length - 1 ? 3.2 : 3.8;
+      fillEllipse(ctx, ox + sx, 26, 4.2, ry + 0.8, '#2d2f36');
+      fillEllipse(ctx, ox + sx, 26, 3.4, ry, rng.chance(0.5) ? '#7d808a' : '#6d707a');
+      fillEllipse(ctx, ox + sx - 1, 24.6, 1.6, 1, '#a3a7b1');
+    });
+  }
 }
 
 const GLOW_BANDS = ['#ffe8a8', '#ffd27a', '#f8b04f', '#ec8a3a', '#c9612a'];

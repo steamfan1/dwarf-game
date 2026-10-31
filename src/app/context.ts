@@ -7,8 +7,15 @@ import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
 import type { InputActions } from '../platform/InputActions';
 import type { AudioService } from '../render/AudioService';
+import type { TileViewRect } from '../render/Minimap';
 import type { GameSession } from '../sim/GameSession';
-import type { DebugStats } from '../ui/state';
+import type { DebugStats, HoverInfo } from '../ui/state';
+
+/** Controls the game scene offers back to the app once the world is on screen. */
+export interface GameView {
+  /** Centre the camera on a tile (used by minimap clicks). */
+  centerOnTile(x: number, y: number): void;
+}
 
 export interface GameContext {
   readonly input: InputActions;
@@ -22,6 +29,12 @@ export interface GameContext {
   readonly debugVisible: boolean;
   /** Called by the boot scene once textures and sounds exist. */
   bootComplete(): void;
+  /** Called by the game scene once the world is built and visible. */
+  worldReady(view: GameView): void;
+  /** The camera's view in tiles, every frame (for the minimap). */
+  reportView(view: TileViewRect): void;
+  /** What's under the pointer changed (null when the pointer left the world). */
+  reportHover(hover: HoverInfo | null): void;
   /** Called a few times a second by the game scene while the debug overlay is open. */
   reportDebugStats(stats: DebugStats): void;
 }

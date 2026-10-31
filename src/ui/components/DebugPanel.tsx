@@ -13,6 +13,7 @@ function fixed(value: number | undefined, digits: number): string {
 export function DebugPanel() {
   const stats = useStore(uiState, (s) => s.debug);
   const time = useStore(uiState, (s) => s.time);
+  const world = useStore(uiState, (s) => s.world);
   const speed = !time
     ? '—'
     : time.paused
@@ -39,7 +40,15 @@ export function DebugPanel() {
         <dt>{t('debug.canvas')}</dt>
         <dd>{stats ? `${stats.canvasWidth}×${stats.canvasHeight} @${stats.dpr}x` : '—'}</dd>
         <dt>{t('debug.zoom')}</dt>
-        <dd>{stats ? `${stats.zoom}×` : '—'}</dd>
+        <dd data-testid="debug-zoom">{stats ? `${stats.zoom}×` : '—'}</dd>
+        <dt>{t('debug.camera')}</dt>
+        <dd data-testid="debug-camera">{stats ? `${stats.cameraTile.x}, ${stats.cameraTile.y}` : '—'}</dd>
+        <dt>{t('debug.cursor')}</dt>
+        <dd>{stats?.cursorTile ? `${stats.cursorTile.x}, ${stats.cursorTile.y}` : '—'}</dd>
+        <dt>{t('debug.chunks')}</dt>
+        <dd>{stats ? stats.chunksDrawn : '—'}</dd>
+        <dt>{t('debug.seed')}</dt>
+        <dd>{world?.seed ?? '—'}</dd>
       </dl>
     </aside>
   );

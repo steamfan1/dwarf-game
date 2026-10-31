@@ -1,0 +1,360 @@
+{
+  "tiles": [
+    {
+      "id": "air",
+      "name": "Open air",
+      "solid": false,
+      "mapColor": "#000000",
+      "art": { "style": "none" }
+    },
+    {
+      "id": "dirt",
+      "name": "Dirt",
+      "solid": true,
+      "hardness": 1,
+      "drops": "dirt",
+      "mapColor": "#7a5236",
+      "art": {
+        "style": "soil",
+        "base": "#7a5236",
+        "dark": "#62412a",
+        "light": "#8d6343",
+        "pebble": "#9a8c7d"
+      }
+    },
+    {
+      "id": "grass",
+      "name": "Grassy dirt",
+      "solid": true,
+      "hardness": 1,
+      "drops": "dirt",
+      "mapColor": "#5ea33e",
+      "art": {
+        "style": "soil",
+        "base": "#7a5236",
+        "dark": "#62412a",
+        "light": "#8d6343",
+        "pebble": "#9a8c7d",
+        "cap": { "base": "#5ea33e", "light": "#82c255", "dark": "#3f7a2a", "tip": "#a4d86b" }
+      }
+    },
+    {
+      "id": "clay",
+      "name": "Clay",
+      "solid": true,
+      "hardness": 1.2,
+      "drops": "clay",
+      "mapColor": "#9a5c43",
+      "art": { "style": "soil", "base": "#9a5c43", "dark": "#7d4733", "light": "#b0705a" }
+    },
+    {
+      "id": "sand",
+      "name": "Sand",
+      "solid": true,
+      "hardness": 0.8,
+      "drops": "sand",
+      "mapColor": "#d7c28a",
+      "art": { "style": "soil", "base": "#d7c28a", "dark": "#bfa86e", "light": "#ead9a5" }
+    },
+    {
+      "id": "snow",
+      "name": "Packed snow",
+      "solid": true,
+      "hardness": 0.7,
+      "drops": "snowball",
+      "mapColor": "#e8f0f8",
+      "art": {
+        "style": "soil",
+        "base": "#e3ecf6",
+        "dark": "#c3d3e6",
+        "light": "#ffffff",
+        "cap": { "base": "#f4f8fc", "light": "#ffffff", "dark": "#d4e1ee" }
+      }
+    },
+    {
+      "id": "ice",
+      "name": "Ice",
+      "solid": true,
+      "hardness": 1.2,
+      "drops": "ice",
+      "mapColor": "#a9d6ee",
+      "art": { "style": "ice", "base": "#a9d6ee", "dark": "#86bcd9", "light": "#d6f0fb" }
+    },
+    {
+      "id": "stone",
+      "name": "Stone",
+      "solid": true,
+      "hardness": 2,
+      "drops": "stone",
+      "mapColor": "#7c7f87",
+      "art": { "style": "rock", "base": "#7c7f87", "dark": "#5c5f66", "light": "#9a9da5" }
+    },
+    {
+      "id": "deep_stone",
+      "name": "Deep stone",
+      "solid": true,
+      "hardness": 3,
+      "drops": "deep_stone",
+      "mapColor": "#545a6e",
+      "art": { "style": "rock", "base": "#545a6e", "dark": "#3c4152", "light": "#6a7187" }
+    },
+    {
+      "id": "basalt",
+      "name": "Basalt",
+      "solid": true,
+      "hardness": 4,
+      "drops": "basalt",
+      "mapColor": "#3c3335",
+      "art": { "style": "rock", "base": "#3e3537", "dark": "#2a2224", "light": "#54484a" }
+    },
+    {
+      "id": "bedrock",
+      "name": "Bedrock",
+      "solid": true,
+      "indestructible": true,
+      "mapColor": "#1d1a25",
+      "art": { "style": "rock", "base": "#262230", "dark": "#16131d", "light": "#363044" }
+    },
+    {
+      "id": "copper_ore",
+      "name": "Copper ore",
+      "solid": true,
+      "hardness": 2.5,
+      "drops": "copper_ore",
+      "mapColor": "#d47a3c",
+      "art": {
+        "style": "ore",
+        "base": "#7c7f87",
+        "dark": "#5c5f66",
+        "light": "#9a9da5",
+        "ore": { "main": "#d47a3c", "light": "#f4a868", "shadow": "#9b4f22" }
+      }
+    },
+    {
+      "id": "iron_ore",
+      "name": "Iron ore",
+      "solid": true,
+      "hardness": 3,
+      "drops": "iron_ore",
+      "mapColor": "#c09078",
+      "art": {
+        "style": "ore",
+        "base": "#7c7f87",
+        "dark": "#5c5f66",
+        "light": "#9a9da5",
+        "ore": { "main": "#b98b73", "light": "#e6c8b0", "shadow": "#7f5a48" }
+      }
+    },
+    {
+      "id": "gold_ore",
+      "name": "Gold ore",
+      "solid": true,
+      "hardness": 3.5,
+      "drops": "gold_ore",
+      "mapColor": "#f0c33c",
+      "art": {
+        "style": "ore",
+        "base": "#545a6e",
+        "dark": "#3c4152",
+        "light": "#6a7187",
+        "ore": { "main": "#f0c33c", "light": "#fff0a0", "shadow": "#b0861c" }
+      }
+    },
+    {
+      "id": "crystal",
+      "name": "Crystal",
+      "solid": true,
+      "hardness": 4,
+      "drops": "crystal",
+      "mapColor": "#55e0d4",
+      "art": {
+        "style": "crystal",
+        "base": "#545a6e",
+        "dark": "#3c4152",
+        "light": "#6a7187",
+        "ore": { "main": "#55e0d4", "light": "#c8fff8", "shadow": "#2a9f9a", "accent": "#b07cf0" }
+      }
+    },
+    {
+      "id": "log",
+      "name": "Oak trunk",
+      "solid": false,
+      "connect": "self",
+      "drops": "log",
+      "mapColor": "#6e4a2c",
+      "art": { "style": "log", "base": "#6e4a2c", "dark": "#4f3420", "light": "#8a603a" }
+    },
+    {
+      "id": "leaves",
+      "name": "Oak leaves",
+      "solid": false,
+      "connect": "self",
+      "replaceable": true,
+      "mapColor": "#3f8a3a",
+      "art": { "style": "leaves", "base": "#3f8a3a", "dark": "#2c6a2c", "light": "#5fae4c" }
+    },
+    {
+      "id": "pine_log",
+      "name": "Pine trunk",
+      "solid": false,
+      "connect": "self",
+      "drops": "log",
+      "mapColor": "#5a3d26",
+      "art": { "style": "log", "base": "#5a3d26", "dark": "#3f2a1a", "light": "#74512f" }
+    },
+    {
+      "id": "pine_leaves",
+      "name": "Pine needles",
+      "solid": false,
+      "connect": "self",
+      "replaceable": true,
+      "mapColor": "#2f6b4a",
+      "art": {
+        "style": "leaves",
+        "base": "#2f6b4a",
+        "dark": "#1f4f37",
+        "light": "#3f8a60",
+        "snow": "#e8f1f8"
+      }
+    },
+    {
+      "id": "tall_grass",
+      "name": "Tall grass",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#5ea33e",
+      "art": {
+        "style": "sprite",
+        "palette": { "a": "#86c858", "b": "#4f9a36" },
+        "rows": [
+          "..a.......a.....",
+          "..a..a....a..a..",
+          ".ab..a..a.ab.a..",
+          ".ab.ab..a.ab.ab.",
+          "abb.ab.ab.abbab.",
+          "abbaabbabbabbabb",
+          "bbbbbbbbbbbbbbbb"
+        ]
+      }
+    },
+    {
+      "id": "flowers",
+      "name": "Wildflowers",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#5ea33e",
+      "art": {
+        "style": "sprite",
+        "palette": {
+          "r": "#e0483e",
+          "o": "#ffd36b",
+          "y": "#f2d03b",
+          "Y": "#c9822a",
+          "w": "#f6f2ea",
+          "g": "#3f8a2c",
+          "a": "#86c858",
+          "b": "#4f9a36"
+        },
+        "rows": [
+          "...r.........y..",
+          "..ror.......yYy.",
+          "...r...w.....y..",
+          "...g..wow....g..",
+          "..ag...w..a..g.a",
+          ".abg.a.g.ab.ag.b",
+          "abbaabbabbabbabb",
+          "bbbbbbbbbbbbbbbb"
+        ]
+      }
+    },
+    {
+      "id": "mushroom",
+      "name": "Cave mushroom",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#c8503c",
+      "art": {
+        "style": "sprite",
+        "palette": { "k": "#3a2a24", "r": "#c8503c", "R": "#e88a6a", "w": "#f6eadf", "s": "#e9dcc4" },
+        "rows": [
+          "......kkkk......",
+          ".....kRrwrk.....",
+          "....kRrrrwrk....",
+          "....kkkkkkkk....",
+          "......kssk......",
+          "......kssk......"
+        ]
+      }
+    },
+    {
+      "id": "snow_shrub",
+      "name": "Frosted shrub",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#5f8f84",
+      "art": {
+        "style": "sprite",
+        "palette": { "w": "#f2f7fb", "b": "#5f8f84", "B": "#3f6b62" },
+        "rows": [
+          "......w.w.......",
+          "....wbwbbw......",
+          "...wbbBbbbw.....",
+          "..wbbBbbBbbw....",
+          "..bBbbbbbBbb....",
+          "...bbBBbbbb....."
+        ]
+      }
+    }
+  ],
+  "walls": [
+    {
+      "id": "none",
+      "name": "No wall",
+      "natural": true,
+      "mapColor": "#000000",
+      "art": { "style": "none" }
+    },
+    {
+      "id": "dirt_wall",
+      "name": "Dirt wall",
+      "natural": true,
+      "mapColor": "#3e2a1c",
+      "art": { "style": "soil", "base": "#7a5236", "dark": "#62412a", "light": "#8d6343" }
+    },
+    {
+      "id": "stone_wall",
+      "name": "Stone wall",
+      "natural": true,
+      "mapColor": "#3f4146",
+      "art": { "style": "rock", "base": "#7c7f87", "dark": "#5c5f66", "light": "#9a9da5" }
+    },
+    {
+      "id": "deep_stone_wall",
+      "name": "Deep stone wall",
+      "natural": true,
+      "mapColor": "#2b2e39",
+      "art": { "style": "rock", "base": "#545a6e", "dark": "#3c4152", "light": "#6a7187" }
+    },
+    {
+      "id": "basalt_wall",
+      "name": "Basalt wall",
+      "natural": true,
+      "mapColor": "#201b1c",
+      "art": { "style": "rock", "base": "#3e3537", "dark": "#2a2224", "light": "#54484a" }
+    }
+  ],
+  "liquids": [
+    {
+      "id": "water",
+      "name": "Water",
+      "mapColor": "#3b7bd4",
+      "art": { "base": "#3b7bd4", "light": "#8fc3f5", "dark": "#2a5fa8", "alpha": 0.72 }
+    },
+    {
+      "id": "lava",
+      "name": "Lava",
+      "mapColor": "#e8652b",
+      "art": { "base": "#e8652b", "light": "#ffc04a", "dark": "#b8381c", "alpha": 1 }
+    }
+  ]
+}

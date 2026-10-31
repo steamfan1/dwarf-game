@@ -11,6 +11,8 @@ import { FixedTimestep } from '../core/FixedTimestep';
 import { TimeControl } from '../core/TimeControl';
 import type { GameEvents } from './events';
 import { Simulation } from './Simulation';
+import type { TileRegistry } from './world/TileRegistry';
+import type { World } from './world/World';
 
 export class GameSession {
   readonly bus = new EventBus<GameEvents>();
@@ -24,10 +26,14 @@ export class GameSession {
   private readonly now: () => number;
   private readonly unsubscribeTime: () => void;
 
-  constructor(seed: string, now: () => number = () => performance.now()) {
-    this.sim = new Simulation({ seed });
+  constructor(world: World, tiles: TileRegistry, now: () => number = () => performance.now()) {
+    this.sim = new Simulation({ world, tiles, bus: this.bus });
     this.now = now;
     this.unsubscribeTime = this.time.onChange((state) => this.bus.emit('TimeChanged', state));
+  }
+
+  get world(): World {
+    return this.sim.world;
   }
 
   /** Advance by one rendered frame of `frameMs` real milliseconds. Returns the ticks run. */

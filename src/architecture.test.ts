@@ -1,8 +1,13 @@
 /**
  * Guards the architecture rule from the brief: pure game logic (src/core and src/sim)
  * must not depend on Phaser, the DOM, the UI layer or anything browser-specific, so it
- * stays unit-testable and can run inside a Web Worker. It must also stay deterministic,
- * so Math.random() is banned there in favour of the seeded Rng.
+ * stays unit-testable and can run inside a Web Worker.
+ *
+ * It must also stay deterministic, in every browser: Math.random() is banned in favour of
+ * the seeded Rng, and so are the Math functions whose last-digit rounding is up to each
+ * JavaScript engine (hypot, pow, `**`, sin, cos, exp, log...). Only +, -, *, /, sqrt,
+ * floor/round and friends are exact everywhere, so the same seed builds the same world in
+ * Chrome, Firefox and Safari.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -19,6 +24,10 @@ const RULES: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\b(?:window|document|navigator)\./, reason: 'touches the DOM' },
   { pattern: /\blocalStorage\b|\bindexedDB\b/, reason: 'touches browser storage' },
   { pattern: /\bMath\.random\s*\(/, reason: 'uses Math.random instead of the seeded Rng' },
+  {
+    pattern: /\bMath\.(?:hypot|pow|exp|expm1|log|log1p|log2|log10|sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|cbrt)\s*\(|\*\*/,
+    reason: 'uses a Math function that rounds differently between browsers (use +, -, *, / and sqrt)',
+  },
 ];
 
 describe('architecture', () => {

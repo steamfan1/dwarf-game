@@ -7,6 +7,8 @@ import { CommandsContext, SettingsContext, type UiCommands } from './commands';
 import { DebugPanel } from './components/DebugPanel';
 import { GameHud } from './components/GameHud';
 import { GameMenu } from './components/GameMenu';
+import { LoadingScreen } from './components/LoadingScreen';
+import { NewWorldDialog } from './components/NewWorldDialog';
 import { FatalScreen, StorageWarning, Toasts } from './components/Notices';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TitleMenu } from './components/TitleMenu';
@@ -27,6 +29,8 @@ function UiRoot() {
   return (
     <>
       {screen === 'title' && <TitleMenu />}
+      {screen === 'title' && !settingsOpen && <NewWorldDialog />}
+      {screen === 'loading' && <LoadingScreen />}
       {screen === 'game' && <GameHud />}
       {screen === 'fatal' && <FatalScreen />}
       {screen === 'game' && menuOpen && !settingsOpen && <GameMenu />}

@@ -1,0 +1,66 @@
+{
+  "surface": {
+    "baseDepth": 0.24,
+    "hillAmplitude": 14,
+    "mountainAmplitude": 12,
+    "minY": 22,
+    "maxY": 78,
+    "spawnFlatRadius": 9,
+    "spawnBlend": 6
+  },
+  "bands": {
+    "soilDepth": [6, 13],
+    "deepStoneAt": 0.62,
+    "basaltAt": 0.9,
+    "bedrockRows": 3,
+    "wallStartBelowSurface": 2
+  },
+  "blobs": { "clay": 18, "dirtInStone": 30 },
+  "caves": {
+    "startBelowSurface": 11,
+    "openChanceTop": 0.4,
+    "openChanceBottom": 0.47,
+    "regionalVariation": 0.34,
+    "smoothingPasses": 5,
+    "minCaveSize": 14,
+    "spawnClearRadius": 15,
+    "tunnels": 3
+  },
+  "liquids": { "lakeChance": 0.35, "minLakeRegion": 40, "lavaFrom": 0.86, "lavaChance": 0.8 },
+  "ores": [
+    {
+      "tile": "copper_ore",
+      "host": "stone",
+      "minDepth": 0.1,
+      "maxDepth": 0.6,
+      "veins": 70,
+      "size": [4, 9]
+    },
+    {
+      "tile": "iron_ore",
+      "host": "stone",
+      "minDepth": 0.25,
+      "maxDepth": 0.62,
+      "veins": 45,
+      "size": [4, 8]
+    },
+    {
+      "tile": "gold_ore",
+      "host": "deep_stone",
+      "minDepth": 0.6,
+      "maxDepth": 0.95,
+      "veins": 22,
+      "size": [3, 6]
+    },
+    {
+      "tile": "crystal",
+      "host": "deep_stone",
+      "minDepth": 0.72,
+      "maxDepth": 1.0,
+      "veins": 14,
+      "size": [3, 5]
+    }
+  ],
+  "decorations": { "caveMushroomChance": 0.05 },
+  "exploredAtStart": { "radiusX": 26, "radiusY": 13 }
+}

@@ -9,25 +9,37 @@
  *   3. change the entry to:  dwarf: { kind: 'image', url: dwarfUrl, frames: DWARF_FRAMES }
  * Same for sounds: { kind: 'file', url: clickUrl } with an imported .ogg/.mp3.
  * Keep the same frame size and frame order so animations keep working.
+ *
+ * The terrain atlas is special: its layout follows tiles.json (see render/world/tileAtlas.ts),
+ * so a hand-made replacement has to keep that layout.
  */
 import type { Rng } from '../../core/Rng';
+import { TILES } from '../../sim/content';
+import { createAtlasLayout, paintAtlas } from '../world/tileAtlas';
 import {
   DWARF_FRAME_COUNT,
   DWARF_FRAME_SIZE,
   GATE_HEIGHT,
   GATE_WIDTH,
   GROUND_STRIP_WIDTH,
+  HEARTH_FRAMES,
+  HEARTH_HEIGHT,
+  HEARTH_WIDTH,
   paintDirtStrip,
   paintDwarfSheet,
   paintGate,
   paintGateGlow,
   paintGrassStrip,
+  paintHearth,
   paintHills,
   paintSky,
   paintStars,
   SKY_BAND_HEIGHT,
 } from './painters';
 import type { Tone } from './synth';
+
+/** Frame layout of the terrain atlas, derived from tiles.json. */
+export const TERRAIN_LAYOUT = createAtlasLayout(TILES);
 
 /** How a texture is cut into equally sized animation frames, numbered left to right, top to bottom. */
 export interface FrameGrid {
@@ -91,6 +103,20 @@ export const TEXTURES = {
   },
   titleGate: { kind: 'generated', width: GATE_WIDTH, height: GATE_HEIGHT, paint: paintGate },
   titleGateGlow: { kind: 'generated', width: GATE_WIDTH, height: GATE_HEIGHT, paint: paintGateGlow },
+  /** Every block, wall and liquid frame (see render/world/tileAtlas.ts). */
+  terrain: {
+    kind: 'generated',
+    width: TERRAIN_LAYOUT.width,
+    height: TERRAIN_LAYOUT.height,
+    paint: (ctx) => paintAtlas(ctx, TILES, TERRAIN_LAYOUT),
+  },
+  hearth: {
+    kind: 'generated',
+    width: HEARTH_WIDTH * HEARTH_FRAMES,
+    height: HEARTH_HEIGHT,
+    frames: { frameWidth: HEARTH_WIDTH, frameHeight: HEARTH_HEIGHT, count: HEARTH_FRAMES },
+    paint: paintHearth,
+  },
 } satisfies Record<string, TextureSource>;
 
 export type TextureKey = keyof typeof TEXTURES;
@@ -98,6 +124,7 @@ export type TextureKey = keyof typeof TEXTURES;
 /** Animations built from frame grids; keys are what sprites call `play()` with. */
 export const ANIMATIONS = {
   dwarfWalk: { texture: 'dwarf', frames: [1, 2, 3, 4], frameRate: 8, repeat: -1 },
+  hearthFire: { texture: 'hearth', frames: [0, 1, 2, 1], frameRate: 7, repeat: -1 },
 } satisfies Record<string, { texture: TextureKey; frames: number[]; frameRate: number; repeat: number }>;
 
 export type AnimationKey = keyof typeof ANIMATIONS;
@@ -136,6 +163,14 @@ export const SOUNDS = {
   uiClose: {
     kind: 'synth',
     tones: [{ wave: 'sine', freq: 700, freqEnd: 380, duration: 0.11, release: 0.08, volume: 0.7 }],
+  },
+  /** A block dug out: a short gritty crunch. */
+  dig: {
+    kind: 'synth',
+    tones: [
+      { wave: 'noise', freq: 0, duration: 0.09, attack: 0.002, release: 0.08, volume: 0.55 },
+      { wave: 'triangle', freq: 190, freqEnd: 85, duration: 0.08, release: 0.07, volume: 0.6 },
+    ],
   },
   /** New game: two anvil-like strikes. */
   gameStart: {

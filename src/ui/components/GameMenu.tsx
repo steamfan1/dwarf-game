@@ -1,10 +1,13 @@
 /** The in-game menu (Esc). The game is paused while it is open. */
 import { t } from '../../core/strings';
 import { useCommands } from '../commands';
+import { useStore } from '../hooks';
+import { uiState } from '../state';
 import { Modal } from './Modal';
 
 export function GameMenu() {
   const commands = useCommands();
+  const world = useStore(uiState, (s) => s.world);
   const close = (): void => {
     commands.playSound('uiClose');
     commands.closeMenu();
@@ -37,6 +40,11 @@ export function GameMenu() {
           {t('menu.quitToTitle')}
         </button>
       </div>
+      {world && (
+        <p class="menu-world" data-testid="world-info">
+          {t('menu.world', { seed: world.seed, biome: world.biomeName })}
+        </p>
+      )}
     </Modal>
   );
 }

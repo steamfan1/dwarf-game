@@ -1,0 +1,53 @@
+/**
+ * Options for a new world. The New world dialog starts from a random seed and the
+ * temperate biome; for testing and sharing worlds, the page address can preset them:
+ *
+ *   ?seed=mossy-cavern      a specific world (the same seed always gives the same world)
+ *   ?biome=snow             start in another biome (the campaign unlocks biomes later)
+ *   ?reveal=1               lift the fog of war over the whole map
+ */
+export interface NewWorldOptions {
+  seed: string;
+  biome: string;
+  reveal: boolean;
+}
+
+export const DEFAULT_BIOME = 'temperate';
+
+/** Pure: reads options from a query string such as `location.search`. */
+export function worldOptionsFromQuery(query: string, knownBiomes: readonly string[], randomSeed: () => string): NewWorldOptions {
+  const params = new URLSearchParams(query);
+  const seed = params.get('seed')?.trim().slice(0, 64);
+  const biome = params.get('biome')?.trim().toLowerCase();
+  const reveal = params.get('reveal');
+  return {
+    seed: seed || randomSeed(),
+    biome: biome && knownBiomes.includes(biome) ? biome : DEFAULT_BIOME,
+    reveal: reveal === '1' || reveal === 'true' || reveal === '',
+  };
+}
+
+const SEED_ADJECTIVES = [
+  'amber', 'ashen', 'autumn', 'bitter', 'bright', 'copper', 'crooked', 'deep', 'dusky', 'elder',
+  'ember', 'frosty', 'gilded', 'granite', 'hidden', 'hollow', 'iron', 'jagged', 'lonely', 'misty',
+  'mossy', 'northern', 'old', 'quiet', 'rusty', 'silent', 'silver', 'stony', 'sunken', 'tall',
+  'twin', 'wild', 'windy', 'winter',
+];
+const SEED_NOUNS = [
+  'anvil', 'barrow', 'brook', 'cairn', 'cavern', 'crag', 'dell', 'delve', 'fen', 'ford',
+  'forge', 'glen', 'hearth', 'hill', 'knoll', 'ledge', 'marsh', 'mine', 'peak', 'pine',
+  'quarry', 'ridge', 'root', 'shaft', 'spring', 'tarn', 'vale', 'vault', 'warren', 'well',
+];
+
+/**
+ * A fresh, easy-to-share world seed such as "mossy-cavern-17". `random` returns a float
+ * in [0, 1); it is a parameter so tests can make it predictable.
+ */
+export function randomSeed(random: () => number = cryptoRandom): string {
+  const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+  return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${1 + Math.floor(random() * 99)}`;
+}
+
+function cryptoRandom(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296;
+}

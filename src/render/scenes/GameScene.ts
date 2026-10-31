@@ -1,29 +1,53 @@
 /**
- * The in-game scene. Each animation frame it:
- *   1. hands the frame's real time to the session, which runs 0..n fixed simulation ticks;
- *   2. draws every entity at its position blended between the last two ticks (alpha),
- *      so motion is smooth at any frame rate while the simulation stays at 20 ticks/s.
+ * The in-game scene. It draws the session's world and turns pointer input into orders.
  *
- * Milestone 0: a strip of ground and the placeholder walker. Milestone 1 replaces this
- * with the generated world, chunked tilemaps and the camera controls.
+ * Each animation frame it:
+ *   1. hands the frame's real time to the session, which runs 0..n fixed simulation ticks;
+ *   2. moves the camera (real time, so it works while paused) and shows only the chunks
+ *      in view;
+ *   3. updates the tile cursor, the minimap's view box and, if open, the debug overlay.
+ *
+ * Changes in the world arrive as events (TileChanged, ExploredChanged) and redraw only
+ * the cells concerned.
  */
 import * as Phaser from 'phaser';
 import { gameContext } from '../../app/context';
-import { DEFAULT_ZOOM, TILE_SIZE } from '../../config';
-import { deviceZoom } from '../../core/viewport';
+import { CHUNK_SIZE, TILE_SIZE } from '../../config';
+import { cellsOnLine } from '../../core/cameraMath';
+import { BIOMES, TILES } from '../../sim/content';
 import type { GameSession } from '../../sim/GameSession';
+import { TERRAIN_LAYOUT } from '../assets/manifest';
+import { CameraController } from '../CameraController';
+import { DEPTH } from '../depths';
+import { describeCell } from '../world/describeCell';
+import { FogOverlay } from '../world/FogOverlay';
+import { SkyBackdrop } from '../world/SkyBackdrop';
+import { TileCursor } from '../world/TileCursor';
+import { WorldView } from '../world/WorldView';
 import { SceneKeys } from './keys';
 
-/** World-pixel y of the top of the ground strip. */
-const GROUND_Y = 0;
-const GROUND_LEFT_TILES = -40;
-const GROUND_WIDTH_TILES = 100;
-/** The point the camera looks at: the middle of the walker's patrol, a little above the ground. */
-const FOCUS = { x: 8.5 * TILE_SIZE, y: GROUND_Y - 2 * TILE_SIZE };
 const STATS_INTERVAL_MS = 250;
+/** Don't play the dig sound more often than this while dragging. */
+const DIG_SOUND_GAP_MS = 70;
 
 export class GameScene extends Phaser.Scene {
-  private walker!: Phaser.GameObjects.Sprite;
+  private session!: GameSession;
+  private worldView!: WorldView;
+  private fog!: FogOverlay;
+  private sky!: SkyBackdrop;
+  private cursor!: TileCursor;
+  private cameraControl!: CameraController;
+  private chunkGrid!: Phaser.GameObjects.Graphics;
+  private readonly cleanup: Array<() => void> = [];
+
+  private hovered: { x: number; y: number } | null = null;
+  private hoverDirty = true;
+  private digging = false;
+  private lastDug: { x: number; y: number } | null = null;
+  private lastDigSound = 0;
+  private gridZoom = 0;
+  private lastSize = { width: 0, height: 0, scale: 1 };
+
   private statsElapsedMs = 0;
   private rateWindowStart = 0;
   private rateWindowTick = 0;
@@ -34,72 +58,175 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setOrigin(0, 0).setBackgroundColor('#6d9ccc');
+    const context = gameContext();
+    const session = context.session;
+    if (!session) throw new Error('The game scene started without a running session');
+    this.session = session;
+    const world = session.world;
+    // Phaser reuses scene instances, so reset per-world state explicitly.
+    this.hovered = null;
+    this.hoverDirty = true;
+    this.digging = false;
+    this.lastDug = null;
+    this.gridZoom = 0;
+    this.statsElapsedMs = 0;
 
-    const left = GROUND_LEFT_TILES * TILE_SIZE;
-    const width = GROUND_WIDTH_TILES * TILE_SIZE;
-    this.add.tileSprite(left, GROUND_Y, width, TILE_SIZE, 'groundGrass').setOrigin(0, 0);
-    this.add.tileSprite(left, GROUND_Y + TILE_SIZE, width, TILE_SIZE * 12, 'groundDirt').setOrigin(0, 0);
-    this.walker = this.add.sprite(0, GROUND_Y + 2, 'dwarf', 0).setOrigin(0.5, 1);
+    this.sky = new SkyBackdrop(this, BIOMES.get(world.biome).sky);
+    this.worldView = new WorldView(this, world, TILES, TERRAIN_LAYOUT, 'terrain');
+    this.add
+      .sprite((session.sim.hearth.x + 0.5) * TILE_SIZE, (session.sim.hearth.y + 1) * TILE_SIZE, 'hearth', 0)
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH.objects)
+      .play('hearthFire');
+    this.fog = new FogOverlay(this, world);
+    this.cursor = new TileCursor(this);
+    this.chunkGrid = this.add.graphics().setDepth(DEPTH.debug).setVisible(false);
+
+    this.cameraControl = new CameraController(this, world, context.input, context.settings, () => gameContext().dpr);
+    this.cameraControl.centerOnTile(session.sim.hearth.x, session.sim.hearth.y - 2);
+    this.lastSize = { width: this.scale.width, height: this.scale.height, scale: this.cameraControl.scale };
+
+    this.cleanup.push(
+      session.bus.on('TileChanged', ({ x, y }) => {
+        this.worldView.refreshCell(x, y);
+        this.hoverDirty = true;
+      }),
+      session.bus.on('ExploredChanged', (rect) => {
+        this.fog.update(rect);
+        // A newly explored cell under the pointer has something new to describe.
+        this.hoverDirty = true;
+      }),
+    );
+    this.listenForPointer();
+
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
 
     this.rateWindowStart = this.time.now;
-    this.rateWindowTick = gameContext().session?.sim.tick ?? 0;
-
-    this.fitCamera();
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.fitCamera, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, this.fitCamera, this);
-    });
+    this.rateWindowTick = session.sim.tick;
+    context.worldReady({ centerOnTile: (x, y) => this.cameraControl.centerOnTile(x, y) });
   }
 
   override update(time: number, delta: number): void {
     const context = gameContext();
-    const session = context.session;
-    if (!session) return;
+    this.session.frame(delta);
+    this.cameraControl.update(delta);
 
-    session.frame(delta);
-    this.drawWalker(session);
+    const view = this.cameraControl.view;
+    this.worldView.cull(view);
+    this.sky.fit(this.scale.width, this.scale.height, this.cameraControl.scale);
+    context.reportView({ x: view.x / TILE_SIZE, y: view.y / TILE_SIZE, width: view.width / TILE_SIZE, height: view.height / TILE_SIZE });
 
-    if (context.debugVisible) this.reportStats(session, time, delta);
-  }
-
-  private drawWalker(session: GameSession): void {
-    const { walker } = session.sim;
-    const zoom = this.cameras.main.zoom;
-    const tileX = walker.prevX + (walker.x - walker.prevX) * session.alpha;
-    // Snap to whole device pixels: smooth motion, but never a blurry half-pixel.
-    const x = Math.round((tileX * TILE_SIZE + TILE_SIZE / 2) * zoom) / zoom;
-    this.walker.setPosition(x, GROUND_Y + 2);
-    this.walker.setFlipX(walker.direction === -1);
-
-    const speed = session.time.effectiveSpeed;
-    if (walker.walking && speed > 0) {
-      this.walker.anims.timeScale = speed;
-      if (!this.walker.anims.isPlaying) this.walker.play('dwarfWalk');
-    } else if (speed === 0) {
-      if (this.walker.anims.isPlaying) this.walker.anims.pause();
-    } else {
-      this.walker.anims.stop();
-      this.walker.setFrame(0);
+    this.refreshHover();
+    if (context.debugVisible) {
+      this.drawChunkGrid();
+      this.reportStats(time, delta);
+    } else if (this.chunkGrid.visible) {
+      this.chunkGrid.setVisible(false);
     }
-    if (speed > 0 && this.walker.anims.isPaused) this.walker.anims.resume();
   }
 
-  /** Integer zoom for crisp pixels, with the camera scrolled to whole device pixels. */
-  private fitCamera(): void {
-    const camera = this.cameras.main;
-    const zoom = deviceZoom(DEFAULT_ZOOM, gameContext().dpr);
-    camera.setSize(this.scale.width, this.scale.height);
-    camera.setZoom(zoom);
-    const viewWidth = this.scale.width / zoom;
-    const viewHeight = this.scale.height / zoom;
-    camera.setScroll(
-      Math.round((FOCUS.x - viewWidth / 2) * zoom) / zoom,
-      Math.round((FOCUS.y - viewHeight / 2) * zoom) / zoom,
-    );
+  // ---- Pointer: hover and digging ------------------------------------------------------
+
+  private listenForPointer(): void {
+    const onMove = (pointer: Phaser.Input.Pointer): void => {
+      const cell = this.cellAt(pointer);
+      if (!this.hovered || cell.x !== this.hovered.x || cell.y !== this.hovered.y) {
+        this.hovered = cell;
+        this.hoverDirty = true;
+      }
+      if (this.digging && pointer.leftButtonDown()) this.digTo(cell);
+    };
+    const onDown = (pointer: Phaser.Input.Pointer): void => {
+      if (pointer.rightButtonDown()) {
+        // Right-click cancels whatever the left button was doing.
+        this.digging = false;
+        return;
+      }
+      if (!pointer.leftButtonDown()) return;
+      this.digging = true;
+      this.lastDug = null;
+      this.digTo(this.cellAt(pointer));
+    };
+    const onUp = (pointer: Phaser.Input.Pointer): void => {
+      if (!pointer.leftButtonDown()) this.digging = false;
+    };
+    const onOut = (): void => {
+      this.hovered = null;
+      this.hoverDirty = true;
+    };
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, onMove);
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, onDown);
+    this.input.on(Phaser.Input.Events.POINTER_UP, onUp);
+    this.input.on(Phaser.Input.Events.GAME_OUT, onOut);
+    this.cleanup.push(() => {
+      this.input.off(Phaser.Input.Events.POINTER_MOVE, onMove);
+      this.input.off(Phaser.Input.Events.POINTER_DOWN, onDown);
+      this.input.off(Phaser.Input.Events.POINTER_UP, onUp);
+      this.input.off(Phaser.Input.Events.GAME_OUT, onOut);
+    });
   }
 
-  private reportStats(session: GameSession, time: number, delta: number): void {
+  private cellAt(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    return { x: Math.floor(point.x / TILE_SIZE), y: Math.floor(point.y / TILE_SIZE) };
+  }
+
+  /** Dig every cell from the last dug cell to this one, so a fast drag leaves no gaps. */
+  private digTo(cell: { x: number; y: number }): void {
+    const from = this.lastDug ?? cell;
+    let dugAny = false;
+    for (const [x, y] of cellsOnLine(from.x, from.y, cell.x, cell.y)) {
+      if (this.session.sim.dig(x, y) === 'dug') dugAny = true;
+    }
+    this.lastDug = cell;
+    if (dugAny && this.time.now - this.lastDigSound > DIG_SOUND_GAP_MS) {
+      this.lastDigSound = this.time.now;
+      gameContext().audio?.play('dig', 0.7);
+    }
+  }
+
+  private refreshHover(): void {
+    if (!this.hoverDirty) return;
+    this.hoverDirty = false;
+    const context = gameContext();
+    const cell = this.hovered;
+    const info = cell ? describeCell(this.session.sim, cell.x, cell.y) : null;
+    if (!cell || !info) {
+      this.cursor.hide();
+      context.reportHover(null);
+      return;
+    }
+    this.cursor.show(cell.x, cell.y, info.diggable ? 'ok' : 'blocked', this.cameraControl.scale);
+    context.reportHover(info);
+  }
+
+  // ---- Resizing, debug, cleanup -------------------------------------------------------------
+
+  private onResize(): void {
+    const { width, height, scale } = this.lastSize;
+    this.cameras.main.setSize(this.scale.width, this.scale.height);
+    this.cameraControl.handleResize(width, height, scale);
+    this.lastSize = { width: this.scale.width, height: this.scale.height, scale: this.cameraControl.scale };
+    this.hoverDirty = true;
+  }
+
+  /** Chunk borders, two device pixels wide at any zoom. */
+  private drawChunkGrid(): void {
+    const zoom = this.cameraControl.scale;
+    this.chunkGrid.setVisible(true);
+    if (zoom === this.gridZoom) return;
+    this.gridZoom = zoom;
+    const world = this.session.world;
+    const size = CHUNK_SIZE * TILE_SIZE;
+    this.chunkGrid.clear();
+    this.chunkGrid.lineStyle(2 / zoom, 0xff4fd8, 0.6);
+    for (let cx = 0; cx <= world.chunkCols; cx++) this.chunkGrid.lineBetween(cx * size, 0, cx * size, world.height * TILE_SIZE);
+    for (let cy = 0; cy <= world.chunkRows; cy++) this.chunkGrid.lineBetween(0, cy * size, world.width * TILE_SIZE, cy * size);
+  }
+
+  private reportStats(time: number, delta: number): void {
+    const { session } = this;
     if (time - this.rateWindowStart >= 1000) {
       this.ticksPerSecond = ((session.sim.tick - this.rateWindowTick) * 1000) / (time - this.rateWindowStart);
       this.rateWindowStart = time;
@@ -108,6 +235,7 @@ export class GameScene extends Phaser.Scene {
     this.statsElapsedMs += delta;
     if (this.statsElapsedMs < STATS_INTERVAL_MS) return;
     this.statsElapsedMs = 0;
+    const view = this.cameraControl.view;
     gameContext().reportDebugStats({
       fps: this.game.loop.actualFps,
       frameMs: delta,
@@ -118,7 +246,25 @@ export class GameScene extends Phaser.Scene {
       canvasWidth: this.scale.width,
       canvasHeight: this.scale.height,
       dpr: gameContext().dpr,
-      zoom: this.cameras.main.zoom,
+      zoom: this.cameraControl.scale,
+      cameraTile: {
+        x: Math.floor((view.x + view.width / 2) / TILE_SIZE),
+        y: Math.floor((view.y + view.height / 2) / TILE_SIZE),
+      },
+      cursorTile: this.hovered,
+      chunksDrawn: this.worldView.drawnChunks,
     });
+  }
+
+  private teardown(): void {
+    for (const off of this.cleanup) off();
+    this.cleanup.length = 0;
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.cameraControl.destroy();
+    this.worldView.destroy();
+    this.fog.destroy();
+    this.sky.destroy();
+    this.digging = false;
+    this.hovered = null;
   }
 }

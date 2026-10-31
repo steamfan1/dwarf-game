@@ -277,19 +277,211 @@ body {
   border-radius: 3px;
 }
 
+/* Bottom-left, and never wide enough to run under the minimap in the bottom-right corner. */
 .hud-hint {
   position: absolute;
-  left: 50%;
-  bottom: 1em;
-  transform: translateX(-50%);
+  left: 0.5em;
+  bottom: 0.5em;
   margin: 0;
-  max-width: min(42em, 90vw);
+  max-width: min(40em, calc(100% - 21em));
   padding: 0.45em 0.9em;
-  text-align: center;
+  text-align: left;
   font-size: 0.85em;
   color: var(--c-text);
   background: rgba(0, 0, 0, 0.6);
   border-radius: 3px;
+}
+
+/* What's under the pointer. Top-left, clear of the hint and minimap; never blocks clicks. */
+.hover-readout {
+  position: absolute;
+  top: 0.5em;
+  left: 0.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  min-width: 11em;
+  max-width: min(22em, 40vw);
+  padding: 0.4em 0.75em;
+  font-size: 0.9em;
+  pointer-events: none !important;
+}
+
+.hover-readout strong {
+  color: #f6e3bf;
+  font-weight: 700;
+}
+
+.hover-readout span {
+  font-size: 0.88em;
+  color: var(--c-text-dim);
+}
+
+.hover-readout.diggable {
+  border-left: 3px solid var(--c-accent);
+}
+
+.minimap {
+  position: absolute;
+  right: 0.5em;
+  bottom: 0.5em;
+  padding: 0.25em;
+  line-height: 0;
+}
+
+.minimap canvas {
+  display: block;
+  width: 18em;
+  height: 9em;
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ---- Loading -------------------------------------------------------------------------- */
+
+.loading-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1em;
+  background: rgba(5, 6, 10, 0.4);
+  pointer-events: auto;
+}
+
+.loading-panel {
+  width: min(26em, 100%);
+  padding: 1.2em 1.4em 1em;
+  text-align: center;
+}
+
+.loading-panel h2 {
+  margin: 0 0 0.9em;
+  font-family: var(--font-display);
+  font-size: 1.35em;
+  letter-spacing: 0.06em;
+  color: #f6e3bf;
+}
+
+.progress {
+  height: 0.85em;
+  overflow: hidden;
+  background: #0c0e14;
+  border: 1px solid var(--c-edge);
+  border-radius: 3px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d9872a, #ffc56b);
+  transition: width 120ms ease-out;
+}
+
+.loading-stage {
+  min-height: 1.4em;
+  margin: 0.7em 0 0;
+  font-size: 0.9em;
+  color: var(--c-text-dim);
+}
+
+/* ---- New world ---------------------------------------------------------------------------- */
+
+.new-world-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1em;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.field-label {
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.field-row {
+  display: flex;
+  gap: 0.5em;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-family: var(--font-mono);
+  color: var(--c-text);
+  background: #0e1016;
+  border: 2px solid var(--c-edge);
+  border-radius: 3px;
+  padding: 0.4em 0.6em;
+}
+
+.text-input:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.biome-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+  gap: 0.6em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.biome-choice legend {
+  margin-bottom: 0.4em;
+  padding: 0;
+}
+
+.biome-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15em 0.5em;
+  align-items: center;
+  padding: 0.6em 0.7em;
+  border: 2px solid var(--c-edge);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.biome-option.selected {
+  border-color: var(--c-accent);
+  background: rgba(242, 163, 58, 0.08);
+}
+
+.biome-option input {
+  margin: 0;
+  accent-color: var(--c-accent);
+}
+
+.biome-name {
+  font-weight: 700;
+}
+
+.biome-description {
+  grid-column: 2;
+  font-size: 0.85em;
+  color: var(--c-text-dim);
+}
+
+.menu-world {
+  margin: 1em 0 0;
+  font-size: 0.85em;
+  text-align: center;
+  color: var(--c-text-dim);
+  user-select: text;
 }
 
 /* ---- Dialogs ----------------------------------------------------------------------- */
