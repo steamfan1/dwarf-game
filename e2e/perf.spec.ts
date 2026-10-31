@@ -85,16 +85,17 @@ async function setPartVisible(page: Page, part: string, visible: boolean): Promi
       const scene = app?.game?.scene?.getScene('Game');
       if (!scene) return false;
       const alpha = show ? 1 : 0;
-      const layers = (list: any[]): void => list.forEach((layer) => layer.setAlpha(alpha));
+      // Every chunk layer pair, on screen or waiting in the pool (see WorldView).
+      const pairs: any[] = [...scene.worldView.active.values(), ...scene.worldView.pool];
       switch (name) {
         case 'fog':
           scene.fog.image.setAlpha(alpha);
           return true;
         case 'blocks':
-          layers(scene.worldView.blocks);
+          pairs.forEach((pair) => pair.blocks.setAlpha(alpha));
           return true;
         case 'walls':
-          layers(scene.worldView.walls);
+          pairs.forEach((pair) => pair.walls.setAlpha(alpha));
           return true;
         case 'sky':
           scene.sky.image.setAlpha(alpha);

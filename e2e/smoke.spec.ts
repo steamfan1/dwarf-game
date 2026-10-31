@@ -33,10 +33,10 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   }
   expect(blueness(centre.x, centre.y - 7 * tile), 'sky above the Hearth').toBeGreaterThan(40);
 
-  // The debug overlay (backtick) shows the simulation tick. It advances at 20 a second
-  // when the browser keeps up; CI's software renderer can be much slower than that, and
-  // Phaser (deliberately) runs game time slow below 5 frames a second, so this only checks
-  // that the clock runs and never runs fast. The exact tick rate is unit-tested.
+  // The debug overlay (backtick) shows the simulation tick, which advances 20 times a
+  // second at 1x as long as frames come at least 4 times a second (longer frames are
+  // clamped). CI draws in software at about 15 frames a second, which is enough. The
+  // overlay refreshes a few times a second, hence the wide margin.
   await page.keyboard.press('Backquote');
   await expect(page.getByTestId('debug-panel')).toBeVisible();
   await expect.poll(() => readNumber(page, 'debug-ticks')).toBeGreaterThan(0);
@@ -44,8 +44,8 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   await page.waitForTimeout(1500);
   const ticked = (await readNumber(page, 'debug-ticks')) - start;
   testInfo.annotations.push({ type: 'ticks in 1.5 s', description: String(ticked) });
-  expect(ticked, 'ticks in 1.5 s at 1x').toBeGreaterThan(0);
-  expect(ticked, 'ticks in 1.5 s at 1x').toBeLessThan(45);
+  expect(ticked, 'ticks in 1.5 s at 1x (about 30)').toBeGreaterThan(15);
+  expect(ticked, 'ticks in 1.5 s at 1x (about 30)').toBeLessThan(45);
 
   // The mouse hasn't moved since it clicked "Create world", so the camera must stay put:
   // it should not mistake an unknown mouse position for one at a screen edge.

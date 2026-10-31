@@ -2,7 +2,10 @@
  * The in-game scene. It draws the session's world and turns pointer input into orders.
  *
  * Each animation frame it:
- *   1. hands the frame's real time to the session, which runs 0..n fixed simulation ticks;
+ *   1. hands the frame's real time to the session, which runs 0..n fixed simulation ticks.
+ *      That is the time since the previous frame, measured here rather than taken from
+ *      Phaser's `delta`: Phaser smooths its delta and, for a while after the game starts
+ *      or regains focus, caps it at 1/60 s, so below 60 fps game time would run slow;
  *   2. moves the camera (real time, so it works while paused) and gives tilemap layers
  *      to the chunks in view (see WorldView);
  *   3. updates the tile cursor, the minimap's view box and, if open, the debug overlay.
@@ -48,6 +51,8 @@ export class GameScene extends Phaser.Scene {
   private gridZoom = 0;
   private lastSize = { width: 0, height: 0, scale: 1 };
 
+  /** Timestamp of the previous frame, or null before the first one. */
+  private lastFrameTime: number | null = null;
   private statsElapsedMs = 0;
   private rateWindowStart = 0;
   private rateWindowTick = 0;
@@ -69,6 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.digging = false;
     this.lastDug = null;
     this.gridZoom = 0;
+    this.lastFrameTime = null;
     this.statsElapsedMs = 0;
 
     this.sky = new SkyBackdrop(this, BIOMES.get(world.biome).sky);
@@ -108,10 +114,14 @@ export class GameScene extends Phaser.Scene {
     context.worldReady({ centerOnTile: (x, y) => this.cameraControl.centerOnTile(x, y) });
   }
 
-  override update(time: number, delta: number): void {
+  override update(time: number): void {
     const context = gameContext();
-    this.session.frame(delta);
-    this.cameraControl.update(delta);
+    // Real time since the last frame. FixedTimestep clamps long gaps (a background tab, a
+    // debugger pause), and the game pauses itself while the tab is hidden anyway.
+    const frameMs = this.lastFrameTime === null ? 0 : Math.max(0, time - this.lastFrameTime);
+    this.lastFrameTime = time;
+    this.session.frame(frameMs);
+    this.cameraControl.update(frameMs);
 
     const view = this.cameraControl.view;
     this.worldView.cull(view);
@@ -122,7 +132,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshHover();
     if (context.debugVisible) {
       this.drawChunkGrid();
-      this.reportStats(time, delta);
+      this.reportStats(time, frameMs);
     } else if (this.chunkGrid.visible) {
       this.chunkGrid.setVisible(false);
     }
@@ -227,20 +237,20 @@ export class GameScene extends Phaser.Scene {
     for (let cy = 0; cy <= world.chunkRows; cy++) this.chunkGrid.lineBetween(0, cy * size, world.width * TILE_SIZE, cy * size);
   }
 
-  private reportStats(time: number, delta: number): void {
+  private reportStats(time: number, frameMs: number): void {
     const { session } = this;
     if (time - this.rateWindowStart >= 1000) {
       this.ticksPerSecond = ((session.sim.tick - this.rateWindowTick) * 1000) / (time - this.rateWindowStart);
       this.rateWindowStart = time;
       this.rateWindowTick = session.sim.tick;
     }
-    this.statsElapsedMs += delta;
+    this.statsElapsedMs += frameMs;
     if (this.statsElapsedMs < STATS_INTERVAL_MS) return;
     this.statsElapsedMs = 0;
     const view = this.cameraControl.view;
     gameContext().reportDebugStats({
       fps: this.game.loop.actualFps,
-      frameMs: delta,
+      frameMs,
       tickCostMs: session.tickCostMs,
       tick: session.sim.tick,
       ticksPerSecond: this.ticksPerSecond,
