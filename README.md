@@ -119,10 +119,11 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 ## Testing
 
 - `npm test` runs the unit tests in `src/**/*.test.ts`.
-- `npm run smoke` serves the production build and drives it in headless Chromium: title
-  screen, new game, the simulation ticking at the right rate, pause, menu, settings,
-  right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails
-  the test. Screenshots go to `test-results/`.
+- `npm run smoke` drives the game in headless Chromium twice, once on the production build
+  and once on the dev server (`npm run dev`): title screen, new game, the simulation ticking
+  at the right rate, pause, menu, settings, right-click and mouse-wheel blocking, and
+  high-DPI canvas sizing. Any console error fails the test. Screenshots and each test's
+  browser console log go to `test-results/`.
 - GitHub Actions runs type-checking, unit tests, the build and the smoke test on every
   push (`.github/workflows/ci.yml`). Failures show up as annotations on the run, and each
   run's screenshots, browser console logs and results are copied to the `ci-output`

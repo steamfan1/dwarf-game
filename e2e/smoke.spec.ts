@@ -37,7 +37,8 @@ async function readTick(page: Page): Promise<number> {
 test('title screen, new game, running simulation, pause, menu and settings', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   const newGame = page.getByRole('button', { name: 'New game' });
-  await expect(newGame).toBeVisible();
+  // Generous on first load: the dev server pre-bundles Phaser the first time it's requested.
+  await expect(newGame).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'title');
   await page.waitForTimeout(800);

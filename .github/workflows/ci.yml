@@ -24,6 +24,8 @@ jobs:
     name: Type-check, test, build, browser smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      lockfile-generated: ${{ steps.install.outputs.generated }}
     steps:
       - uses: actions/checkout@v7
 
@@ -121,6 +123,7 @@ jobs:
           path: out/smoke
 
       - name: Download the generated lockfile
+        if: needs.check.outputs.lockfile-generated == 'true'
         uses: actions/download-artifact@v7
         continue-on-error: true
         with:
