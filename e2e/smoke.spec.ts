@@ -37,7 +37,7 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
 
   // Light shows the whole sunlit surface, explored or not. On the minimap (one pixel per
   // tile), the first thing under the sky in every column is ground or a tree, never the
-  // near-black of an unexplored cell.
+  // colour of an unexplored cell (Minimap.ts UNEXPLORED, rgb 11 12 17).
   const hiddenColumns = await page.evaluate(() => {
     const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="minimap"] canvas')!;
     const { data, width, height } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
@@ -47,7 +47,7 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
         const o = (y * width + x) * 4;
         const [r, g, b] = [data[o]!, data[o + 1]!, data[o + 2]!];
         if (b > 150 && b - r > 30) continue; // sky (or a pool of water)
-        if (r < 30 && g < 30 && b < 40) hidden++;
+        if (Math.abs(r - 11) <= 2 && Math.abs(g - 12) <= 2 && Math.abs(b - 17) <= 2) hidden++;
         break;
       }
     }
