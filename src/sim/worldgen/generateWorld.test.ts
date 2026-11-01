@@ -92,7 +92,8 @@ function checkInvariants(world: World, biomeId: string): void {
     for (let y = world.surface[x]!; y < height; y++) expect(world.fg[world.index(x, y)]).toBe(bedrock);
   }
 
-  // The colony starts on open, flat, diggable ground that the player can see.
+  // The colony starts on open, flat, diggable ground. Nothing is explored yet: the game
+  // marks whatever light reaches as explored when it starts (see Lighting).
   const { x: sx, y: sy } = world.spawn;
   expect(world.fg[world.index(sx, sy)]).toBe(AIR);
   expect(world.liquidType[world.index(sx, sy)]).toBe(0);
@@ -101,7 +102,7 @@ function checkInvariants(world: World, biomeId: string): void {
     expect(TILES.diggable[world.fg[world.index(sx + dx, sy + 1)]!]).toBe(1);
   }
   for (const dx of [-1, 0, 1]) expect(world.fg[world.index(sx + dx, sy)]).toBe(AIR);
-  expect(world.flags[world.index(sx, sy + 3)]! & FLAG_EXPLORED).toBe(FLAG_EXPLORED);
+  expect(world.flags.some((flags) => (flags & FLAG_EXPLORED) !== 0)).toBe(false);
 
   let surfaceMatches = 0;
   for (let x = 0; x < width; x++) {

@@ -1,89 +1,194 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { EventBus } from '../core/EventBus';
-import { TILES } from './content';
+import { CONTENT, ITEMS, TILES } from './content';
 import type { GameEvents } from './events';
 import { Simulation } from './Simulation';
 import { AIR } from './world/TileRegistry';
-import { FLAG_EXPLORED, World } from './world/World';
+import { World } from './world/World';
+import { generateWorld } from './worldgen/generateWorld';
 
 /**
- * A tiny hand-built world, 12 x 10:
- *   rows 0-4 sky, row 5 grass surface, rows 6-9 dirt over stone, bedrock at the bottom.
- *   The Hearth stands at (3, 4). A tree trunk stands on (8, 5); tall grass on (6, 5).
+ * A hand-built world, 48 x 24:
+ *   rows 0-9 sky, row 10 grass, rows 11-14 dirt, rows 15-22 stone, row 23 bedrock,
+ *   background walls from row 12 down. The Hearth stands at (20, 9); an oak with a
+ *   four-tile trunk stands on (34, 10).
  */
 function makeWorld(): World {
-  const world = World.empty(12, 10, 'test', 'temperate');
-  world.surface.fill(5);
-  for (let x = 0; x < 12; x++) {
-    for (let y = 5; y < 10; y++) {
-      const tile = y === 5 ? 'grass' : y === 9 ? 'bedrock' : y >= 8 ? 'stone' : 'dirt';
+  const width = 48;
+  const height = 24;
+  const world = World.empty(width, height, 'sim-test', 'temperate');
+  world.surface.fill(10);
+  for (let x = 0; x < width; x++) {
+    for (let y = 10; y < height; y++) {
+      const tile = y === 10 ? 'grass' : y === height - 1 ? 'bedrock' : y >= 15 ? 'stone' : 'dirt';
       world.fg[world.index(x, y)] = TILES.tile(tile);
-      if (y >= 7) world.bg[world.index(x, y)] = TILES.wall('dirt_wall');
+      if (y >= 12) world.bg[world.index(x, y)] = TILES.wall('dirt_wall');
     }
   }
-  world.fg[world.index(8, 4)] = TILES.tile('log');
-  world.fg[world.index(6, 4)] = TILES.tile('tall_grass');
-  world.spawn = { x: 3, y: 4 };
-  for (let x = 0; x < 12; x++) for (let y = 5; y < 8; y++) world.flags[world.index(x, y)] = FLAG_EXPLORED;
+  for (let y = 6; y <= 9; y++) world.fg[world.index(34, y)] = TILES.tile('log');
+  for (let y = 3; y <= 6; y++) {
+    for (let x = 32; x <= 36; x++) if (world.fg[world.index(x, y)] === AIR) world.fg[world.index(x, y)] = TILES.tile('leaves');
+  }
+  world.spawn = { x: 20, y: 9 };
   return world;
 }
 
-describe('Simulation.dig', () => {
-  let world: World;
-  let bus: EventBus<GameEvents>;
-  let sim: Simulation;
-  let changed: string[];
-  let revealed: number;
+function newSim(world = makeWorld()) {
+  const bus = new EventBus<GameEvents>();
+  const sim = new Simulation({ world, ...CONTENT, bus });
+  const run = (ticks: number): void => {
+    for (let i = 0; i < ticks; i++) sim.step();
+  };
+  /** Step until `done` is true or `limit` ticks pass; returns the ticks taken. */
+  const runUntil = (done: () => boolean, limit = 4000): number => {
+    for (let i = 0; i < limit; i++) {
+      if (done()) return i;
+      sim.step();
+    }
+    throw new Error(`Still waiting after ${limit} ticks`);
+  };
+  return { world, bus, sim, run, runUntil };
+}
 
-  beforeEach(() => {
-    world = makeWorld();
-    bus = new EventBus<GameEvents>();
-    sim = new Simulation({ world, tiles: TILES, bus });
-    changed = [];
-    revealed = 0;
-    bus.on('TileChanged', ({ x, y }) => changed.push(`${x},${y}`));
-    bus.on('ExploredChanged', () => revealed++);
+const at = (x: number, y: number) => ({ x0: x, y0: y, x1: x, y1: y });
+
+describe('Simulation: dwarves change the world, the player only gives orders', () => {
+  it('starts with three named dwarves beside the Hearth, and the sunlit surface already explored', () => {
+    const { sim, world } = newSim();
+    expect(sim.dwarves).toHaveLength(3);
+    expect(new Set(sim.dwarves.map((d) => d.name)).size).toBe(3);
+    for (const dwarf of sim.dwarves) {
+      expect(dwarf.y).toBe(9);
+      expect(sim.nav.standable(dwarf.x, dwarf.y)).toBe(true);
+    }
+    // Daylight reaches a few blocks into the ground everywhere, even far from the colony.
+    expect(world.isExplored(1, 10)).toBe(true);
+    expect(world.isExplored(46, 12)).toBe(true);
+    // Deep rock stays unexplored.
+    expect(world.isExplored(1, 20)).toBe(false);
   });
 
-  it('removes a visible block, keeps its wall, announces the change and reveals around it', () => {
-    expect(sim.dig(10, 7)).toBe('dug');
-    expect(world.fg[world.index(10, 7)]).toBe(AIR);
-    expect(world.bg[world.index(10, 7)]).toBe(TILES.wall('dirt_wall'));
-    expect(changed).toEqual(['10,7']);
-    expect(revealed).toBe(1);
-    expect(world.isExplored(10, 9)).toBe(true);
+  it('marks a block for digging without changing it', () => {
+    const { sim, world, bus } = newSim();
+    const marks: string[] = [];
+    bus.on('DesignationChanged', ({ x, y }) => marks.push(`${x},${y}`));
+    expect(sim.designate('dig', at(26, 10), 2)).toBe(1);
+    expect(world.fg[world.index(26, 10)]).toBe(TILES.tile('grass'));
+    expect(sim.jobs.at(26, 10)?.type).toBe('dig');
+    expect(marks).toEqual(['26,10']);
+    expect(sim.digStatus(26, 10)).toBe('marked');
   });
 
-  it('takes the grass tuft resting on a dug block with it', () => {
-    expect(sim.dig(6, 5)).toBe('dug');
-    expect(world.fg[world.index(6, 4)]).toBe(AIR);
-    expect(changed).toEqual(['6,5', '6,4']);
+  it('has a dwarf dig a marked block, then haul what it dropped to the Hearth', () => {
+    const { sim, world, runUntil } = newSim();
+    sim.designate('dig', at(26, 10), 2);
+    runUntil(() => world.fg[world.index(26, 10)] === AIR);
+    expect(sim.jobs.at(26, 10)).toBeUndefined();
+    runUntil(() => sim.storage.count(ITEMS.item('dirt')) === 1);
+    expect(sim.ground.size).toBe(0);
+    expect(sim.jobs.size).toBe(0);
+    // Somebody gained mining experience.
+    expect(sim.dwarves.some((d) => d.skills.mining.xp > 0)).toBe(true);
   });
 
-  it('explains why a cell cannot be dug, without changing anything', () => {
-    expect(sim.dig(-1, 5)).toBe('out-of-bounds');
-    expect(sim.dig(5, 8)).toBe('unexplored');
-    expect(sim.dig(5, 2)).toBe('nothing-to-dig');
-    expect(sim.dig(3, 5)).toBe('supports-hearth');
-    expect(sim.dig(8, 5)).toBe('supports-tree');
-    world.flags[world.index(5, 9)] = FLAG_EXPLORED;
-    expect(sim.dig(5, 9)).toBe('indestructible');
-    expect(changed).toEqual([]);
-    expect(revealed).toBe(0);
+  it('digs out a pit, but leaves steps rather than trap anyone in it', () => {
+    const { sim, world, runUntil } = newSim();
+    expect(sim.designate('dig', { x0: 24, y0: 10, x1: 27, y1: 12 }, 2)).toBe(12);
+    // Done when every remaining mark is blocked, nobody is busy and everything is stored.
+    runUntil(() => {
+      const jobs = [...sim.jobs.all()];
+      return jobs.every((job) => job.type === 'dig' && job.blocked && job.claimedBy === 0) && sim.ground.size === 0 && sim.dwarves.every((d) => d.phase !== 'to-storage');
+    }, 10_000);
+    let dug = 0;
+    for (let y = 10; y <= 12; y++) for (let x = 24; x <= 27; x++) if (world.fg[world.index(x, y)] === AIR) dug++;
+    expect(dug).toBeGreaterThanOrEqual(8);
+    expect(sim.storage.count(ITEMS.item('dirt'))).toBe(dug);
+    // Everyone can still walk home: the blocks left standing are the way out.
+    for (const dwarf of sim.dwarves) expect(sim.homeMaps.canGetHome(world.index(dwarf.x, dwarf.y))).toBe(true);
   });
 
-  it('canDig agrees with dig', () => {
-    expect(sim.canDig(10, 6)).toBe('dug');
-    expect(world.fg[world.index(10, 6)]).toBe(TILES.tile('dirt'));
+  it('refuses to mark what cannot be dug, and says why', () => {
+    const { sim } = newSim();
+    expect(sim.digStatus(20, 5)).toBe('nothing-to-dig');
+    expect(sim.digStatus(20, 10)).toBe('supports-hearth');
+    expect(sim.digStatus(34, 10)).toBe('supports-tree');
+    expect(sim.digStatus(5, 20)).toBe('unexplored');
+    expect(sim.digStatus(-1, 0)).toBe('out-of-bounds');
+    expect(sim.designate('dig', { x0: 19, y0: 10, x1: 21, y1: 10 }, 2)).toBe(0);
   });
 
-  it('puts the Hearth at the spawn', () => {
-    expect(sim.hearth).toEqual({ x: 3, y: 4 });
+  it('fells a whole tree when any part of it is marked, and the wood gets stored', () => {
+    const { sim, world, runUntil } = newSim();
+    expect(sim.designate('chop', at(33, 4), 2)).toBe(1); // a leaf
+    expect(sim.jobs.at(34, 9)?.type).toBe('chop'); // the mark covers the trunk
+    runUntil(() => world.fg[world.index(34, 9)] === AIR);
+    for (let y = 3; y <= 9; y++) for (let x = 32; x <= 36; x++) expect(world.fg[world.index(x, y)]).toBe(AIR);
+    runUntil(() => sim.storage.count(ITEMS.item('log')) > 0);
+    expect(sim.digStatus(34, 10)).toBe('ok');
   });
 
-  it('revealAll lifts the fog everywhere', () => {
-    sim.revealAll();
-    expect(world.isExplored(0, 9)).toBe(true);
-    expect(revealed).toBe(1);
+  it('cancels marks, and a dwarf on that job stops', () => {
+    const { sim, world, run } = newSim();
+    sim.designate('dig', at(40, 10), 2);
+    run(40);
+    expect(sim.jobs.at(40, 10)?.claimedBy).not.toBe(0);
+    expect(sim.cancelDesignations({ x0: 38, y0: 10, x1: 42, y1: 14 })).toBe(1);
+    run(400);
+    expect(world.fg[world.index(40, 10)]).toBe(TILES.tile('grass'));
+    expect(sim.dwarves.every((d) => d.jobId === 0)).toBe(true);
+  });
+
+  it('takes urgent jobs before normal ones', () => {
+    const { sim, run } = newSim();
+    // Four normal jobs near the colony, two far-off ones made urgent.
+    for (const x of [16, 17, 23, 24, 4, 44]) sim.designate('dig', at(x, 10), 2);
+    expect(sim.prioritize(at(4, 10), 4) + sim.prioritize(at(44, 10), 4)).toBe(2);
+    expect(sim.jobs.at(4, 10)?.priority).toBe(4);
+    run(30);
+    // Three dwarves: the two urgent jobs are taken first, then one normal job.
+    expect(sim.jobs.at(4, 10)?.claimedBy).not.toBe(0);
+    expect(sim.jobs.at(44, 10)?.claimedBy).not.toBe(0);
+    expect([16, 17, 23, 24].filter((x) => sim.jobs.at(x, 10)?.claimedBy !== 0)).toHaveLength(1);
+  });
+
+  it('flags a job no dwarf can reach, and takes it on once a staircase leads there', () => {
+    const { sim, run, runUntil } = newSim();
+    // A block deep under solid ground: nowhere to stand next to it. (Only explored cells
+    // can be marked, so pretend the player has already seen this patch of rock.)
+    sim.world.revealEllipse(35, 13, 7, 7);
+    expect(sim.designate('dig', at(38, 17), 2)).toBe(1);
+    run(1);
+    expect(sim.jobs.at(38, 17)?.blocked).toBe(true);
+    // A staircase down to it: one tile across and one down per step, with headroom to jump back up.
+    for (let k = 1; k <= 7; k++) {
+      sim.designate('dig', at(30 + k, 9 + k), 3);
+      if (k >= 2) sim.designate('dig', at(30 + k, 8 + k), 3);
+    }
+    runUntil(() => sim.world.fg[sim.world.index(38, 17)] === AIR, 20_000);
+  });
+
+  it('hurts a dwarf that falls further than the safe drop', () => {
+    const { sim, world, run } = newSim();
+    const dwarf = sim.dwarves[0]!;
+    // Hollow out a pit six tiles deep under the dwarf (two more than the safe drop).
+    for (let y = 10; y <= 15; y++) world.fg[world.index(dwarf.x, y)] = AIR;
+    run(40);
+    expect(dwarf.y).toBe(15);
+    expect(dwarf.health).toBe(dwarf.maxHealth - 2 * CONTENT.colony.movement.fallDamagePerRow);
+  });
+
+  it('plays out identically from the same seed and orders', () => {
+    const play = (): string => {
+      const world = World.fromSnapshot(generateWorld({ seed: 'replay', biome: 'temperate' }).snapshot);
+      const { sim, run } = newSim(world);
+      const { x, y } = sim.hearth;
+      sim.designate('dig', { x0: x + 3, y0: y + 1, x1: x + 8, y1: y + 3 }, 2);
+      run(1200);
+      const dwarves = sim.dwarves.map((d) => `${d.name}@${d.x},${d.y}:${d.phase}:${d.skills.mining.xp}`).join('|');
+      let terrain = 0;
+      for (let i = 0; i < world.fg.length; i++) terrain = (terrain * 31 + world.fg[i]!) | 0;
+      return `${dwarves}#${terrain}#${sim.storage.entries().map((e) => `${e.item}x${e.count}`).join(',')}`;
+    };
+    expect(play()).toBe(play());
   });
 });

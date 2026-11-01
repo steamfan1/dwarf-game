@@ -1,7 +1,7 @@
 {
   "name": "gatewright",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A 2D side-view colony-survival sandbox for the browser: dig, build, craft and defend with a small band of dwarves.",
   "type": "module",
   "engines": {

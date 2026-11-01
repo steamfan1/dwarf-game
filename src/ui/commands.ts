@@ -8,6 +8,8 @@ import { useContext } from 'preact/hooks';
 import type { GameSpeed } from '../config';
 import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
+import type { Priority } from '../sim/jobs/JobBoard';
+import type { Tool } from './state';
 
 export type UiSound = 'uiClick' | 'uiOpen' | 'uiClose';
 
@@ -44,6 +46,14 @@ export interface UiCommands {
   /** The minimap's canvas, when it is shown (null when hidden). */
   attachMinimap(canvas: HTMLCanvasElement | null): void;
   toggleMinimap(): void;
+  /** Pick a toolbar tool. */
+  setTool(tool: Tool): void;
+  /** The priority for new marks and for the Priority tool. */
+  setPriority(priority: Priority): void;
+  /** Select a dwarf (null to deselect); `focus` also moves the camera to it. */
+  selectDwarf(id: number | null, focus?: boolean): void;
+  /** Debug overlay: show light levels in place of the fog of war. */
+  setDebugLight(on: boolean): void;
 }
 
 export const CommandsContext = createContext<UiCommands | null>(null);

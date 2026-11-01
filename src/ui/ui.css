@@ -317,8 +317,367 @@ body {
   color: var(--c-text-dim);
 }
 
-.hover-readout.diggable {
-  border-left: 3px solid var(--c-accent);
+/* Tinted by what the current tool would do here. */
+.hover-readout.action-ok {
+  border-left: 3px solid #8fd16b;
+}
+
+.hover-readout.action-blocked {
+  border-left: 3px solid var(--c-danger);
+}
+
+/* ---- Toolbar (left edge) ----------------------------------------------------------------- */
+
+.toolbar {
+  position: absolute;
+  left: 0.5em;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  padding: 0.35em;
+}
+
+.btn-tool {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1.2em 1fr auto;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.4em 0.6em;
+  text-align: left;
+  font-size: 0.92em;
+}
+
+.btn-tool .icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.btn-tool kbd,
+.roster-row kbd {
+  font: 700 0.75em var(--font-mono);
+  color: var(--c-text-dim);
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--c-edge);
+  border-radius: 2px;
+}
+
+.btn-tool.active kbd {
+  color: var(--c-accent-bright);
+  border-color: var(--c-accent);
+}
+
+.priority-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25em;
+  margin-top: 0.2em;
+  padding-top: 0.45em;
+  border-top: 1px solid var(--c-edge);
+}
+
+.btn-priority {
+  min-width: 0;
+  height: 1.9em;
+  padding: 0.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-priority .pips {
+  display: flex;
+  gap: 2px;
+}
+
+.btn-priority .pips i {
+  width: 4px;
+  height: 8px;
+  background: var(--pip);
+}
+
+.btn-priority.active {
+  border-color: var(--pip);
+  background: linear-gradient(#383a42, #26282f);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Stored resources in the top bar ---------------------------------------------------- */
+
+.resource-bar {
+  display: flex;
+  gap: 0.7em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resource-bar li {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-bar img,
+.storage img,
+.carrying img {
+  image-rendering: pixelated;
+}
+
+/* ---- Right-hand column: debug panel, roster, dwarf details, storage -------------------- */
+
+.side-column {
+  position: absolute;
+  top: 0.5em;
+  right: 0.5em;
+  bottom: 11em; /* clear of the minimap */
+  width: 17em;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* The column itself lets clicks through; only its panels catch them. */
+.side-column > * {
+  flex: none;
+}
+
+.colony-panel {
+  padding: 0.5em 0.65em;
+  font-size: 0.88em;
+}
+
+.colony-panel h3 {
+  margin: 0 0 0.35em;
+  font-size: 0.95em;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  color: #f6e3bf;
+}
+
+.colony-panel h3 .count {
+  margin-left: 0.3em;
+  font-family: var(--font-ui);
+  color: var(--c-text-dim);
+}
+
+.colony-panel h4 {
+  margin: 0.7em 0 0.25em;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-dim);
+}
+
+.colony-panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.colony-panel .note {
+  margin: 0.3em 0 0;
+  font-size: 0.85em;
+  color: var(--c-text-dim);
+}
+
+.roster-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 0.5em 1fr 3.5em;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.3em 0.35em;
+  font: inherit;
+  color: var(--c-text);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.roster-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.roster-row.selected {
+  border-color: var(--c-accent);
+  background: rgba(242, 163, 58, 0.12);
+}
+
+.roster-row.dead {
+  opacity: 0.5;
+}
+
+.roster-row .swatch {
+  width: 0.5em;
+  height: 1.8em;
+  border-radius: 1px;
+}
+
+.roster-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.roster-text strong,
+.roster-text .activity {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity {
+  font-size: 0.9em;
+  color: var(--c-text-dim);
+}
+
+.activity.warn {
+  color: var(--c-warning);
+}
+
+.dwarf-details header {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.dwarf-details header h3 {
+  flex: 1;
+  margin: 0;
+}
+
+.dwarf-details > .activity {
+  margin: 0.2em 0 0.5em;
+}
+
+.needs {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.25em 0.6em;
+  margin: 0;
+}
+
+.needs dd {
+  margin: 0;
+}
+
+.skills li,
+.equipment li {
+  display: grid;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.08em 0;
+}
+
+.skills li {
+  grid-template-columns: 1fr 1.5em 4em;
+}
+
+.skills .level {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.equipment li {
+  grid-template-columns: 5em 1fr;
+}
+
+.equipment .empty {
+  color: var(--c-text-dim);
+  font-style: italic;
+}
+
+.carrying {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0.6em 0 0;
+}
+
+.storage li {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.05em 0;
+}
+
+.storage .count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A thin bar for health, food, energy and skill progress. */
+.meter {
+  position: relative;
+  display: block;
+  height: 0.55em;
+  min-width: 3em;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #8fd16b;
+}
+
+.meter-food .meter-fill {
+  background: #e3b25a;
+}
+
+.meter-energy .meter-fill {
+  background: #7fb2f0;
+}
+
+.meter-xp .meter-fill {
+  background: var(--c-accent);
+}
+
+.needs .meter {
+  height: 0.95em;
+}
+
+.meter-value {
+  position: absolute;
+  right: 0.3em;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7em;
+  font-weight: 700;
+  line-height: 1;
+  color: #10120e;
+}
+
+.debug-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: 0.5em;
+  cursor: pointer;
 }
 
 .minimap {
@@ -654,10 +1013,8 @@ input[type='checkbox'] {
 
 /* ---- Debug overlay --------------------------------------------------------------- */
 
+/* Lives in the right-hand column (see .side-column). */
 .debug-panel {
-  position: absolute;
-  top: 0.5em;
-  right: 0.5em;
   min-width: 15em;
   padding: 0.5em 0.7em;
   font-family: var(--font-mono);
@@ -709,13 +1066,15 @@ input[type='checkbox'] {
   height: 1.4em;
 }
 
+/* Top centre, under the top bar and the "Paused" banner, clear of every corner panel. */
 .toasts {
   position: absolute;
-  right: 1em;
-  bottom: 1em;
+  top: 6em;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.5em;
 }
 

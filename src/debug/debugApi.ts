@@ -3,7 +3,7 @@
  * Production builds strip this module entirely.
  *
  *   debug.setSpeed(5)          run the simulation 5x faster on top of the chosen speed
- *   debug.spawnItem('plank', 20)
+ *   debug.spawnItem('stone', 20)   drop items at the Hearth (the dwarves store them)
  *   debug.skipToNight()
  *   debug.revealMap()
  *
@@ -33,9 +33,19 @@ function notYet(name: string, milestone: number): void {
 export function installDebugApi(app: App): void {
   window.debug = {
     spawnItem: (id, count = 1) => {
-      void id;
-      void count;
-      notYet('spawnItem', 3);
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.spawnItem() needs a running game: start a new game first.');
+        return;
+      }
+      if (!sim.items.has(id)) {
+        console.info(`Unknown item "${id}". Items: ${sim.items.items.map((item) => item.id).join(', ')}`);
+        return;
+      }
+      const amount = Math.max(1, Math.floor(count));
+      // Dropped beside the Hearth like anything a dwarf digs up; the dwarves carry it in.
+      sim.dropItems(sim.items.item(id), amount, sim.hearth.x, sim.hearth.y);
+      console.info(`Dropped ${amount} × ${sim.items.get(sim.items.item(id)).name} at the Hearth.`);
     },
     skipToNight: () => notYet('skipToNight', 4),
     revealMap: () => {

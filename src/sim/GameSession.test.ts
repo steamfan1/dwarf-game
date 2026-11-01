@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TILES } from './content';
+import { CONTENT } from './content';
 import { GameSession } from './GameSession';
 import { World } from './world/World';
 
@@ -11,7 +11,7 @@ function playSeconds(session: GameSession, seconds: number): void {
 }
 
 function newSession(): GameSession {
-  return new GameSession(World.empty(16, 16, 'test', 'temperate'), TILES);
+  return new GameSession(World.empty(16, 16, 'test', 'temperate'), CONTENT);
 }
 
 describe('GameSession', () => {

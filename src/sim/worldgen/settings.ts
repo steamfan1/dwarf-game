@@ -77,7 +77,6 @@ export interface WorldgenSettings {
   liquids: { lakeChance: number; minLakeRegion: number; lavaFrom: number; lavaChance: number };
   ores: OreRule[];
   decorations: { caveMushroomChance: number };
-  exploredAtStart: { radiusX: number; radiusY: number };
 }
 
 export class BiomeRegistry {
@@ -174,7 +173,6 @@ export function parseWorldgenSettings(data: unknown, tiles: TileRegistry): World
   const c = section('caves');
   const l = section('liquids');
   const d = section('decorations');
-  const e = section('exploredAtStart');
   const fraction = (o: Record<string, unknown> | undefined, key: string, path: string): number =>
     v.number(o?.[key], `${path}.${key}`, 0, 1);
   const count = (o: Record<string, unknown> | undefined, key: string, path: string, max = 1000): number =>
@@ -227,7 +225,6 @@ export function parseWorldgenSettings(data: unknown, tiles: TileRegistry): World
       };
     }),
     decorations: { caveMushroomChance: fraction(d, 'caveMushroomChance', 'decorations') },
-    exploredAtStart: { radiusX: count(e, 'radiusX', 'exploredAtStart', 400), radiusY: count(e, 'radiusY', 'exploredAtStart', 200) },
   };
   if (settings.surface.minY >= settings.surface.maxY) v.problem('surface.minY must be below surface.maxY');
   settings.ores.forEach((ore, i) => {

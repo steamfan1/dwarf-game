@@ -11,7 +11,95 @@ const STROKED = {
   close: 'M4 4L12 12M12 4L4 12',
 } as const;
 
-export type IconName = keyof typeof FILLED | keyof typeof STROKED;
+/** Icons drawn pixel by pixel on a 12 x 12 grid ('X' is filled), centred in the 16 x 16 box. */
+const PIXELS = {
+  select: [
+    'X...........',
+    'XX..........',
+    'XXX.........',
+    'XXXX........',
+    'XXXXX.......',
+    'XXXXXX......',
+    'XXXXXXX.....',
+    'XXXXXXXX....',
+    'XXXXX.......',
+    'XX.XXX......',
+    'X...XXX.....',
+    '.....XX.....',
+  ],
+  pick: [
+    '.XXXXXXXXXX.',
+    'XX...XX...XX',
+    'X....XX....X',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+  ],
+  axe: [
+    '.....XX.....',
+    '..XXXXX.....',
+    '.XXXXXX.....',
+    'XXXXXXX.....',
+    '.XXXXXX.....',
+    '..XXXXX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+    '.....XX.....',
+  ],
+  priority: [
+    '.....XX.....',
+    '....XXXX....',
+    '...XXXXXX...',
+    '..XXX..XXX..',
+    '.XXX....XXX.',
+    '.....XX.....',
+    '....XXXX....',
+    '...XXXXXX...',
+    '..XXX..XXX..',
+    '.XXX....XXX.',
+    '............',
+    '............',
+  ],
+  focus: [
+    '.....XX.....',
+    '.....XX.....',
+    '..XXXXXXXX..',
+    '..X......X..',
+    '..X..XX..X..',
+    'XXX.XXXX.XXX',
+    'XXX.XXXX.XXX',
+    '..X..XX..X..',
+    '..X......X..',
+    '..XXXXXXXX..',
+    '.....XX.....',
+    '.....XX.....',
+  ],
+} as const;
+
+/** One 1 x 1 square per filled pixel, offset by 2 to centre a 12 x 12 map in the 16 x 16 box. */
+function pixelPath(rows: readonly string[]): string {
+  let path = '';
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) if (row[x] === 'X') path += `M${x + 2} ${y + 2}h1v1h-1z`;
+  });
+  return path;
+}
+
+const PIXEL_PATHS = Object.fromEntries(Object.entries(PIXELS).map(([name, rows]) => [name, pixelPath(rows)])) as Record<
+  keyof typeof PIXELS,
+  string
+>;
+
+export type IconName = keyof typeof FILLED | keyof typeof STROKED | keyof typeof PIXELS;
 
 export function Icon({ name }: { name: IconName }) {
   return (
@@ -24,6 +112,8 @@ export function Icon({ name }: { name: IconName }) {
           stroke-linecap="square"
           fill="none"
         />
+      ) : name in PIXELS ? (
+        <path d={PIXEL_PATHS[name as keyof typeof PIXELS]} fill="currentColor" />
       ) : (
         <path d={FILLED[name as keyof typeof FILLED]} fill="currentColor" fill-rule="evenodd" />
       )}

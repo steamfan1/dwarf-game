@@ -19,6 +19,11 @@ export const ACTIONS = [
   'speed2',
   'speed3',
   'cancel',
+  'toolSelect',
+  'toolDig',
+  'toolChop',
+  'toolCancel',
+  'toolPriority',
   'toggleMinimap',
   'toggleDebug',
 ] as const;
@@ -41,6 +46,11 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   speed2: ['Digit2'],
   speed3: ['Digit3'],
   cancel: ['Escape'],
+  toolSelect: ['KeyQ'],
+  toolDig: ['KeyF'],
+  toolChop: ['KeyC'],
+  toolCancel: ['KeyX'],
+  toolPriority: ['KeyP'],
   toggleMinimap: ['KeyM'],
   toggleDebug: ['Backquote'],
 };

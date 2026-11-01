@@ -9,7 +9,9 @@ import type { InputActions } from '../platform/InputActions';
 import type { AudioService } from '../render/AudioService';
 import type { TileViewRect } from '../render/Minimap';
 import type { GameSession } from '../sim/GameSession';
-import type { DebugStats, HoverInfo } from '../ui/state';
+import type { Priority } from '../sim/jobs/JobBoard';
+import type { CellRect } from '../sim/world/World';
+import type { DebugStats, HoverInfo, Tool } from '../ui/state';
 
 /** Controls the game scene offers back to the app once the world is on screen. */
 export interface GameView {
@@ -37,6 +39,20 @@ export interface GameContext {
   reportHover(hover: HoverInfo | null): void;
   /** Called a few times a second by the game scene while the debug overlay is open. */
   reportDebugStats(stats: DebugStats): void;
+  /** Called a few times a second: refresh the dwarf roster and the stored resources. */
+  reportColony(): void;
+
+  /** The toolbar's current tool and priority. */
+  readonly tool: Tool;
+  readonly priority: Priority;
+  /** Use the current tool on a rectangle of cells (a click is a 1 x 1 rectangle). */
+  applyTool(rect: CellRect): void;
+  /** Right-click: put the current tool down (back to selecting). */
+  dropTool(): void;
+  readonly selectedDwarf: number | null;
+  selectDwarf(id: number | null): void;
+  /** Debug overlay option: show light levels instead of the fog of war. */
+  readonly debugLight: boolean;
 }
 
 let current: GameContext | null = null;

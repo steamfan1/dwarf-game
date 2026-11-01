@@ -7,9 +7,10 @@ home from monsters at night, and finally build a gate to the next world.
 All names, art, sound and text are original to this project. Art and sound are generated
 at runtime as placeholders, so the game currently needs no image or audio files.
 
-**Status: Milestone 1 (world).** Worlds are generated from a seed in a background worker
-(hills, caves, lakes, lava, ores, trees, two biomes), drawn with chunked tilemaps under a
-fog of war, and you can pan, zoom and dig by clicking. Dwarves arrive in Milestone 2. See
+**Status: Milestone 2 (dwarves).** Worlds are generated from a seed in a background worker
+(hills, caves, lakes, lava, ores, trees, two biomes) and drawn with chunked tilemaps. Three
+dwarves start beside the Hearth; you mark blocks to dig and trees to fell, and they find
+their way there, do the work and carry what comes out back to the Hearth. See
 [Roadmap](#roadmap) for what each milestone adds.
 
 ## Requirements
@@ -36,11 +37,26 @@ Then open http://localhost:5173.
 | `npm run smoke` | Browser smoke tests against the build (run `npx playwright install chromium` once first) |
 | `npm run check` | Build, unit tests and smoke tests in one go |
 
-## Controls (Milestone 1)
+## Controls (Milestone 2)
+
+You never move dwarves or change the world yourself: you mark work, and idle dwarves
+take it on. Pick a tool from the toolbar on the left (or press its key), then click or
+drag over the world.
+
+| Tool | Key | What a click or drag does |
+| --- | --- | --- |
+| Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
+| Dig | F | Mark blocks for digging |
+| Fell trees | C | Mark a tree for felling (click any part of it) |
+| Cancel marks | X | Remove dig and felling marks |
+| Priority | P | Set marked work to the priority picked under the tools (Low, Normal, High, Urgent) |
+
+New marks get the priority picked under the tools; dwarves always take the most urgent
+work first, then the nearest. Right-click (or Esc) puts the tool down; with no tool in
+hand it deselects the dwarf.
 
 | Input | Action |
 | --- | --- |
-| Left-click or drag | Dig the blocks under the pointer (instant for now; dwarves take over in Milestone 2) |
 | W A S D or arrow keys | Pan the camera (hold Shift to go faster) |
 | Screen edges | Pan the camera when the pointer rests there (can be turned off in Settings) |
 | Middle-drag | Drag the map around |
@@ -48,15 +64,32 @@ Then open http://localhost:5173.
 | M | Show or hide the minimap (click it to jump there) |
 | Space | Pause / resume |
 | 1, 2, 3 | Normal, double, triple speed |
-| Esc | Open or close the in-game menu, close dialogs |
-| ` (backtick) | Debug overlay: FPS, frame time, tick cost, camera, cursor, chunk borders |
+| Esc | Close a dialog, put the tool down, deselect the dwarf, or open the in-game menu |
+| ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
 
 Every key can be changed in **Settings → Key bindings**. Keys are matched by physical
 position, so the defaults stay put on AZERTY or Dvorak keyboards. Keys the browser
 reserves (F3, F5, F11, F12, Tab, and any Ctrl/Alt/Cmd combination) can't be bound.
 
 The game pauses itself when you switch to another tab, and stays paused when you come
-back until you press Space. The camera still moves while the game is paused.
+back until you press Space. The camera still moves while the game is paused, and you can
+mark work while paused too.
+
+### How the colony works
+
+- **Dwarves dig, fell and haul.** An idle dwarf takes the most urgent marked job it can
+  reach, walks there (walking, jumping up one tile, climbing ladders, swimming, and
+  dropping up to four tiles; longer falls hurt), and works at it. Harder blocks take
+  longer, and dwarves dig faster as their mining skill grows. Dug blocks and felled trees
+  drop items, which dwarves carry to the Hearth when nothing more urgent is waiting. The
+  top bar shows what's stored; the panel on the right lists everything.
+- **Nobody gets stranded.** Dwarves only take work they can reach and come back from, and
+  they won't dig out a block if that would leave someone in a hole they can't climb out
+  of. Such work shows a red mark until a way opens up (dig steps or a ramp to it).
+- **What light reaches, you can see.** Sunlight lights the sky and a few blocks into the
+  ground, so the whole surface is visible from the start; lava and glow crystals light up
+  the caves around them. Everything else stays dark until a dwarf comes close or light
+  reaches it. (Day and night arrive in Milestone 4.)
 
 ### Choosing a world
 
@@ -80,15 +113,21 @@ src/
   core/            pure building blocks: event bus, fixed timestep, seeded RNG, settings,
                    key bindings, time control, string table
   sim/             pure game state and rules
-    world/         the tile grid (typed arrays) and the tile registry built from tiles.json
+    world/         the tile grid (typed arrays), the tile registry built from tiles.json, trees
     worldgen/      seeded world generation: terrain, caves, liquids, ores, vegetation
+    light/         per-tile light (sunlight, lava, the Hearth) that also decides what's explored
+    nav/           how dwarves move, A* pathfinding with a per-tick budget and a path cache
+    jobs/          the job board: dig, fell and haul jobs, reservations and priorities
+    dwarves/       dwarves (data), their behaviour (DwarfAI) and colony settings
+    items/         the item registry, items lying in the world, and the colony's storage
   workers/         the world-generation Web Worker
   platform/        browser APIs with graceful failure: storage, keyboard, input guards
   render/          Phaser: scenes, camera, asset manifest, viewport sizing, audio
-    world/         chunked tilemaps, terrain atlas and tile art, fog of war, tile cursor
+    world/         chunked tilemaps, terrain atlas and tile art, fog of war, dwarf and item
+                   sprites, designation marks, selection box, tile cursor
   ui/              HTML/CSS overlay in Preact: menus, HUD, settings, debug panel
   debug/           window.debug helpers (dev builds only)
-  data/            game content as JSON (strings now; tiles, items, recipes... later)
+  data/            game content as JSON: tiles, biomes, world generation, items, dwarves, strings
 e2e/               browser smoke tests (Playwright)
 .github/workflows/ CI and GitHub Pages deployment
 ```
@@ -118,9 +157,26 @@ e2e/               browser smoke tests (Playwright)
   so memory depends on the screen size rather than the world size. Digging a block redraws
   just that cell and its four neighbours. Block edges, outlines and grass caps come from
   one generated terrain atlas.
+- **Light decides what's explored.** `sim/light/Lighting.ts` keeps one light value per
+  tile: sunlight falls down each column, lava, glow crystals and the Hearth glow, and light
+  spreads by flood fill, dimming faster through blocks and water. Any lit cell counts as
+  explored, as do cells near a dwarf. A dug block relights only the cells within reach of
+  it (a few hundred), never the whole world.
 - **Fog of war** is a 400 x 200 texture (one pixel per tile) stretched over the world,
-  updated only where cells are revealed, at most once per frame. Lighting joins it in
-  Milestone 4.
+  updated only where cells are revealed, at most once per frame. In Milestone 4 the same
+  texture also shows darkness from the light levels.
+- **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`), found from the tile
+  grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
+  per tick; a dwarf whose turn doesn't come waits a tick, so a burst of orders never drops
+  a frame. Paths are cached, and a terrain change forgets only the paths through its
+  chunk. Two flood fills from the Hearth (`HomeMaps`) tell which cells a dwarf can reach
+  and come back from, which is how dwarves avoid work that would strand them.
+- **Jobs** live on a board (`sim/jobs/JobBoard.ts`): most urgent first, then nearest, then
+  oldest. Claiming a job reserves it, so two dwarves never take the same one. Work done is
+  kept on the job, so an interrupted dig isn't lost.
+- **The player only gives orders.** Tools call `Simulation.designate`, `cancelDesignations`
+  and `prioritize`, which only add, remove or change jobs. The world changes only through
+  the dwarves' work (and, in Milestone 7, spells).
 - **Event bus.** Systems announce what happened on a typed bus (`core/EventBus.ts`,
   event list in `sim/events.ts`) instead of calling each other.
 - **HTML UI over the canvas.** Panels are Preact components styled with plain CSS
@@ -143,8 +199,9 @@ at runtime.
 - **Text:** every player-visible string is in `src/data/strings/en.json` and is looked up
   with `t('key')`. Placeholders look like `{name}`. A translation would be another file
   with the same keys.
-- **Items, recipes, the tech tree, creatures and spells** get their JSON files in
-  Milestones 3 to 7, documented here as they arrive.
+- **Items** are in `src/data/items.json` and **dwarves** (names, looks, speeds, skills) in
+  `src/data/dwarves.json`, both described below. **Recipes, the tech tree, creatures and
+  spells** get their JSON files in Milestones 3 to 7, documented here as they arrive.
 
 Every file is checked when the game starts. A mistake (a misspelt tile id, a colour that
 isn't `#rrggbb`, a range with min above max) stops the game with a message naming the
@@ -177,10 +234,12 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 | `id` | snake_case, unique. Saves and other files refer to tiles by this id. |
 | `name` | Shown when the pointer is over the tile. |
 | `solid` | Blocks movement and can be stood on. Non-solid tiles (trunks, leaves, grass tufts) can be walked through. |
-| `hardness` | Relative digging time, 1 = dirt (used from Milestone 2). |
+| `hardness` | Relative digging time, 1 = dirt (see `digTicksPerHardness` in dwarves.json). |
 | `indestructible` | Can never be dug (bedrock). |
-| `drops` | Item id left behind when dug (items arrive in Milestone 3). |
+| `drops` | Item id (from items.json) left behind when dug, or when a tree's trunk is felled. |
 | `replaceable` | Building or growing over it simply removes it (grass tufts, flowers). |
+| `climbable` | Dwarves climb up and down through it and can stand on it (ladders). |
+| `light` | Light it gives off, 0 to 15 (15 is daylight). Liquids can glow too (lava is 12). |
 | `connect` | What the tile visually joins with: `solid` (default for solid tiles), `self` or `none`. |
 | `mapColor` | Colour on the minimap. |
 | `art` | How the placeholder art is painted (below). |
@@ -216,6 +275,40 @@ Veins only replace their `host` rock, between `minDepth` and `maxDepth` (0 = the
 surface, 1 = the bottom of the world). So adding a new ore takes two steps: a tile entry
 in tiles.json and an ore rule here.
 
+### Items: `src/data/items.json`
+
+```json
+{
+  "id": "tin_ore",
+  "name": "Tin ore",
+  "category": "ore",
+  "description": "Pale rock with dull grey flecks.",
+  "stack": 50,
+  "icon": { "style": "ore", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad", "accent": "#c8d2d8" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | snake_case, unique. Tiles' `drops` and (later) recipes refer to items by this id. |
+| `name`, `description` | Shown in the HUD. |
+| `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food` or `furniture`. |
+| `stack` | Most of the item in one pile on the ground or in a dwarf's arms (default 50). |
+| `icon` | The placeholder icon: `style` is `lump`, `pile`, `ball`, `gem`, `ore` or `log`, with `base`, `dark` and `light` colours and an `accent` for ore flecks. |
+
+Every tile's `drops` must name an item here; the game checks this at start-up. So a new
+ore takes three entries: the tile, its ore rule in worldgen.json, and the item it drops.
+
+### Dwarves: `src/data/dwarves.json`
+
+How many dwarves the colony starts with (`startingDwarves`) and can grow to
+(`maxDwarves`), the name parts and colours new dwarves are made from, and the numbers that
+set the pace of the game: `movement` (ticks per step for each kind of move, the safe drop
+and fall damage), `vision` (how near a dwarf must be to uncover a cell), `work` (ticks to
+dig a block of hardness 1, to fell a tree, to pick up and put down) and `skills` (the
+experience each level needs and how much faster each level works). There are 20 ticks per
+second at normal speed.
+
 ### Replacing placeholder art and sound
 
 Every texture and sound is listed in one manifest, `src/render/assets/manifest.ts`, and
@@ -228,10 +321,13 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 
 - `npm test` runs the unit tests in `src/**/*.test.ts`.
 - `npm run smoke` drives the game in headless Chromium twice, once on the production build
-  and once on the dev server (`npm run dev`): creating worlds in both biomes, digging,
-  zooming and panning, the minimap, the simulation ticking at the right rate, pause, menu,
-  settings, right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and each test's
-  browser console log go to `test-results/`.
+  and once on the dev server (`npm run dev`): creating worlds in both biomes, checking the
+  picture and that the sunlit surface is visible, marking blocks and a tree and watching
+  the dwarves dig, fell and haul, the dwarf panel, zooming and panning, the minimap, the
+  simulation ticking at the right rate, pause, menu, settings, right-click and mouse-wheel
+  blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
+  each test's browser console log go to `test-results/`. `e2e/perf.spec.ts` also records
+  frame rates and a CPU profile for comparing runs.
 - GitHub Actions runs type-checking, unit tests, the build and the smoke test on every
   push (`.github/workflows/ci.yml`). Failures show up as annotations on the run, and each
   run's screenshots, browser console logs and results are copied to the `ci-output`
@@ -241,12 +337,16 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 ## Debug tools
 
 - Press **`** (backtick) in game for the debug overlay: frame and tick timing, camera and
-  cursor tiles, chunks drawn, the seed, and chunk borders drawn over the world. More
-  in-world overlays (paths, job reservations, rooms, light levels) arrive with their systems.
+  cursor tiles, chunks drawn, jobs by type (and how many are blocked), pathfinding
+  counts, and how far the dwarves can range from the Hearth. In the world it draws chunk
+  borders, each dwarf's remaining path (cyan) and the job it has reserved (gold), and the
+  "Show light levels" box swaps the fog of war for the light map. Room regions arrive in
+  Milestone 4.
 - In dev builds (`npm run dev`), the browser console has `window.debug`:
-  `debug.setSpeed(5)` runs the simulation 5x faster on top of the chosen speed and
-  `debug.revealMap()` lifts the fog of war; `spawnItem(id, count)` and `skipToNight()`
-  become active in the milestones that add items and day/night.
+  `debug.setSpeed(5)` runs the simulation 5x faster on top of the chosen speed,
+  `debug.revealMap()` lifts the fog of war, and `debug.spawnItem('stone', 20)` drops items
+  beside the Hearth for the dwarves to store. `skipToNight()` becomes active with day and
+  night in Milestone 4.
 
 ## Deploying
 
@@ -288,12 +388,12 @@ static host works the same way: upload the contents of `dist/`.
 | --- | --- | --- |
 | 0 | Scaffold: Vite + TypeScript + Phaser 4, title screen, empty game scene, settings, CI | Done |
 | 1 | World generation in a worker, chunked tile rendering, camera, digging by click | Done |
-| 2 | Dwarves, pathfinding, job queue (dig, chop, haul) | Next |
-| 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | |
+| 2 | Dwarves, pathfinding, job queue (dig, chop, haul); light shows the surface | Done |
+| 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Next |
 | 4 | Hunger and sleep, day/night, lighting overlay, room detection | |
 | 5 | Monsters, combat, invasion waves, defences | |
 | 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | |
-| 7 | Magic, full save system (slots, export/import), UI polish, balance | |
+| 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | |
 | 8 | Release: bundle optimisation, cross-browser testing, publishing guides | |
 
 ## Tech

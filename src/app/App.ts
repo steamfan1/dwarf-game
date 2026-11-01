@@ -3,9 +3,12 @@
  *
  * Owns the long-lived pieces (settings, keyboard input, storage, the Phaser game, audio)
  * and the running GameSession, and implements:
- *   - UiCommands: what the HTML UI can ask for (new game, pause, settings...);
- *   - GameContext: what Phaser scenes need to read (session, input, pixel ratio...).
+ *   - UiCommands: what the HTML UI can ask for (new game, pause, tools, settings...);
+ *   - GameContext: what Phaser scenes need to read (session, input, current tool...).
  * Nothing else wires systems together, so this file is the map of how the app fits.
+ *
+ * Player orders go through here to the simulation, and only ever mark work (dig, fell,
+ * cancel, re-prioritise): the dwarves are the ones who change the world.
  */
 import type * as Phaser from 'phaser';
 import type { GameSpeed } from '../config';
@@ -21,20 +24,27 @@ import { probeStorage, SafeKeyValueStore, storageIsPersistent } from '../platfor
 import { generateWorldInWorker } from '../platform/worldgenClient';
 import { AudioService } from '../render/AudioService';
 import { createGame } from '../render/createGame';
+import { itemIconUrl } from '../render/assets/itemArt';
 import { MinimapRenderer, type TileViewRect } from '../render/Minimap';
 import { SceneKeys } from '../render/scenes/keys';
 import { ViewportManager } from '../render/ViewportManager';
-import { BIOMES, TILES } from '../sim/content';
+import { describeActivity } from '../render/world/describeCell';
+import { BIOMES, CONTENT, TILES } from '../sim/content';
+import { EQUIPMENT_SLOTS, SKILLS, type Dwarf } from '../sim/dwarves/Dwarf';
 import { GameSession } from '../sim/GameSession';
-import { World } from '../sim/world/World';
+import type { Priority } from '../sim/jobs/JobBoard';
+import type { Simulation } from '../sim/Simulation';
+import { World, type CellRect } from '../sim/world/World';
 import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
-import { pushToast, uiState, type DebugStats, type HoverInfo } from '../ui/state';
+import { pushToast, uiState, type DebugStats, type DwarfSummary, type HoverInfo, type Tool } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
 import { provideGameContext, type GameContext, type GameView } from './context';
 import { randomSeed, worldOptionsFromQuery } from './worldOptions';
 
 const SETTINGS_STORAGE_KEY = 'gatewright.settings';
 const SETTINGS_SAVE_DELAY_MS = 300;
+/** "Some work can't be reached" is said at most this often. */
+const BLOCKED_TOAST_GAP_MS = 20_000;
 
 export interface AppElements {
   /** Wraps the canvas and the overlay. */
@@ -63,6 +73,7 @@ export class App implements UiCommands, GameContext {
   private pendingReveal = false;
   /** Bumped on every new game or quit, so a slow world generation can tell it was abandoned. */
   private generation = 0;
+  private lastBlockedToast = -Infinity;
 
   constructor(elements: AppElements) {
     this.elements = elements;
@@ -125,6 +136,53 @@ export class App implements UiCommands, GameContext {
     uiState.set({ debug: stats });
   }
 
+  /** Refresh the HUD's dwarf roster and stored resources from the simulation. */
+  reportColony(): void {
+    const sim = this.session?.sim;
+    if (!sim) return;
+    const resources = sim.storage.entries().map(({ item, count }) => {
+      const def = sim.items.get(item);
+      return { id: def.id, name: def.name, count, icon: itemIconUrl(sim.items, item) };
+    });
+    uiState.set({ colony: { dwarves: sim.dwarves.map((dwarf) => summarizeDwarf(sim, dwarf)), resources } });
+  }
+
+  get tool(): Tool {
+    return uiState.get().tool;
+  }
+
+  get priority(): Priority {
+    return uiState.get().priority;
+  }
+
+  get selectedDwarf(): number | null {
+    return uiState.get().selectedDwarf;
+  }
+
+  get debugLight(): boolean {
+    return uiState.get().debugLight;
+  }
+
+  /** Use the current tool on a rectangle of cells. Tools only mark work; dwarves do it. */
+  applyTool(rect: CellRect): void {
+    const sim = this.session?.sim;
+    if (!sim) return;
+    const { tool, priority } = uiState.get();
+    let changed: number;
+    if (tool === 'dig' || tool === 'chop') changed = sim.designate(tool, rect, priority);
+    else if (tool === 'cancel') changed = sim.cancelDesignations(rect);
+    else if (tool === 'priority') changed = sim.prioritize(rect, priority);
+    else return;
+    if (changed > 0) this.audio?.play(tool === 'cancel' ? 'uiClose' : 'uiClick');
+  }
+
+  /** Right-click: put the tool down, or (with no tool in hand) deselect the dwarf. */
+  dropTool(): void {
+    const ui = uiState.get();
+    if (ui.tool !== 'select') this.setTool('select');
+    else if (ui.selectedDwarf !== null) this.selectDwarf(null);
+  }
+
   // ---- UiCommands --------------------------------------------------------------------
 
   /** Open the New world dialog, preset from the page address if it names a seed or biome. */
@@ -153,7 +211,7 @@ export class App implements UiCommands, GameContext {
     game.scene.stop(SceneKeys.game);
     this.endSession();
     game.scene.start(SceneKeys.title);
-    uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null, hover: null, world: null });
+    uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null, hover: null, world: null, ...FRESH_COLONY_UI });
   }
 
   centerCameraOn(tileX: number, tileY: number): void {
@@ -167,6 +225,25 @@ export class App implements UiCommands, GameContext {
 
   toggleMinimap(): void {
     uiState.update((s) => ({ minimapOpen: !s.minimapOpen }));
+  }
+
+  setTool(tool: Tool): void {
+    uiState.set({ tool });
+  }
+
+  setPriority(priority: Priority): void {
+    uiState.set({ priority });
+  }
+
+  selectDwarf(id: number | null, focus = false): void {
+    uiState.set({ selectedDwarf: id });
+    if (!focus || id === null) return;
+    const dwarf = this.session?.sim.dwarf(id);
+    if (dwarf) this.gameView?.centerOnTile(dwarf.x, dwarf.y);
+  }
+
+  setDebugLight(on: boolean): void {
+    uiState.set({ debugLight: on });
   }
 
   togglePause(): void {
@@ -245,7 +322,7 @@ export class App implements UiCommands, GameContext {
       if (generation !== this.generation) return;
       console.info(`World "${options.seed}" (${options.biome}) generated in ${result.stats.milliseconds} ms`, result.stats);
 
-      const session = new GameSession(World.fromSnapshot(result.snapshot), TILES);
+      const session = new GameSession(World.fromSnapshot(result.snapshot), CONTENT);
       this.session = session;
       this.pendingReveal = options.reveal;
       this.minimap = new MinimapRenderer(session.world, TILES, BIOMES.get(session.world.biome).sky);
@@ -255,6 +332,18 @@ export class App implements UiCommands, GameContext {
         session.bus.on('TimeChanged', (time) => uiState.set({ time })),
         session.bus.on('TileChanged', ({ x, y }) => minimap.updateCells({ x0: x, y0: y, x1: x, y1: y })),
         session.bus.on('ExploredChanged', (rect) => minimap.updateCells(rect)),
+        session.bus.on('SkillUp', ({ name, skill, level }) => {
+          pushToast(t('toast.skillUp', { name, skill: t(`skill.${skill}`), level }), 'info', 5000);
+        }),
+        session.bus.on('DwarfDied', ({ name, cause }) => {
+          pushToast(t('toast.dwarfDied', { name, cause: t(`toast.cause.${cause}`) }), 'error', 9000);
+        }),
+        session.bus.on('JobBlocked', () => {
+          const now = performance.now();
+          if (now - this.lastBlockedToast < BLOCKED_TOAST_GAP_MS) return;
+          this.lastBlockedToast = now;
+          pushToast(t('toast.jobBlocked'), 'warning', 7000);
+        }),
       );
       uiState.set({
         loading: { stage: 'building', progress: 0.97 },
@@ -262,6 +351,7 @@ export class App implements UiCommands, GameContext {
         debug: null,
         hover: null,
         world: { seed: options.seed, biomeName: BIOMES.get(options.biome).name },
+        ...FRESH_COLONY_UI,
       });
       // Let the loading screen show its last step before building the map blocks the thread briefly.
       await nextFrame();
@@ -324,6 +414,11 @@ export class App implements UiCommands, GameContext {
     this.input.onPressed('speed3', () => this.setSpeed(3));
     this.input.onPressed('toggleDebug', () => this.toggleDebug());
     this.input.onPressed('toggleMinimap', () => this.toggleMinimap());
+    this.input.onPressed('toolSelect', () => this.setTool('select'));
+    this.input.onPressed('toolDig', () => this.setTool('dig'));
+    this.input.onPressed('toolChop', () => this.setTool('chop'));
+    this.input.onPressed('toolCancel', () => this.setTool('cancel'));
+    this.input.onPressed('toolPriority', () => this.setTool('priority'));
     this.input.onPressed('cancel', () => this.cancel());
     this.input.attach(window);
   }
@@ -335,7 +430,7 @@ export class App implements UiCommands, GameContext {
     return ui.screen === 'game' && !ui.menuOpen && !ui.settingsOpen;
   }
 
-  /** Esc: close the topmost dialog, or open the in-game menu. */
+  /** Esc: close the topmost dialog, put down the tool, deselect the dwarf, or else open the in-game menu. */
   private cancel(): void {
     const ui = uiState.get();
     if (ui.settingsOpen) {
@@ -347,6 +442,8 @@ export class App implements UiCommands, GameContext {
     } else if (ui.screen === 'game' && ui.menuOpen) {
       this.playSound('uiClose');
       this.closeMenu();
+    } else if (ui.screen === 'game' && (ui.tool !== 'select' || ui.selectedDwarf !== null)) {
+      this.dropTool();
     } else if (ui.screen === 'game') {
       this.playSound('uiOpen');
       this.openMenu();
@@ -388,6 +485,41 @@ export class App implements UiCommands, GameContext {
     this.minimap = null;
     this.pendingReveal = false;
   }
+}
+
+/** The HUD's colony state for a world that has just started (or ended). */
+const FRESH_COLONY_UI = { tool: 'select', selectedDwarf: null, colony: null } as const;
+
+/** One dwarf as the roster and the dwarf panel show it. */
+function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {
+  const levels = sim.colony.skills.levels;
+  const dead = dwarf.phase === 'dead';
+  const stranded = !dead && !sim.homeMaps.canGetHome(sim.world.index(dwarf.x, dwarf.y));
+  return {
+    id: dwarf.id,
+    name: dwarf.name,
+    activity: describeActivity(sim, dwarf, stranded),
+    health: Math.max(0, Math.round(dwarf.health)),
+    maxHealth: dwarf.maxHealth,
+    hunger: Math.round(dwarf.hunger),
+    energy: Math.round(dwarf.energy),
+    skills: SKILLS.map((skill) => {
+      const { level, xp } = dwarf.skills[skill];
+      const from = levels[level - 1] ?? 0;
+      const to = levels[level];
+      return { skill, level, progress: to === undefined ? 1 : Math.min(1, (xp - from) / (to - from)) };
+    }),
+    equipment: EQUIPMENT_SLOTS.map((slot) => {
+      const item = dwarf.equipment[slot];
+      return { slot, item: item === null ? null : sim.items.get(item).name };
+    }),
+    carrying: dwarf.carrying
+      ? { name: sim.items.get(dwarf.carrying.item).name, count: dwarf.carrying.count, icon: itemIconUrl(sim.items, dwarf.carrying.item) }
+      : null,
+    dead,
+    stranded,
+    tunic: sim.colony.looks.tunic[dwarf.looks.tunic] ?? '#888888',
+  };
 }
 
 function applyUiScale(scale: number): void {

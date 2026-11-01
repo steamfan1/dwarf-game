@@ -1,8 +1,10 @@
 /**
- * Debug overlay (backtick key): frame and simulation timing. In-world overlays (paths,
- * job reservations, rooms, light levels, chunk borders) are added by later milestones.
+ * Debug overlay (backtick key): frame and simulation timing, jobs and pathfinding. In the
+ * world it draws chunk borders, each dwarf's path (cyan) and reserved job (gold), and can
+ * swap the fog of war for the light levels. Room regions join in Milestone 4.
  */
 import { t } from '../../core/strings';
+import { useCommands } from '../commands';
 import { useStore } from '../hooks';
 import { uiState } from '../state';
 
@@ -11,7 +13,9 @@ function fixed(value: number | undefined, digits: number): string {
 }
 
 export function DebugPanel() {
+  const commands = useCommands();
   const stats = useStore(uiState, (s) => s.debug);
+  const showLight = useStore(uiState, (s) => s.debugLight);
   const time = useStore(uiState, (s) => s.time);
   const world = useStore(uiState, (s) => s.world);
   const speed = !time
@@ -49,9 +53,21 @@ export function DebugPanel() {
         <dd data-testid="debug-chunks">{stats ? stats.chunksDrawn : '—'}</dd>
         <dt>{t('debug.chunkLayers')}</dt>
         <dd>{stats ? stats.chunkLayers : '—'}</dd>
+        <dt>{t('debug.jobs')}</dt>
+        <dd data-testid="debug-jobs">
+          {stats ? t('debug.jobsValue', { dig: stats.jobs.dig, chop: stats.jobs.chop, haul: stats.jobs.haul, blocked: stats.jobs.blocked }) : '—'}
+        </dd>
+        <dt>{t('debug.paths')}</dt>
+        <dd>{stats ? t('debug.pathsValue', { searches: stats.paths.searches, hits: stats.paths.cacheHits, busy: stats.paths.busy }) : '—'}</dd>
+        <dt>{t('debug.home')}</dt>
+        <dd>{stats ? t('debug.homeValue', { from: stats.homeCells.fromHome, to: stats.homeCells.toHome }) : '—'}</dd>
         <dt>{t('debug.seed')}</dt>
         <dd>{world?.seed ?? '—'}</dd>
       </dl>
+      <label class="debug-option">
+        <input type="checkbox" checked={showLight} onChange={(event) => commands.setDebugLight(event.currentTarget.checked)} />
+        {t('debug.showLight')}
+      </label>
     </aside>
   );
 }

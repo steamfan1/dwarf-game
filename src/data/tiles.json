@@ -162,10 +162,11 @@
     },
     {
       "id": "crystal",
-      "name": "Crystal",
+      "name": "Glow crystal",
       "solid": true,
       "hardness": 4,
       "drops": "crystal",
+      "light": 8,
       "mapColor": "#55e0d4",
       "art": {
         "style": "crystal",
@@ -304,6 +305,36 @@
           "...bbBBbbbb....."
         ]
       }
+    },
+    {
+      "id": "ladder",
+      "name": "Ladder",
+      "solid": false,
+      "climbable": true,
+      "connect": "none",
+      "mapColor": "#8a603a",
+      "art": {
+        "style": "sprite",
+        "palette": { "r": "#a4774a", "R": "#6b4628", "u": "#9c6f45", "U": "#5f3f24" },
+        "rows": [
+          "...rR......rR...",
+          "...rRuuuuuurR...",
+          "...rRUUUUUUrR...",
+          "...rR......rR...",
+          "...rR......rR...",
+          "...rRuuuuuurR...",
+          "...rRUUUUUUrR...",
+          "...rR......rR...",
+          "...rR......rR...",
+          "...rRuuuuuurR...",
+          "...rRUUUUUUrR...",
+          "...rR......rR...",
+          "...rR......rR...",
+          "...rRuuuuuurR...",
+          "...rRUUUUUUrR...",
+          "...rR......rR..."
+        ]
+      }
     }
   ],
   "walls": [
@@ -354,6 +385,7 @@
       "id": "lava",
       "name": "Lava",
       "mapColor": "#e8652b",
+      "light": 12,
       "art": { "base": "#e8652b", "light": "#ffc04a", "dark": "#b8381c", "alpha": 1 }
     }
   ]

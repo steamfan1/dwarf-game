@@ -4,6 +4,7 @@ import { useEffect } from 'preact/hooks';
 import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
 import { CommandsContext, SettingsContext, type UiCommands } from './commands';
+import { ColonyPanel } from './components/ColonyPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { GameHud } from './components/GameHud';
 import { GameMenu } from './components/GameMenu';
@@ -35,7 +36,13 @@ function UiRoot() {
       {screen === 'fatal' && <FatalScreen />}
       {screen === 'game' && menuOpen && !settingsOpen && <GameMenu />}
       {settingsOpen && <SettingsPanel />}
-      {debugOpen && <DebugPanel />}
+      {(debugOpen || screen === 'game') && (
+        // The right-hand column: the debug panel above the colony panels, never overlapping.
+        <div class="side-column">
+          {debugOpen && <DebugPanel />}
+          {screen === 'game' && <ColonyPanel />}
+        </div>
+      )}
       <StorageWarning />
       <Toasts />
     </>

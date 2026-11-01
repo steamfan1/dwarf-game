@@ -4,7 +4,7 @@
  * (see src/workers/worldgen.worker.ts) and directly in unit tests.
  *
  * Steps, in order: terrain shape and layers, material blobs, caves, surface pools,
- * underground lakes and lava, ore veins, vegetation, then the spawn and starting view.
+ * underground lakes and lava, ore veins, vegetation, then the spawn point.
  */
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../../config';
 import { Rng } from '../../core/Rng';
@@ -77,9 +77,8 @@ export function generateWorld(options: WorldGenOptions, onProgress: ProgressCall
 
   onProgress('finishing', 0.95);
   // The Hearth stands on the flat ground in the spawn area; the dwarves start beside it.
+  // Nothing is explored yet: when the game starts, whatever light reaches is (see Lighting).
   world.spawn = { x: ctx.spawnX, y: ctx.heights[ctx.spawnX]! - 1 };
-  const { radiusX, radiusY } = WORLDGEN.exploredAtStart;
-  world.revealEllipse(world.spawn.x, world.spawn.y, radiusX, radiusY);
 
   return {
     snapshot: world.toSnapshot(),

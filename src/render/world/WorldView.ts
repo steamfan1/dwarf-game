@@ -1,6 +1,6 @@
 /**
- * Draws the world with Phaser tilemap layers, one pair per 32 x 32 chunk: a layer of
- * background walls and a layer of blocks and liquids in front of it.
+ * Draws the world with Phaser tilemap layers, three per 32 x 32 chunk: background walls,
+ * blocks and liquids in front of them, and the dig and chop marks on designated work.
  *
  * Only chunks near the camera have layers. They come from a pool: when a chunk scrolls
  * into view it borrows a free pair (or a new one, if every pair is busy), which is moved
@@ -10,7 +10,8 @@
  * touches chunks that are out of sight.
  *
  * When a cell changes, only that cell and its four neighbours (whose edge outlines may
- * change) are redrawn, and only if their chunks are on screen.
+ * change) are redrawn, and only if their chunks are on screen. Marks are redrawn cell by
+ * cell as designations come and go.
  */
 import * as Phaser from 'phaser';
 import { CHUNK_SIZE, TILE_SIZE } from '../../config';
@@ -33,10 +34,17 @@ const SHOW_MARGIN = 4 * TILE_SIZE;
 /** Chunks keep their layers until they are this far out of view, so panning back and forth doesn't refill them. */
 const KEEP_MARGIN = CHUNK_SIZE * TILE_SIZE;
 
+/** Tile index where the marks tileset starts, well clear of the terrain atlas's frames. */
+const MARK_GID = 1 << 14;
+
 interface ChunkLayers {
   walls: Phaser.Tilemaps.TilemapLayer;
   blocks: Phaser.Tilemaps.TilemapLayer;
+  marks: Phaser.Tilemaps.TilemapLayer;
 }
+
+/** The mark frame (see colonyArt.ts markFrame) to draw on a cell, or -1 for none. */
+export type MarkLookup = (x: number, y: number) => number;
 
 export class WorldView {
   private readonly world: World;
@@ -44,19 +52,31 @@ export class WorldView {
   private readonly layout: AtlasLayout;
   private readonly map: Phaser.Tilemaps.Tilemap;
   private readonly tileset: Phaser.Tilemaps.Tileset;
+  private readonly marksTileset: Phaser.Tilemaps.Tileset;
+  private readonly markAt: MarkLookup;
   /** Layers in use, by chunk index. */
   private readonly active = new Map<number, ChunkLayers>();
   private readonly pool: ChunkLayers[] = [];
   private layersCreated = 0;
 
-  constructor(scene: Phaser.Scene, world: World, tiles: TileRegistry, layout: AtlasLayout, textureKey: string) {
+  constructor(
+    scene: Phaser.Scene,
+    world: World,
+    tiles: TileRegistry,
+    layout: AtlasLayout,
+    textures: { terrain: string; marks: string },
+    markAt: MarkLookup,
+  ) {
     this.world = world;
     this.tiles = tiles;
     this.layout = layout;
+    this.markAt = markAt;
     this.map = scene.make.tilemap({ tileWidth: TILE_SIZE, tileHeight: TILE_SIZE, width: CHUNK_SIZE, height: CHUNK_SIZE });
-    const tileset = this.map.addTilesetImage('terrain', textureKey, TILE_SIZE, TILE_SIZE, ATLAS_MARGIN, ATLAS_SPACING);
-    if (!tileset) throw new Error('Could not create the terrain tileset');
+    const tileset = this.map.addTilesetImage('terrain', textures.terrain, TILE_SIZE, TILE_SIZE, ATLAS_MARGIN, ATLAS_SPACING);
+    const marksTileset = this.map.addTilesetImage('marks', textures.marks, TILE_SIZE, TILE_SIZE, 0, 0, MARK_GID);
+    if (!tileset || !marksTileset) throw new Error('Could not create the tilesets');
     this.tileset = tileset;
+    this.marksTileset = marksTileset;
   }
 
   /** Number of chunks currently drawn (for the debug overlay). */
@@ -78,6 +98,13 @@ export class WorldView {
       const layers = this.active.get(this.world.chunkIndex(cx, cy));
       if (layers) this.drawCell(layers, cx, cy);
     }
+  }
+
+  /** Redraw the designation mark on one cell (if its chunk is on screen). */
+  refreshMark(x: number, y: number): void {
+    if (!this.world.inBounds(x, y)) return;
+    const layers = this.active.get(this.world.chunkIndex(x, y));
+    if (layers) this.drawMark(layers, x, y);
   }
 
   /** Give layers to the chunks around the camera's view (world pixels) and take them back from far-away ones. */
@@ -109,7 +136,7 @@ export class WorldView {
   private assign(chunk: number): void {
     const layers = this.pool.pop() ?? this.createLayers();
     const cells = this.world.chunkCells(chunk);
-    for (const layer of [layers.walls, layers.blocks]) layer.setPosition(cells.x0 * TILE_SIZE, cells.y0 * TILE_SIZE).setVisible(true);
+    for (const layer of [layers.walls, layers.blocks, layers.marks]) layer.setPosition(cells.x0 * TILE_SIZE, cells.y0 * TILE_SIZE).setVisible(true);
     this.active.set(chunk, layers);
     // Fill every cell; cells past the edge of the world (in the last row and column of
     // chunks, which are smaller) are cleared, since the layer may have drawn another chunk.
@@ -120,8 +147,10 @@ export class WorldView {
         if (x > cells.x1 || y > cells.y1) {
           layers.walls.putTileAt(-1, lx, ly, false);
           layers.blocks.putTileAt(-1, lx, ly, false);
+          layers.marks.putTileAt(-1, lx, ly, false);
         } else {
           this.drawCell(layers, x, y);
+          this.drawMark(layers, x, y);
         }
       }
     }
@@ -130,18 +159,28 @@ export class WorldView {
   private release(chunk: number, layers: ChunkLayers): void {
     layers.walls.setVisible(false);
     layers.blocks.setVisible(false);
+    layers.marks.setVisible(false);
     this.active.delete(chunk);
     this.pool.push(layers);
   }
 
   private createLayers(): ChunkLayers {
     const id = this.layersCreated++;
-    const make = (name: string, depth: number): Phaser.Tilemaps.TilemapLayer => {
-      const layer = this.map.createBlankLayer(`${name}-${id}`, this.tileset, 0, 0, CHUNK_SIZE, CHUNK_SIZE);
+    const make = (name: string, tileset: Phaser.Tilemaps.Tileset, depth: number): Phaser.Tilemaps.TilemapLayer => {
+      const layer = this.map.createBlankLayer(`${name}-${id}`, tileset, 0, 0, CHUNK_SIZE, CHUNK_SIZE);
       if (!layer) throw new Error(`Could not create tilemap layer ${name}-${id}`);
       return layer.setDepth(depth);
     };
-    return { walls: make('walls', DEPTH.walls), blocks: make('blocks', DEPTH.blocks) };
+    return {
+      walls: make('walls', this.tileset, DEPTH.walls),
+      blocks: make('blocks', this.tileset, DEPTH.blocks),
+      marks: make('marks', this.marksTileset, DEPTH.marks),
+    };
+  }
+
+  private drawMark(layers: ChunkLayers, x: number, y: number): void {
+    const frame = this.markAt(x, y);
+    layers.marks.putTileAt(frame < 0 ? -1 : MARK_GID + frame, x % CHUNK_SIZE, y % CHUNK_SIZE, false);
   }
 
   private drawCell(layers: ChunkLayers, x: number, y: number): void {

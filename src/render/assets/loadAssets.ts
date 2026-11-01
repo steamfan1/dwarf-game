@@ -43,6 +43,11 @@ export function createGeneratedAssets(scene: Phaser.Scene): void {
   createAnimations(scene);
 }
 
+/** Paint a generated texture under `key` unless it already exists (e.g. a dwarf's own colours). */
+export function ensureGeneratedTexture(scene: Phaser.Scene, key: string, source: Extract<TextureSource, { kind: 'generated' }>): void {
+  if (!scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
+}
+
 function addGeneratedTexture(
   scene: Phaser.Scene,
   key: string,

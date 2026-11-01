@@ -14,10 +14,20 @@
  * so a hand-made replacement has to keep that layout.
  */
 import type { Rng } from '../../core/Rng';
-import { TILES } from '../../sim/content';
+import { ITEMS, TILES } from '../../sim/content';
 import { createAtlasLayout, paintAtlas } from '../world/tileAtlas';
 import {
-  DWARF_FRAME_COUNT,
+  CRACK_FRAMES,
+  DEFAULT_DWARF_COLOURS,
+  DWARF_SHEET_FRAMES,
+  MARK_FRAMES,
+  paintCracks,
+  paintDwarfLookSheet,
+  paintMarks,
+  type DwarfColours,
+} from './colonyArt';
+import { ITEM_ICON_SIZE, paintItemAtlas } from './itemArt';
+import {
   DWARF_FRAME_SIZE,
   GATE_HEIGHT,
   GATE_WIDTH,
@@ -26,7 +36,6 @@ import {
   HEARTH_HEIGHT,
   HEARTH_WIDTH,
   paintDirtStrip,
-  paintDwarfSheet,
   paintGate,
   paintGateGlow,
   paintGrassStrip,
@@ -69,17 +78,30 @@ export type TextureSource = GeneratedTexture | ImageTexture;
 export const DWARF_FRAMES: FrameGrid = {
   frameWidth: DWARF_FRAME_SIZE,
   frameHeight: DWARF_FRAME_SIZE,
-  count: DWARF_FRAME_COUNT,
+  count: DWARF_SHEET_FRAMES,
 };
 
-export const TEXTURES = {
-  dwarf: {
+/**
+ * A dwarf sheet in one dwarf's colours (frames in colonyArt.ts DWARF_FRAMES). Each dwarf
+ * gets its own texture, made the first time it appears; see dwarfTextureKey.
+ */
+export function dwarfSheet(colours: DwarfColours): GeneratedTexture {
+  return {
     kind: 'generated',
-    width: DWARF_FRAME_SIZE * DWARF_FRAME_COUNT,
+    width: DWARF_FRAME_SIZE * DWARF_SHEET_FRAMES,
     height: DWARF_FRAME_SIZE,
     frames: DWARF_FRAMES,
-    paint: paintDwarfSheet,
-  },
+    paint: (ctx) => paintDwarfLookSheet(ctx, colours),
+  };
+}
+
+export function dwarfTextureKey(colours: DwarfColours): string {
+  return `dwarf:${colours.skin}:${colours.beard}:${colours.tunic}`;
+}
+
+export const TEXTURES = {
+  /** The title screen's dwarves, in the default colours. */
+  dwarf: dwarfSheet(DEFAULT_DWARF_COLOURS),
   groundGrass: { kind: 'generated', width: GROUND_STRIP_WIDTH, height: 16, paint: paintGrassStrip },
   groundDirt: { kind: 'generated', width: GROUND_STRIP_WIDTH, height: 16, paint: paintDirtStrip },
   titleSky: { kind: 'generated', width: 8, height: SKY_BAND_HEIGHT * 12, paint: paintSky },
@@ -116,6 +138,24 @@ export const TEXTURES = {
     height: HEARTH_HEIGHT,
     frames: { frameWidth: HEARTH_WIDTH, frameHeight: HEARTH_HEIGHT, count: HEARTH_FRAMES },
     paint: paintHearth,
+  },
+  /** Item icons from items.json; frame n is item number n. */
+  items: {
+    kind: 'generated',
+    width: ITEM_ICON_SIZE * ITEMS.items.length,
+    height: ITEM_ICON_SIZE,
+    frames: { frameWidth: ITEM_ICON_SIZE, frameHeight: ITEM_ICON_SIZE, count: ITEMS.items.length },
+    paint: (ctx) => paintItemAtlas(ctx, ITEMS),
+  },
+  /** Dig and chop marks by priority, and blocked marks (see colonyArt.ts markFrame). */
+  marks: { kind: 'generated', width: 16 * MARK_FRAMES, height: 16, paint: paintMarks },
+  /** Cracks in a block being dug, in four stages. */
+  cracks: {
+    kind: 'generated',
+    width: 16 * CRACK_FRAMES,
+    height: 16,
+    frames: { frameWidth: 16, frameHeight: 16, count: CRACK_FRAMES },
+    paint: paintCracks,
   },
 } satisfies Record<string, TextureSource>;
 

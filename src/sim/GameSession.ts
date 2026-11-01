@@ -9,9 +9,9 @@ import { MAX_FRAME_MS, MAX_TICKS_PER_FRAME, TICK_MS } from '../config';
 import { EventBus } from '../core/EventBus';
 import { FixedTimestep } from '../core/FixedTimestep';
 import { TimeControl } from '../core/TimeControl';
+import type { GameContent } from './content';
 import type { GameEvents } from './events';
 import { Simulation } from './Simulation';
-import type { TileRegistry } from './world/TileRegistry';
 import type { World } from './world/World';
 
 export class GameSession {
@@ -26,8 +26,8 @@ export class GameSession {
   private readonly now: () => number;
   private readonly unsubscribeTime: () => void;
 
-  constructor(world: World, tiles: TileRegistry, now: () => number = () => performance.now()) {
-    this.sim = new Simulation({ world, tiles, bus: this.bus });
+  constructor(world: World, content: GameContent, now: () => number = () => performance.now()) {
+    this.sim = new Simulation({ world, ...content, bus: this.bus });
     this.now = now;
     this.unsubscribeTime = this.time.onChange((state) => this.bus.emit('TimeChanged', state));
   }

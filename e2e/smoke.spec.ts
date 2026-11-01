@@ -5,7 +5,7 @@
 import { createWorld, expect, readNumber, test } from './fixtures';
 import { decodePng, pixelAt } from './png';
 
-test('a new world: terrain, digging, camera, minimap, pause and menus', async ({ page, browserErrors }, testInfo) => {
+test('a new world: dwarves dig and fell what the player marks; camera, minimap, pause and menus', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   await expect(page.locator('#game canvas')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(500);
@@ -13,6 +13,8 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
 
   await createWorld(page, { seed: 'smoke-test' });
   await expect(page.getByTestId('minimap')).toBeVisible();
+  // Three dwarves start beside the Hearth.
+  await expect(page.getByTestId('roster-dwarf')).toHaveCount(3);
   await page.waitForTimeout(800);
   const world = decodePng(await page.screenshot({ path: testInfo.outputPath('2-world.png') }));
 
@@ -32,6 +34,26 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
     expect(blueness(centre.x + dx * tile, groundY), `ground ${dx} tiles from the Hearth`).toBeLessThan(30);
   }
   expect(blueness(centre.x, centre.y - 7 * tile), 'sky above the Hearth').toBeGreaterThan(40);
+
+  // Light shows the whole sunlit surface, explored or not. On the minimap (one pixel per
+  // tile), the first thing under the sky in every column is ground or a tree, never the
+  // near-black of an unexplored cell.
+  const hiddenColumns = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="minimap"] canvas')!;
+    const { data, width, height } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+    let hidden = 0;
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        const o = (y * width + x) * 4;
+        const [r, g, b] = [data[o]!, data[o + 1]!, data[o + 2]!];
+        if (b > 150 && b - r > 30) continue; // sky (or a pool of water)
+        if (r < 30 && g < 30 && b < 40) hidden++;
+        break;
+      }
+    }
+    return hidden;
+  });
+  expect(hiddenColumns, 'columns whose surface is still hidden in the dark').toBe(0);
 
   // The debug overlay (backtick) shows the simulation tick, which advances 20 times a
   // second at 1x as long as frames come at least 4 times a second (longer frames are
@@ -53,17 +75,54 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   await page.waitForTimeout(800);
   await expect(page.getByTestId('debug-camera')).toHaveText(settled ?? '');
 
-  // The dirt three columns right of the Hearth and two rows below the surface.
-  const dirt = { x: centre.x + 3 * tile, y: centre.y + 5 * tile };
-  await page.mouse.move(dirt.x, dirt.y);
+  // Only dwarves change the world: clicking with the Select tool digs nothing.
   const readout = page.getByTestId('hover-title');
-  await expect(readout).toHaveText(/Dirt|Clay|Stone/);
+  const surfaceY = centre.y + 3 * tile; // the row of ground the Hearth stands on
+  await page.mouse.move(centre.x + 3 * tile, surfaceY);
+  await expect(readout).toHaveText('Grassy dirt');
   await page.mouse.down();
   await page.mouse.up();
-  await expect(readout).toHaveText('Open cave');
-  await page.screenshot({ path: testInfo.outputPath('3-dug.png') });
+  await expect(readout).toHaveText('Grassy dirt');
 
-  // Zoom with the + key and the mouse wheel; pan with D.
+  // With the Dig tool (F), dragging along the ground marks three blocks right of the Hearth.
+  await page.keyboard.press('KeyF');
+  await expect(page.getByTestId('tool-dig')).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.down();
+  await page.mouse.move(centre.x + 5 * tile, surfaceY, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByTestId('hover-readout')).toContainText(/Marked for digging|on the way|is on it/);
+  await expect(page.getByTestId('debug-jobs')).toContainText(/[1-3] dig/);
+  await page.screenshot({ path: testInfo.outputPath('3-marked.png') });
+
+  // At triple speed the dwarves dig all three, then carry the dirt to the Hearth.
+  await page.keyboard.press('Digit3');
+  await expect(page.getByTestId('debug-jobs')).toContainText('0 dig', { timeout: 30_000 });
+  await expect(page.getByTestId('stored-dirt')).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: testInfo.outputPath('4-dug.png') });
+
+  // The Fell trees tool (C) marks the whole tree when any part of it is clicked; the
+  // dwarves cut it down and store the wood. The nearest tree stands six columns right.
+  await page.keyboard.press('KeyC');
+  await page.mouse.move(centre.x + 6 * tile, centre.y);
+  await expect(readout).toHaveText('Oak trunk');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.getByTestId('debug-jobs')).toContainText(/1 fell/);
+  await expect(page.getByTestId('debug-jobs')).toContainText('0 fell', { timeout: 30_000 });
+  await expect(page.getByTestId('stored-log')).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: testInfo.outputPath('5-felled.png') });
+
+  // Back to the Select tool (Q). Picking a dwarf in the roster opens its details; Esc closes them.
+  await page.keyboard.press('KeyQ');
+  await page.getByTestId('roster-dwarf').first().click();
+  await expect(page.getByTestId('dwarf-details')).toBeVisible();
+  await expect(page.getByTestId('dwarf-details')).toContainText('Mining');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('dwarf-details')).toBeHidden();
+  await expect(page.getByTestId('game-menu')).toBeHidden();
+
+  // Zoom with the + key and the mouse wheel (over the world, not the roster); pan with D.
+  await page.mouse.move(centre.x, centre.y);
   await expect(page.getByTestId('debug-zoom')).toHaveText('2×');
   await page.keyboard.press('Equal');
   await expect(page.getByTestId('debug-zoom')).toHaveText('3×');
@@ -96,9 +155,9 @@ test('a new world: terrain, digging, camera, minimap, pause and menus', async ({
   await page.waitForTimeout(800);
   expect(await readNumber(page, 'debug-ticks')).toBe(pausedAt);
 
-  // Key 3 resumes at triple speed.
-  await page.keyboard.press('Digit3');
-  await expect(page.getByTestId('debug-speed')).toHaveText('3×');
+  // Key 2 resumes at double speed.
+  await page.keyboard.press('Digit2');
+  await expect(page.getByTestId('debug-speed')).toHaveText('2×');
 
   // Esc opens the in-game menu, which names the world; Settings opens from there.
   await page.keyboard.press('Escape');

@@ -1,0 +1,95 @@
+{
+  "items": [
+    {
+      "id": "dirt",
+      "name": "Dirt",
+      "category": "block",
+      "description": "Loose earth. Good for filling holes.",
+      "icon": { "style": "lump", "base": "#7a5236", "dark": "#5b3c26", "light": "#94694a" }
+    },
+    {
+      "id": "clay",
+      "name": "Clay",
+      "category": "material",
+      "description": "Sticky red earth that fires into bricks.",
+      "icon": { "style": "lump", "base": "#9a5c43", "dark": "#7a4532", "light": "#b8765c" }
+    },
+    {
+      "id": "sand",
+      "name": "Sand",
+      "category": "material",
+      "description": "Fine pale grit from the pond shores.",
+      "icon": { "style": "pile", "base": "#d7c28a", "dark": "#b49d63", "light": "#efe0ad" }
+    },
+    {
+      "id": "snowball",
+      "name": "Snowball",
+      "category": "material",
+      "description": "Packed snow. It won't last near a fire.",
+      "icon": { "style": "ball", "base": "#e3ecf6", "dark": "#b5c7dc", "light": "#ffffff" }
+    },
+    {
+      "id": "ice",
+      "name": "Ice",
+      "category": "material",
+      "description": "A clear, cold block from a frozen pool.",
+      "icon": { "style": "gem", "base": "#a9d6ee", "dark": "#79b0d0", "light": "#e2f6ff" }
+    },
+    {
+      "id": "stone",
+      "name": "Stone",
+      "category": "block",
+      "description": "Grey rock, the colony's basic building stone.",
+      "icon": { "style": "lump", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad" }
+    },
+    {
+      "id": "deep_stone",
+      "name": "Deep stone",
+      "category": "block",
+      "description": "Dense blue-grey rock from far below.",
+      "icon": { "style": "lump", "base": "#545a6e", "dark": "#3a3f50", "light": "#737a91" }
+    },
+    {
+      "id": "basalt",
+      "name": "Basalt",
+      "category": "block",
+      "description": "Black rock formed where lava cooled.",
+      "icon": { "style": "lump", "base": "#3e3537", "dark": "#272022", "light": "#5c4f52" }
+    },
+    {
+      "id": "copper_ore",
+      "name": "Copper ore",
+      "category": "ore",
+      "description": "Rock threaded with soft orange metal.",
+      "icon": { "style": "ore", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad", "accent": "#e08a48" }
+    },
+    {
+      "id": "iron_ore",
+      "name": "Iron ore",
+      "category": "ore",
+      "description": "Heavy rock streaked with rust.",
+      "icon": { "style": "ore", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad", "accent": "#c89a80" }
+    },
+    {
+      "id": "gold_ore",
+      "name": "Gold ore",
+      "category": "ore",
+      "description": "Deep rock glinting with gold.",
+      "icon": { "style": "ore", "base": "#545a6e", "dark": "#3a3f50", "light": "#737a91", "accent": "#f6cc48" }
+    },
+    {
+      "id": "crystal",
+      "name": "Glow crystal",
+      "category": "ore",
+      "description": "A crystal that gives off a faint light of its own.",
+      "icon": { "style": "gem", "base": "#55e0d4", "dark": "#2a9f9a", "light": "#c8fff8" }
+    },
+    {
+      "id": "log",
+      "name": "Wood",
+      "category": "material",
+      "description": "A length of trunk, ready to be sawn into planks.",
+      "icon": { "style": "log", "base": "#7a5232", "dark": "#523621", "light": "#c49a64" }
+    }
+  ]
+}

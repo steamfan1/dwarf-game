@@ -26,7 +26,7 @@ describe('asset manifest', () => {
 
   it('gives generated textures sizes that fit their frame grids', () => {
     for (const source of Object.values(TEXTURES)) {
-      if (source.kind !== 'generated' || !('frames' in source)) continue;
+      if (source.kind !== 'generated' || !('frames' in source) || !source.frames) continue;
       const { frameWidth, frameHeight, count } = source.frames;
       const columns = Math.floor(source.width / frameWidth);
       expect(columns * Math.floor(source.height / frameHeight)).toBeGreaterThanOrEqual(count);

@@ -55,10 +55,14 @@ export interface TileDef {
   indestructible: boolean;
   /** Relative time to dig; 1 is dirt. */
   hardness: number;
-  /** Item id dropped when dug (items arrive in Milestone 3). */
+  /** Item id dropped when dug or chopped (see items.json). */
   drops: string | null;
   /** Building or growing over it simply replaces it (grass tufts, leaves). */
   replaceable: boolean;
+  /** Dwarves can climb up and down through it, and stand on top of it (ladders). */
+  climbable: boolean;
+  /** Light it gives off, 0 (none) to 15 (as bright as daylight). */
+  light: number;
   connect: ConnectRule;
   mapColor: string;
   art: TileArt;
@@ -77,6 +81,8 @@ export interface LiquidDef {
   id: string;
   name: string;
   mapColor: string;
+  /** Light it gives off, 0 to 15 (lava glows). */
+  light: number;
   art: { base: string; light: string; dark: string; alpha: number };
 }
 
@@ -98,6 +104,12 @@ export class TileRegistry {
   readonly replaceable: Uint8Array;
   /** Tiles with equal non-zero groups join up visually; 0 never joins anything. */
   readonly connectGroup: Uint16Array;
+  /** 1 where a tile id can be climbed (ladders). */
+  readonly climbable: Uint8Array;
+  /** Light given off by each tile id, 0..15. */
+  readonly lightEmitted: Uint8Array;
+  /** Light given off by each liquid type (index 0 is "no liquid"), 0..15. */
+  readonly liquidLight: Uint8Array;
 
   private readonly tileIds: ReadonlyMap<string, number>;
   private readonly wallIds: ReadonlyMap<string, number>;
@@ -115,12 +127,17 @@ export class TileRegistry {
     this.diggable = new Uint8Array(tiles.length);
     this.replaceable = new Uint8Array(tiles.length);
     this.connectGroup = new Uint16Array(tiles.length);
+    this.climbable = new Uint8Array(tiles.length);
+    this.lightEmitted = new Uint8Array(tiles.length);
     tiles.forEach((tile, i) => {
       this.solid[i] = tile.solid ? 1 : 0;
       this.diggable[i] = tile.solid && !tile.indestructible ? 1 : 0;
       this.replaceable[i] = tile.replaceable ? 1 : 0;
       this.connectGroup[i] = tile.connect === 'solid' ? 1 : tile.connect === 'self' ? 2 + i : 0;
+      this.climbable[i] = tile.climbable ? 1 : 0;
+      this.lightEmitted[i] = tile.light;
     });
+    this.liquidLight = Uint8Array.from([0, ...liquids.map((liquid) => liquid.light)]);
   }
 
   /** Validate raw JSON and build the registry. Throws one error listing every problem found. */
@@ -238,6 +255,8 @@ function parseTile(v: Validator, raw: unknown, path: string): TileDef {
     hardness: o?.hardness === undefined ? 1 : v.number(o.hardness, `${path}.hardness`, 0.1, 100),
     drops: o?.drops === undefined ? null : v.identifier(o.drops, `${path}.drops`),
     replaceable: o?.replaceable === undefined ? false : v.boolean(o.replaceable, `${path}.replaceable`),
+    climbable: o?.climbable === undefined ? false : v.boolean(o.climbable, `${path}.climbable`),
+    light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
     connect,
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: parseArt(v, o?.art, `${path}.art`),
@@ -262,6 +281,7 @@ function parseLiquid(v: Validator, raw: unknown, path: string): LiquidDef {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
+    light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
     art: {
       base: v.color(art?.base, `${path}.art.base`),
       light: v.color(art?.light, `${path}.art.light`),

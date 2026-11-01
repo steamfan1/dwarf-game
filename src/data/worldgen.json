@@ -61,6 +61,5 @@
       "size": [3, 5]
     }
   ],
-  "decorations": { "caveMushroomChance": 0.05 },
-  "exploredAtStart": { "radiusX": 26, "radiusY": 13 }
+  "decorations": { "caveMushroomChance": 0.05 }
 }
