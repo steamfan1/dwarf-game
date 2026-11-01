@@ -443,10 +443,9 @@ body {
   top: 0.5em;
   right: 0.5em;
   bottom: 11em; /* clear of the minimap */
-  width: 17em;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 0.5em;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -458,6 +457,8 @@ body {
 }
 
 .colony-panel {
+  box-sizing: border-box;
+  width: 19.3em;
   padding: 0.5em 0.65em;
   font-size: 0.88em;
 }
@@ -1013,9 +1014,10 @@ input[type='checkbox'] {
 
 /* ---- Debug overlay --------------------------------------------------------------- */
 
-/* Lives in the right-hand column (see .side-column). */
+/* Lives in the right-hand column (see .side-column), wider than the colony panels below it. */
 .debug-panel {
-  min-width: 15em;
+  box-sizing: border-box;
+  width: 34em;
   padding: 0.5em 0.7em;
   font-family: var(--font-mono);
   font-size: 0.75em;
