@@ -1,5 +1,7 @@
 /**
  * The left toolbar. A tool decides what a click or drag on the world does:
+ *   Auto        mark whatever is clicked: blocks for digging, trees for felling (and
+ *               pick a dwarf, or remove a mark, with a click);
  *   Select      pick a dwarf to see its details;
  *   Dig         mark blocks for the dwarves to dig;
  *   Fell trees  mark trees for the dwarves to cut down;
@@ -26,6 +28,7 @@ interface ToolSpec {
 }
 
 const TOOLS: readonly ToolSpec[] = [
+  { tool: 'auto', icon: 'auto', label: 'tool.auto', tip: 'tool.auto.tip', action: 'toolAuto' },
   { tool: 'select', icon: 'select', label: 'tool.select', tip: 'tool.select.tip', action: 'toolSelect' },
   { tool: 'dig', icon: 'pick', label: 'tool.dig', tip: 'tool.dig.tip', action: 'toolDig' },
   { tool: 'chop', icon: 'axe', label: 'tool.chop', tip: 'tool.chop.tip', action: 'toolChop' },
@@ -34,7 +37,7 @@ const TOOLS: readonly ToolSpec[] = [
 ];
 
 /** Tools whose marks or changes use the priority level. */
-const USES_PRIORITY: ReadonlySet<Tool> = new Set<Tool>(['dig', 'chop', 'priority']);
+const USES_PRIORITY: ReadonlySet<Tool> = new Set<Tool>(['auto', 'dig', 'chop', 'priority']);
 
 export function Toolbar() {
   const commands = useCommands();

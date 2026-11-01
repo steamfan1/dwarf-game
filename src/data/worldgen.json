@@ -12,8 +12,7 @@
     "soilDepth": [6, 13],
     "deepStoneAt": 0.62,
     "basaltAt": 0.9,
-    "bedrockRows": 3,
-    "wallStartBelowSurface": 2
+    "bedrockRows": 3
   },
   "blobs": { "clay": 18, "dirtInStone": 30 },
   "caves": {

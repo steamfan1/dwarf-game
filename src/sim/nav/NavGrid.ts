@@ -4,14 +4,16 @@
  *
  *   walk   one tile left or right onto ground          cost 1 (2 through water)
  *   jump   one tile up and one across, onto a ledge     cost 2 (needs headroom above)
- *   climb  one tile up or down a ladder                 cost 1.5
+ *   climb  one tile up or down a ladder or a wall       cost 1.5
  *   swim   one tile up or down through water            cost 2
  *   drop   step off an edge and fall up to `safeDrop`   cost 1 + tiles fallen
  *          tiles (or let go of a ladder and fall)
  *
+ * Dwarves climb ladders, and also any open cell with a background wall behind it: every
+ * natural block has a wall, so a dug-out shaft or a cave can be climbed like a ladder.
  * A cell can be stood in if it isn't solid or lava and has something to stand on: a
- * solid block or a ladder below, a ladder in the cell itself, or water to swim in.
- * Trees, grass and flowers don't get in the way.
+ * solid block or something climbable below, something climbable in the cell itself, or
+ * water to swim in. Trees, grass and flowers don't get in the way.
  *
  * The navigation graph is implicit: `forEachMove` works out a cell's moves from the
  * tiles when the pathfinder asks, so terrain changes never leave a stale graph behind.
@@ -67,9 +69,14 @@ export class NavGrid {
     return world.inBounds(x, y) && this.tiles.solid[world.fg[y * world.width + x]!] === 1;
   }
 
+  /** A ladder, or an open cell (not solid, not lava) with a background wall behind it. */
   climbableAt(x: number, y: number): boolean {
     const { world } = this;
-    return world.inBounds(x, y) && this.tiles.climbable[world.fg[y * world.width + x]!] === 1;
+    if (!world.inBounds(x, y)) return false;
+    const i = y * world.width + x;
+    const tile = world.fg[i]!;
+    if (this.tiles.climbable[tile] === 1) return true;
+    return world.bg[i] !== 0 && this.tiles.solid[tile] === 0 && world.liquidType[i] !== this.lavaType;
   }
 
   waterAt(x: number, y: number): boolean {

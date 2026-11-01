@@ -13,6 +13,21 @@ const STROKED = {
 
 /** Icons drawn pixel by pixel on a 12 x 12 grid ('X' is filled), centred in the 16 x 16 box. */
 const PIXELS = {
+  // A pick and an axe, crossed.
+  auto: [
+    'XXX......XX.',
+    'X.XX....XXX.',
+    '...XX..XXXX.',
+    '....XXXX.XX.',
+    '.....XX.....',
+    '....XXXX....',
+    '...XX..XX...',
+    '..XX....XX..',
+    '.XX......XX.',
+    'XX........XX',
+    'X..........X',
+    '............',
+  ],
   select: [
     'X...........',
     'XX..........',

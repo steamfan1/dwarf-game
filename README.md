@@ -45,6 +45,7 @@ drag over the world.
 
 | Tool | Key | What a click or drag does |
 | --- | --- | --- |
+| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling. A click on a mark removes it; a click on a dwarf selects it |
 | Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
 | Dig | F | Mark blocks for digging |
 | Fell trees | C | Mark a tree for felling (click any part of it) |
@@ -52,8 +53,8 @@ drag over the world.
 | Priority | P | Set marked work to the priority picked under the tools (Low, Normal, High, Urgent) |
 
 New marks get the priority picked under the tools; dwarves always take the most urgent
-work first, then the nearest. Right-click (or Esc) puts the tool down; with no tool in
-hand it deselects the dwarf.
+work first, then the nearest. Right-click (or Esc) puts the tool down, back to Auto; with
+Auto in hand it deselects the dwarf.
 
 | Input | Action |
 | --- | --- |
@@ -78,18 +79,22 @@ mark work while paused too.
 ### How the colony works
 
 - **Dwarves dig, fell and haul.** An idle dwarf takes the most urgent marked job it can
-  reach, walks there (walking, jumping up one tile, climbing ladders, swimming, and
-  dropping up to four tiles; longer falls hurt), and works at it. Harder blocks take
+  reach, walks there (walking, jumping up one tile, climbing ladders and background
+  walls, swimming, and dropping up to four tiles; longer falls hurt), and works at it. Harder blocks take
   longer, and dwarves dig faster as their mining skill grows. Dug blocks and felled trees
   drop items, which dwarves carry to the Hearth when nothing more urgent is waiting. The
   top bar shows what's stored; the panel on the right lists everything.
+- **Walls are for climbing.** Every block in the ground has a background wall behind it,
+  and a dug-out block leaves its wall behind, so dwarves can climb straight up and down
+  the shafts and caves they open (as they climb ladders).
 - **Nobody gets stranded.** Dwarves only take work they can reach and come back from, and
   they won't dig out a block if that would leave someone in a hole they can't climb out
-  of. Such work shows a red mark until a way opens up (dig steps or a ramp to it).
-- **What light reaches, you can see.** Sunlight lights the sky and a few blocks into the
-  ground, so the whole surface is visible from the start; lava and glow crystals light up
-  the caves around them. Everything else stays dark until a dwarf comes close or light
-  reaches it. (Day and night arrive in Milestone 4.)
+  of. Such work shows a red mark until a way opens up.
+- **What sunlight reaches, you can see.** Sunlight lights the sky and a few blocks into
+  the ground, so the whole surface is visible from the start, and it shines further in
+  down every shaft the dwarves open. Lava and glow crystals give off light too, but don't
+  give away what's down there: everything sunlight doesn't reach stays dark until a dwarf
+  comes close. (Day and night arrive in Milestone 4.)
 
 ### Choosing a world
 
@@ -157,16 +162,18 @@ e2e/               browser smoke tests (Playwright)
   so memory depends on the screen size rather than the world size. Digging a block redraws
   just that cell and its four neighbours. Block edges, outlines and grass caps come from
   one generated terrain atlas.
-- **Light decides what's explored.** `sim/light/Lighting.ts` keeps one light value per
-  tile: sunlight falls down each column, lava, glow crystals and the Hearth glow, and light
-  spreads by flood fill, dimming faster through blocks and water. Any lit cell counts as
-  explored, as do cells near a dwarf. A dug block relights only the cells within reach of
-  it (a few hundred), never the whole world.
+- **Sunlight decides what's explored.** `sim/light/Lighting.ts` keeps two light values per
+  tile: sunlight, which falls down each column, and glow, from lava, glow crystals and the
+  Hearth (torches later). Both spread by flood fill, dimming faster through blocks and
+  water. Any sunlit cell counts as explored, as do cells near a dwarf; glow alone never
+  uncovers anything. A dug block relights only the cells within reach of it (a few
+  hundred), never the whole world.
 - **Fog of war** is a 400 x 200 texture (one pixel per tile) stretched over the world,
   updated only where cells are revealed, at most once per frame. In Milestone 4 the same
   texture also shows darkness from the light levels.
-- **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`), found from the tile
-  grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
+- **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`): walking, jumping,
+  dropping, swimming and climbing ladders or background walls. The moves are worked out
+  from the tile grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
   per tick; a dwarf whose turn doesn't come waits a tick, so a burst of orders never drops
   a frame. Paths are cached, and a terrain change forgets only the paths through its
   chunk. Two flood fills from the Hearth (`HomeMaps`) tell which cells a dwarf can reach

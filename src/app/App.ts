@@ -36,7 +36,7 @@ import type { Priority } from '../sim/jobs/JobBoard';
 import type { Simulation } from '../sim/Simulation';
 import { World, type CellRect } from '../sim/world/World';
 import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
-import { pushToast, uiState, type DebugStats, type DwarfSummary, type HoverInfo, type Tool } from '../ui/state';
+import { DEFAULT_TOOL, pushToast, uiState, type DebugStats, type DwarfSummary, type HoverInfo, type Tool } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
 import { provideGameContext, type GameContext, type GameView } from './context';
 import { randomSeed, worldOptionsFromQuery } from './worldOptions';
@@ -169,17 +169,32 @@ export class App implements UiCommands, GameContext {
     if (!sim) return;
     const { tool, priority } = uiState.get();
     let changed: number;
-    if (tool === 'dig' || tool === 'chop') changed = sim.designate(tool, rect, priority);
-    else if (tool === 'cancel') changed = sim.cancelDesignations(rect);
-    else if (tool === 'priority') changed = sim.prioritize(rect, priority);
+    let removed = false;
+    if (tool === 'auto') {
+      const click = rect.x0 === rect.x1 && rect.y0 === rect.y1;
+      const marked = click ? sim.jobs.at(rect.x0, rect.y0) : undefined;
+      if (marked && marked.type !== 'haul') {
+        // Clicking a mark again takes it away.
+        changed = sim.cancelDesignations(rect);
+        removed = true;
+      } else {
+        changed = sim.designate('auto', rect, priority);
+        // A click on nothing that can be marked deselects the dwarf, as with Select.
+        if (click && changed === 0) this.selectDwarf(null);
+      }
+    } else if (tool === 'dig' || tool === 'chop') changed = sim.designate(tool, rect, priority);
+    else if (tool === 'cancel') {
+      changed = sim.cancelDesignations(rect);
+      removed = true;
+    } else if (tool === 'priority') changed = sim.prioritize(rect, priority);
     else return;
-    if (changed > 0) this.audio?.play(tool === 'cancel' ? 'uiClose' : 'uiClick');
+    if (changed > 0) this.audio?.play(removed ? 'uiClose' : 'uiClick');
   }
 
-  /** Right-click: put the tool down, or (with no tool in hand) deselect the dwarf. */
+  /** Right-click: put the tool down (back to Auto), or, with Auto in hand, deselect the dwarf. */
   dropTool(): void {
     const ui = uiState.get();
-    if (ui.tool !== 'select') this.setTool('select');
+    if (ui.tool !== DEFAULT_TOOL) this.setTool(DEFAULT_TOOL);
     else if (ui.selectedDwarf !== null) this.selectDwarf(null);
   }
 
@@ -414,6 +429,7 @@ export class App implements UiCommands, GameContext {
     this.input.onPressed('speed3', () => this.setSpeed(3));
     this.input.onPressed('toggleDebug', () => this.toggleDebug());
     this.input.onPressed('toggleMinimap', () => this.toggleMinimap());
+    this.input.onPressed('toolAuto', () => this.setTool('auto'));
     this.input.onPressed('toolSelect', () => this.setTool('select'));
     this.input.onPressed('toolDig', () => this.setTool('dig'));
     this.input.onPressed('toolChop', () => this.setTool('chop'));
@@ -442,7 +458,7 @@ export class App implements UiCommands, GameContext {
     } else if (ui.screen === 'game' && ui.menuOpen) {
       this.playSound('uiClose');
       this.closeMenu();
-    } else if (ui.screen === 'game' && (ui.tool !== 'select' || ui.selectedDwarf !== null)) {
+    } else if (ui.screen === 'game' && (ui.tool !== DEFAULT_TOOL || ui.selectedDwarf !== null)) {
       this.dropTool();
     } else if (ui.screen === 'game') {
       this.playSound('uiOpen');
@@ -488,7 +504,7 @@ export class App implements UiCommands, GameContext {
 }
 
 /** The HUD's colony state for a world that has just started (or ended). */
-const FRESH_COLONY_UI = { tool: 'select', selectedDwarf: null, colony: null } as const;
+const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null } as const;
 
 /** One dwarf as the roster and the dwarf panel show it. */
 function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {

@@ -68,6 +68,16 @@ export function describeMark(sim: Simulation, job: Job): string {
 
 function toolHint(sim: Simulation, x: number, y: number, tool: Tool, priority: Priority, job: Job | undefined): { action: HoverAction; hint: string } {
   switch (tool) {
+    case 'auto': {
+      if (job) return { action: 'ok', hint: t('tool.auto.unmark') };
+      const target = sim.autoTarget(x, y);
+      if (target === 'chop') return { action: 'ok', hint: t('tool.auto.chop') };
+      if (target === 'dig') return { action: 'ok', hint: t('tool.auto.dig') };
+      // Say why a block can't be dug; open air needs no explanation.
+      const status = sim.digStatus(x, y);
+      if (status === 'nothing-to-dig' || status === 'marked') return { action: 'none', hint: '' };
+      return { action: 'blocked', hint: t(DIG_REASONS[status as Exclude<DigStatus, 'ok'>]) };
+    }
     case 'dig': {
       const status = sim.digStatus(x, y);
       if (status === 'ok') return { action: 'ok', hint: t('tool.dig.hint') };

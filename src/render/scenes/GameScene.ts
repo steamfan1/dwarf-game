@@ -224,9 +224,11 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (!pointer.leftButtonDown() || !this.hovered) return;
-      if (context.tool === 'select') {
-        const world = this.pointerWorld!;
-        context.selectDwarf(this.dwarfSprites.dwarfAt(world.x, world.y, this.session.sim.dwarves));
+      // Select picks a dwarf (or none); Auto picks a dwarf if one is under the pointer.
+      const world = this.pointerWorld!;
+      const dwarf = this.dwarfSprites.dwarfAt(world.x, world.y, this.session.sim.dwarves);
+      if (context.tool === 'select' || (context.tool === 'auto' && dwarf !== null)) {
+        context.selectDwarf(dwarf);
         return;
       }
       this.dragFrom = this.hovered;
@@ -305,7 +307,7 @@ export class GameScene extends Phaser.Scene {
     const world = this.pointerWorld;
     const dwarfId = world ? this.dwarfSprites.dwarfAt(world.x, world.y, sim.dwarves) : null;
     const dwarf = dwarfId === null ? undefined : sim.dwarf(dwarfId);
-    if (dwarf && (context.tool === 'select' || this.dragFrom === null)) {
+    if (dwarf && this.dragFrom === null) {
       const stranded = dwarf.phase !== 'dead' && !sim.homeMaps.canGetHome(sim.world.index(dwarf.x, dwarf.y));
       this.cursor.hide();
       context.reportHover({ title: dwarf.name, detail: describeActivity(sim, dwarf, stranded), action: 'none' });

@@ -1,23 +1,28 @@
 /**
- * Light: one value per cell, from 0 (pitch dark) to MAX_LIGHT (15, full daylight).
+ * Light: two values per cell, each from 0 (pitch dark) to MAX_LIGHT (15, full daylight).
  *
- *  - Sunlight falls straight down every column until it meets a solid block, so open
- *    sky and the bottom of a shaft open to the sky are fully lit.
- *  - Lava, glow crystals and point lights such as the Hearth give off their own light.
- *  - Light then spreads to the four neighbours of each lit cell by flood fill, losing 1
- *    per step through open space, 2 through water and 4 when it enters a solid block.
- *    So daylight reaches about three blocks into the ground, which is enough to see the
- *    surface everywhere, and a lava pool lights up a little of the cave around it.
+ *  - `sun`: sunlight falls straight down every column until it meets a solid block, so
+ *    open sky and the bottom of a shaft open to the sky are fully lit; from there it
+ *    spreads sideways and into the ground.
+ *  - `glow`: light from things that shine on their own: lava, glow crystals and point
+ *    lights such as the Hearth (and, later, torches).
+ *  - `light`: the brighter of the two, which is what the eye sees (the darkness overlay
+ *    in Milestone 4, where night will dim the sun channel only).
  *
- * Anything lit counts as seen: `discover()` marks lit cells as explored, so light, and
- * dwarves walking about, are what lift the fog of war.
+ * In both channels light spreads to the four neighbours of each lit cell by flood fill,
+ * losing 1 per step through open space, 2 through water and 4 when it enters a solid
+ * block. So daylight reaches about three blocks into the ground, which is enough to see
+ * the surface everywhere, and a lava pool lights up a little of the cave around it.
+ *
+ * Only sunlight uncovers the map: `discover()` marks sunlit cells as explored. A lava
+ * lake glowing deep underground stays hidden until a dwarf finds it.
  *
  * When a cell changes, only the cells it could affect are relit: those within 15 cells of
  * it, plus the column below it if sunlight now reaches further down (or less far). Light
  * from outside that area shines in from its edges. That keeps a dug block to a few
  * hundred cells of work instead of the whole 80,000-cell world.
  *
- * Pure: no Phaser and no DOM. Day and night (Milestone 4) will scale the sunlight.
+ * Pure: no Phaser and no DOM.
  */
 import type { TileRegistry } from '../world/TileRegistry';
 import { FLAG_EXPLORED, growRect, type CellRect, type World } from '../world/World';
@@ -31,6 +36,11 @@ const COST_WATER = 2;
 const COST_SOLID = 4;
 
 export class Lighting {
+  /** Sunlight per cell. */
+  readonly sun: Uint8Array;
+  /** Light from lava, glowing blocks and point lights per cell. */
+  readonly glow: Uint8Array;
+  /** The brighter of `sun` and `glow` per cell. */
   readonly light: Uint8Array;
   /** For each column, the row of the first solid block (sunlight stops there); the world's height if there is none. */
   readonly sunDepth: Int16Array;
@@ -41,12 +51,15 @@ export class Lighting {
   private readonly pointLights = new Map<number, number>();
   /** Flood-fill work lists, one per light level, reused between updates. */
   private readonly buckets: number[][] = Array.from({ length: MAX_LIGHT + 1 }, () => []);
-  private waterType = 0;
+  private readonly waterType: number;
 
   constructor(world: World, tiles: TileRegistry) {
     this.world = world;
     this.tiles = tiles;
-    this.light = new Uint8Array(world.width * world.height);
+    const cells = world.width * world.height;
+    this.sun = new Uint8Array(cells);
+    this.glow = new Uint8Array(cells);
+    this.light = new Uint8Array(cells);
     this.sunDepth = new Int16Array(world.width);
     for (let x = 0; x < world.width; x++) this.sunDepth[x] = this.scanSunDepth(x);
     this.waterType = tiles.hasLiquid('water') ? tiles.liquid('water') : 0;
@@ -54,6 +67,10 @@ export class Lighting {
 
   lightAt(x: number, y: number): number {
     return this.world.inBounds(x, y) ? this.light[y * this.world.width + x]! : 0;
+  }
+
+  sunAt(x: number, y: number): number {
+    return this.world.inBounds(x, y) ? this.sun[y * this.world.width + x]! : 0;
   }
 
   /** Light the whole world from scratch. Returns the area relit (all of it). */
@@ -101,17 +118,17 @@ export class Lighting {
   }
 
   /**
-   * Mark every lit cell in a rectangle as explored. Returns the bounding box of the cells
-   * that were newly explored, or null if there were none.
+   * Mark every sunlit cell in a rectangle as explored. Returns the bounding box of the
+   * cells that were newly explored, or null if there were none. Glow doesn't count.
    */
   discover(rect: CellRect): CellRect | null {
-    const { world, light } = this;
+    const { world, sun } = this;
     const flags = world.flags;
     let found: CellRect | null = null;
     for (let y = rect.y0; y <= rect.y1; y++) {
       let i = y * world.width + rect.x0;
       for (let x = rect.x0; x <= rect.x1; x++, i++) {
-        if (light[i] === 0 || flags[i]! & FLAG_EXPLORED) continue;
+        if (sun[i] === 0 || flags[i]! & FLAG_EXPLORED) continue;
         flags[i] = flags[i]! | FLAG_EXPLORED;
         found = found ? growRect(found, x, y) : { x0: x, y0: y, x1: x, y1: y };
       }
@@ -134,43 +151,60 @@ export class Lighting {
     return this.waterType !== 0 && this.world.liquidType[i] === this.waterType ? COST_WATER : COST_OPEN;
   }
 
+  /** Recompute both channels inside `r`, then the combined light. */
+  private relight(r: CellRect): void {
+    const { world, tiles, sunDepth, pointLights } = this;
+    const width = world.width;
+
+    this.spread(this.sun, r, (push) => {
+      for (let x = r.x0; x <= r.x1; x++) {
+        const bottom = Math.min(r.y1, sunDepth[x]! - 1);
+        for (let y = r.y0; y <= bottom; y++) push(y * width + x, MAX_LIGHT);
+      }
+    });
+
+    this.spread(this.glow, r, (push) => {
+      for (let y = r.y0; y <= r.y1; y++) {
+        let i = y * width + r.x0;
+        for (let x = r.x0; x <= r.x1; x++, i++) {
+          const glow = Math.max(tiles.lightEmitted[world.fg[i]!]!, tiles.liquidLight[world.liquidType[i]!] ?? 0);
+          if (glow > 0) push(i, glow);
+        }
+      }
+      for (const [i, level] of pointLights) {
+        const x = i % width;
+        const y = (i - x) / width;
+        if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) push(i, level);
+      }
+    });
+
+    const { sun, glow, light } = this;
+    for (let y = r.y0; y <= r.y1; y++) {
+      const end = y * width + r.x1;
+      for (let i = y * width + r.x0; i <= end; i++) light[i] = sun[i]! > glow[i]! ? sun[i]! : glow[i]!;
+    }
+  }
+
   /**
-   * Recompute light inside `r`, treating light outside it as fixed. Cells are lit by the
-   * sun, by emitters inside `r`, and by lit cells just outside its edge; then light
+   * Recompute one channel inside `r`, treating its values outside `r` as fixed. Cells are
+   * lit by `seed` (sources inside `r`) and by lit cells just outside its edge; then light
    * spreads brightest-first, so every cell ends up with the best light any path brings.
    */
-  private relight(r: CellRect): void {
-    const { world, tiles, light, sunDepth, buckets } = this;
+  private spread(channel: Uint8Array, r: CellRect, seed: (push: (i: number, level: number) => void) => void): void {
+    const { world, buckets } = this;
     const width = world.width;
     const push = (i: number, level: number): void => {
-      if (level <= light[i]!) return;
-      light[i] = level;
+      if (level <= channel[i]!) return;
+      channel[i] = level;
       buckets[level]!.push(i);
     };
 
-    for (let y = r.y0; y <= r.y1; y++) light.fill(0, y * width + r.x0, y * width + r.x1 + 1);
-
-    // Sunlight down each column, then everything that glows.
-    for (let x = r.x0; x <= r.x1; x++) {
-      const bottom = Math.min(r.y1, sunDepth[x]! - 1);
-      for (let y = r.y0; y <= bottom; y++) push(y * width + x, MAX_LIGHT);
-    }
-    for (let y = r.y0; y <= r.y1; y++) {
-      let i = y * width + r.x0;
-      for (let x = r.x0; x <= r.x1; x++, i++) {
-        const glow = Math.max(tiles.lightEmitted[world.fg[i]!]!, tiles.liquidLight[world.liquidType[i]!] ?? 0);
-        if (glow > 0) push(i, glow);
-      }
-    }
-    for (const [i, level] of this.pointLights) {
-      const x = i % width;
-      const y = (i - x) / width;
-      if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) push(i, level);
-    }
+    for (let y = r.y0; y <= r.y1; y++) channel.fill(0, y * width + r.x0, y * width + r.x1 + 1);
+    seed(push);
 
     // Light from just outside the area shines in across its edges.
     const shineIn = (outside: number, inside: number): void => {
-      const level = light[outside]! - this.cost(inside);
+      const level = channel[outside]! - this.cost(inside);
       if (level > 0) push(inside, level);
     };
     for (let x = r.x0; x <= r.x1; x++) {
@@ -188,7 +222,7 @@ export class Lighting {
       const bucket = buckets[level]!;
       while (bucket.length > 0) {
         const i = bucket.pop()!;
-        if (light[i] !== level) continue;
+        if (channel[i] !== level) continue;
         const x = i % width;
         const y = (i - x) / width;
         if (x > r.x0) push(i - 1, level - this.cost(i - 1));

@@ -75,14 +75,28 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
   await page.waitForTimeout(800);
   await expect(page.getByTestId('debug-camera')).toHaveText(settled ?? '');
 
-  // Only dwarves change the world: clicking with the Select tool digs nothing.
+  // Only dwarves change the world: a click with the Select tool (Q) marks nothing.
   const readout = page.getByTestId('hover-title');
+  const jobs = page.getByTestId('debug-jobs');
   const surfaceY = centre.y + 3 * tile; // the row of ground the Hearth stands on
+  await expect(page.getByTestId('tool-auto')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('KeyQ');
   await page.mouse.move(centre.x + 3 * tile, surfaceY);
   await expect(readout).toHaveText('Grassy dirt');
   await page.mouse.down();
   await page.mouse.up();
   await expect(readout).toHaveText('Grassy dirt');
+  await expect(jobs).toContainText(/^0 dig/);
+
+  // The Auto tool (E, and the tool a world starts with) marks a block with a click and
+  // takes the mark away with a second click.
+  await page.keyboard.press('KeyE');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(jobs).toContainText(/^1 dig/);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(jobs).toContainText(/^0 dig/);
 
   // With the Dig tool (F), dragging along the ground marks three blocks right of the Hearth.
   await page.keyboard.press('KeyF');
@@ -91,12 +105,12 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
   await page.mouse.move(centre.x + 5 * tile, surfaceY, { steps: 4 });
   await page.mouse.up();
   await expect(page.getByTestId('hover-readout')).toContainText(/Marked for digging|on the way|is on it/);
-  await expect(page.getByTestId('debug-jobs')).toContainText(/[1-3] dig/);
+  await expect(jobs).toContainText(/^[1-3] dig/);
   await page.screenshot({ path: testInfo.outputPath('3-marked.png') });
 
   // At triple speed the dwarves dig all three, then carry the dirt to the Hearth.
   await page.keyboard.press('Digit3');
-  await expect(page.getByTestId('debug-jobs')).toContainText('0 dig', { timeout: 30_000 });
+  await expect(jobs).toContainText(/^0 dig/, { timeout: 30_000 });
   await expect(page.getByTestId('stored-dirt')).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: testInfo.outputPath('4-dug.png') });
 
@@ -107,13 +121,15 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
   await expect(readout).toHaveText('Oak trunk');
   await page.mouse.down();
   await page.mouse.up();
-  await expect(page.getByTestId('debug-jobs')).toContainText(/1 fell/);
-  await expect(page.getByTestId('debug-jobs')).toContainText('0 fell', { timeout: 30_000 });
+  await expect(jobs).toContainText(/ 1 fell/);
+  await expect(jobs).toContainText(/ 0 fell/, { timeout: 30_000 });
   await expect(page.getByTestId('stored-log')).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: testInfo.outputPath('5-felled.png') });
 
-  // Back to the Select tool (Q). Picking a dwarf in the roster opens its details; Esc closes them.
-  await page.keyboard.press('KeyQ');
+  // Esc puts the tool down (back to Auto). Picking a dwarf in the roster opens its
+  // details; Esc closes them, rather than opening the menu.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('tool-auto')).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('roster-dwarf').first().click();
   await expect(page.getByTestId('dwarf-details')).toBeVisible();
   await expect(page.getByTestId('dwarf-details')).toContainText('Mining');

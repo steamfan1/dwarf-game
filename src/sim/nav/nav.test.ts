@@ -6,8 +6,8 @@ import { Pathfinder, type PathGoal } from './Pathfinder';
 import { PathService } from './PathService';
 
 /**
- * Build a small world from a picture: '#' stone, 'H' ladder, '~' water, 'L' lava, '.' air.
- * Below the last row counts as solid ground.
+ * Build a small world from a picture: '#' stone, 'H' ladder, '~' water, 'L' lava, '.' air,
+ * 'w' air with a background wall behind it. Below the last row counts as solid ground.
  */
 function worldFrom(rows: string[]): World {
   const world = World.empty(rows[0]!.length, rows.length, 'nav-test', 'temperate');
@@ -18,6 +18,7 @@ function worldFrom(rows: string[]): World {
       else if (ch === 'H') world.fg[i] = TILES.tile('ladder');
       else if (ch === '~') world.liquidType[i] = TILES.liquid('water');
       else if (ch === 'L') world.liquidType[i] = TILES.liquid('lava');
+      else if (ch === 'w') world.bg[i] = TILES.wall('stone_wall');
     });
   });
   return world;
@@ -79,6 +80,23 @@ describe('NavGrid moves', () => {
     expect(up.cells.some((cell) => xy(cell)[0] === 4 && xy(cell)[1] < 3)).toBe(true);
     expect(xy(up.cells[up.cells.length - 1]!)).toEqual([0, 0]);
     expect(route(0, 0, 0, 3).found).toBe(true);
+  });
+
+  it('climbs the background wall of a dug-out shaft, down and back up', () => {
+    const { route, nav, xy } = setup(['......', '###w##', '###w##', '###w##', '###w##', '######']);
+    expect(nav.standable(3, 2)).toBe(true);
+    const down = route(0, 0, 3, 4);
+    expect(down.found && down.cells.map(xy).slice(-2)).toEqual([[3, 3], [3, 4]]);
+    expect(route(3, 4, 0, 0).found).toBe(true);
+    expect(nav.moveKind(nav.world.index(3, 3), nav.world.index(3, 2))).toBe('climb');
+  });
+
+  it('moves along a cave wall without falling, but not through open air with no wall', () => {
+    const { route, nav } = setup(['www...', 'www...', 'www...', '######']);
+    expect(nav.standable(1, 0)).toBe(true);
+    expect(nav.standable(4, 0)).toBe(false);
+    expect(route(2, 0, 0, 0).found).toBe(true);
+    expect(route(2, 0, 4, 0).found).toBe(false);
   });
 
   it('swims through water', () => {

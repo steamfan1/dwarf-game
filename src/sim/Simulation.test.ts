@@ -10,8 +10,8 @@ import { generateWorld } from './worldgen/generateWorld';
 /**
  * A hand-built world, 48 x 24:
  *   rows 0-9 sky, row 10 grass, rows 11-14 dirt, rows 15-22 stone, row 23 bedrock,
- *   background walls from row 12 down. The Hearth stands at (20, 9); an oak with a
- *   four-tile trunk stands on (34, 10).
+ *   background walls behind every block, as in a generated world. The Hearth stands at
+ *   (20, 9); an oak with a four-tile trunk stands on (34, 10).
  */
 function makeWorld(): World {
   const width = 48;
@@ -22,7 +22,7 @@ function makeWorld(): World {
     for (let y = 10; y < height; y++) {
       const tile = y === 10 ? 'grass' : y === height - 1 ? 'bedrock' : y >= 15 ? 'stone' : 'dirt';
       world.fg[world.index(x, y)] = TILES.tile(tile);
-      if (y >= 12) world.bg[world.index(x, y)] = TILES.wall('dirt_wall');
+      world.bg[world.index(x, y)] = TILES.wall('dirt_wall');
     }
   }
   for (let y = 6; y <= 9; y++) world.fg[world.index(34, y)] = TILES.tile('log');
@@ -91,20 +91,42 @@ describe('Simulation: dwarves change the world, the player only gives orders', (
     expect(sim.dwarves.some((d) => d.skills.mining.xp > 0)).toBe(true);
   });
 
-  it('digs out a pit, but leaves steps rather than trap anyone in it', () => {
+  it('digs out a whole pit, climbing its walls to get back out', () => {
     const { sim, world, runUntil } = newSim();
-    expect(sim.designate('dig', { x0: 24, y0: 10, x1: 27, y1: 12 }, 2)).toBe(12);
-    // Done when every remaining mark is blocked, nobody is busy and everything is stored.
-    runUntil(() => {
-      const jobs = [...sim.jobs.all()];
-      return jobs.every((job) => job.type === 'dig' && job.blocked && job.claimedBy === 0) && sim.ground.size === 0 && sim.dwarves.every((d) => d.phase !== 'to-storage');
-    }, 10_000);
-    let dug = 0;
-    for (let y = 10; y <= 12; y++) for (let x = 24; x <= 27; x++) if (world.fg[world.index(x, y)] === AIR) dug++;
-    expect(dug).toBeGreaterThanOrEqual(8);
-    expect(sim.storage.count(ITEMS.item('dirt'))).toBe(dug);
-    // Everyone can still walk home: the blocks left standing are the way out.
+    // Only explored cells can be marked: pretend the player has seen below the sunlit rows.
+    world.revealEllipse(25, 12, 6, 6);
+    expect(sim.designate('dig', { x0: 24, y0: 10, x1: 27, y1: 13 }, 2)).toBe(16);
+    // Done when no work is left, nobody is busy and everything is stored.
+    runUntil(() => sim.jobs.size === 0 && sim.ground.size === 0 && sim.dwarves.every((d) => d.carrying === null), 10_000);
+    for (let y = 10; y <= 13; y++) for (let x = 24; x <= 27; x++) expect(world.fg[world.index(x, y)]).toBe(AIR);
+    expect(sim.storage.count(ITEMS.item('dirt'))).toBe(16);
+    // Everyone can still walk home.
     for (const dwarf of sim.dwarves) expect(sim.homeMaps.canGetHome(world.index(dwarf.x, dwarf.y))).toBe(true);
+  });
+
+  it('leaves a block standing if digging it would drop a dwarf into a hole with no way out', () => {
+    const { sim, world, runUntil } = newSim();
+    // A shaft with no background wall: nothing to climb once inside it.
+    for (let y = 10; y <= 16; y++) world.bg[world.index(26, y)] = 0;
+    world.revealEllipse(26, 13, 4, 6);
+    expect(sim.designate('dig', { x0: 26, y0: 10, x1: 26, y1: 15 }, 2)).toBe(6);
+    runUntil(() => [...sim.jobs.all()].every((job) => job.type === 'dig' && job.blocked && job.claimedBy === 0) && sim.ground.size === 0, 10_000);
+    // Dwarves can drop four tiles but only jump up one, so the bottom of the shaft stays.
+    expect(world.fg[world.index(26, 15)]).not.toBe(AIR);
+    for (const dwarf of sim.dwarves) expect(sim.homeMaps.canGetHome(world.index(dwarf.x, dwarf.y))).toBe(true);
+  });
+
+  it('with the Auto tool, marks trees for felling and blocks for digging', () => {
+    const { sim } = newSim();
+    expect(sim.autoTarget(33, 4)).toBe('chop'); // a leaf of the oak
+    expect(sim.autoTarget(40, 10)).toBe('dig');
+    expect(sim.autoTarget(20, 5)).toBeNull(); // open air
+    expect(sim.autoTarget(20, 10)).toBeNull(); // holds up the Hearth
+    // A drag over the oak and the ground beside it: one tree, and the diggable blocks.
+    expect(sim.designate('auto', { x0: 33, y0: 8, x1: 36, y1: 10 }, 2)).toBe(1 + 3);
+    expect(sim.jobs.at(34, 9)?.type).toBe('chop');
+    expect(sim.jobs.at(35, 10)?.type).toBe('dig');
+    expect(sim.jobs.at(34, 10)).toBeUndefined(); // the oak stands on it
   });
 
   it('refuses to mark what cannot be dug, and says why', () => {
@@ -170,8 +192,12 @@ describe('Simulation: dwarves change the world, the player only gives orders', (
   it('hurts a dwarf that falls further than the safe drop', () => {
     const { sim, world, run } = newSim();
     const dwarf = sim.dwarves[0]!;
-    // Hollow out a pit six tiles deep under the dwarf (two more than the safe drop).
-    for (let y = 10; y <= 15; y++) world.fg[world.index(dwarf.x, y)] = AIR;
+    // Hollow out a pit six tiles deep under the dwarf (two more than the safe drop), with
+    // no background wall to catch hold of.
+    for (let y = 10; y <= 15; y++) {
+      world.fg[world.index(dwarf.x, y)] = AIR;
+      world.bg[world.index(dwarf.x, y)] = 0;
+    }
     run(40);
     expect(dwarf.y).toBe(15);
     expect(dwarf.health).toBe(dwarf.maxHealth - 2 * CONTENT.colony.movement.fallDamagePerRow);

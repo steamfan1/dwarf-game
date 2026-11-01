@@ -60,7 +60,6 @@ export interface WorldgenSettings {
     deepStoneAt: number;
     basaltAt: number;
     bedrockRows: number;
-    wallStartBelowSurface: number;
   };
   blobs: { clay: number; dirtInStone: number };
   caves: {
@@ -193,7 +192,6 @@ export function parseWorldgenSettings(data: unknown, tiles: TileRegistry): World
       deepStoneAt: fraction(b, 'deepStoneAt', 'bands'),
       basaltAt: fraction(b, 'basaltAt', 'bands'),
       bedrockRows: count(b, 'bedrockRows', 'bands', 20),
-      wallStartBelowSurface: count(b, 'wallStartBelowSurface', 'bands', 20),
     },
     blobs: { clay: count(blobs, 'clay', 'blobs'), dirtInStone: count(blobs, 'dirtInStone', 'blobs') },
     caves: {

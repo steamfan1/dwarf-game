@@ -44,8 +44,8 @@ export type DigStatus =
   | 'supports-hearth'
   | 'supports-tree';
 
-/** The tools that mark work. */
-export type DesignationTool = 'dig' | 'chop';
+/** The tools that mark work. 'auto' fells trees and digs everything else that can be dug. */
+export type DesignationTool = 'dig' | 'chop' | 'auto';
 
 /** Most A* searches per tick, so a burst of new jobs never drops a frame. */
 export const PATH_SEARCHES_PER_TICK = 4;
@@ -168,27 +168,26 @@ export class Simulation implements ColonyContext {
 
   /**
    * Mark work in a rectangle of cells: blocks to dig, or trees to fell (any part of a
-   * tree marks the whole tree). Returns the number of new jobs.
+   * tree marks the whole tree), or with 'auto' whichever of the two each cell needs.
+   * Returns the number of new jobs.
    */
   designate(tool: DesignationTool, rect: CellRect, priority: Priority): number {
     const r = this.clampRect(rect);
     let added = 0;
     for (let y = r.y0; y <= r.y1; y++) {
       for (let x = r.x0; x <= r.x1; x++) {
-        if (tool === 'dig') {
-          if (this.digStatus(x, y) !== 'ok') continue;
-          this.flagIfBlocked(this.jobs.add({ type: 'dig', x, y, priority, tick: this.tick, cells: [this.world.index(x, y)] }));
-          added++;
-        } else {
-          if (!this.world.isVisible(x, y)) continue;
-          const tree = this.trees.treeAt(x, y);
-          if (!tree || this.jobs.at(tree.x, tree.base)) continue;
-          this.flagIfBlocked(this.jobs.add({ type: 'chop', x: tree.x, y: tree.base, priority, tick: this.tick, cells: tree.column }));
-          added++;
-        }
+        if ((tool === 'chop' || tool === 'auto') && this.markTree(x, y, priority)) added++;
+        else if ((tool === 'dig' || tool === 'auto') && this.markDig(x, y, priority)) added++;
       }
     }
     return added;
+  }
+
+  /** What a click with the Auto tool would mark here: a tree to fell, a block to dig, or nothing. */
+  autoTarget(x: number, y: number): 'chop' | 'dig' | null {
+    if (!this.world.inBounds(x, y) || !this.world.isVisible(x, y)) return null;
+    if (this.trees.treeAt(x, y)) return 'chop';
+    return this.digStatus(x, y) === 'ok' ? 'dig' : null;
   }
 
   /** Remove dig and chop marks in a rectangle (dwarves on those jobs stop). Returns how many. */
@@ -308,6 +307,21 @@ export class Simulation implements ColonyContext {
   }
 
   // ---- Internals --------------------------------------------------------------------------------
+
+  private markDig(x: number, y: number, priority: Priority): boolean {
+    if (this.digStatus(x, y) !== 'ok') return false;
+    this.flagIfBlocked(this.jobs.add({ type: 'dig', x, y, priority, tick: this.tick, cells: [this.world.index(x, y)] }));
+    return true;
+  }
+
+  /** Mark the tree with a part in (x, y) for felling, unless it's marked already. */
+  private markTree(x: number, y: number, priority: Priority): boolean {
+    if (!this.world.inBounds(x, y) || !this.world.isVisible(x, y)) return false;
+    const tree = this.trees.treeAt(x, y);
+    if (!tree || this.jobs.at(tree.x, tree.base)) return false;
+    this.flagIfBlocked(this.jobs.add({ type: 'chop', x: tree.x, y: tree.base, priority, tick: this.tick, cells: tree.column }));
+    return true;
+  }
 
   /** Why a block can't be dug at all, or null if it can. */
   private blockReason(x: number, y: number): Exclude<DigStatus, 'ok' | 'marked' | 'out-of-bounds' | 'unexplored'> | null {

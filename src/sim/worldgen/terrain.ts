@@ -4,7 +4,8 @@
  *  - a 1D noise heightmap gives hills and broad mountains, flattened around the spawn;
  *  - each column is filled top to bottom: surface block, optional cap (snow), soil,
  *    stone, deep stone, basalt and a ragged bedrock floor, with noisy band boundaries;
- *  - natural background walls start a couple of rows under the surface;
+ *  - every natural block has a background wall behind it, from the surface down, so a
+ *    dug-out block leaves a wall that dwarves can climb;
  *  - the left and right edge columns are bedrock;
  *  - blobs of clay in the soil and pockets of dirt in the stone add variety.
  */
@@ -109,8 +110,7 @@ export function fillTerrain(ctx: GenContext): void {
         wall = walls.stone;
       }
       world.fg[i] = tile;
-      // Walls start a little under the surface, so a hole dug at the very top shows sky.
-      world.bg[i] = y >= top + b.wallStartBelowSurface ? wall : 0;
+      world.bg[i] = wall;
     }
   }
 
@@ -141,7 +141,7 @@ export function scatterBlobs(ctx: GenContext): void {
     forEachInBlob(ctx, x, y, rng.range(1.8, 3.6), rng, (_x, _y, i) => {
       if (world.fg[i] !== ids.stone) return;
       world.fg[i] = ids.dirt;
-      if (world.bg[i] !== 0) world.bg[i] = walls.dirt;
+      world.bg[i] = walls.dirt;
     });
   }
 }

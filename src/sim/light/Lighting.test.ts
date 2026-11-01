@@ -79,7 +79,7 @@ describe('Lighting', () => {
     expect(lighting.lightAt(25, 40)).toBe(0);
   });
 
-  it('marks lit cells as explored, and reports only newly explored ones', () => {
+  it('marks sunlit cells as explored, and reports only newly explored ones', () => {
     const world = flatWorld();
     const lighting = new Lighting(world, TILES);
     const all = lighting.computeAll();
@@ -87,6 +87,20 @@ describe('Lighting', () => {
     expect(world.isExplored(20, 12)).toBe(true);
     expect(world.isExplored(20, 13)).toBe(false);
     expect(lighting.discover(all)).toBeNull();
+  });
+
+  it('never uncovers what only lava, crystals or other glow light up', () => {
+    const world = flatWorld(60, 60);
+    world.fg[world.index(10, 40)] = AIR;
+    world.liquidType[world.index(10, 40)] = LAVA;
+    world.fg[world.index(40, 40)] = CRYSTAL;
+    const lighting = new Lighting(world, TILES);
+    lighting.discover(lighting.computeAll());
+    expect(lighting.lightAt(10, 40)).toBe(12);
+    expect(lighting.sunAt(10, 40)).toBe(0);
+    expect(world.isExplored(10, 40)).toBe(false);
+    expect(world.isExplored(11, 40)).toBe(false);
+    expect(world.isExplored(40, 40)).toBe(false);
   });
 
   it('gives the same light after many local updates as a full recompute', () => {
@@ -107,7 +121,9 @@ describe('Lighting', () => {
     fresh.computeAll();
     expect(Array.from(lighting.sunDepth)).toEqual(Array.from(fresh.sunDepth));
     let differences = 0;
-    for (let i = 0; i < lighting.light.length; i++) if (lighting.light[i] !== fresh.light[i]) differences++;
+    for (let i = 0; i < lighting.light.length; i++) {
+      if (lighting.light[i] !== fresh.light[i] || lighting.sun[i] !== fresh.sun[i] || lighting.glow[i] !== fresh.glow[i]) differences++;
+    }
     expect(differences).toBe(0);
   });
 });

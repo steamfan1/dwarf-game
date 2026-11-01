@@ -48,8 +48,14 @@ export interface HoverInfo {
   action: HoverAction;
 }
 
-/** The left toolbar's tools. Only Dig and Chop create work; dwarves do all of it. */
-export type Tool = 'select' | 'dig' | 'chop' | 'cancel' | 'priority';
+/**
+ * The left toolbar's tools. Auto, Dig and Fell trees mark work (Auto picks digging or
+ * felling for whatever is clicked); dwarves do all of it.
+ */
+export type Tool = 'auto' | 'select' | 'dig' | 'chop' | 'cancel' | 'priority';
+
+/** The tool in hand when a world starts, and after a tool is put down. */
+export const DEFAULT_TOOL: Tool = 'auto';
 
 export interface SkillSummary {
   skill: Skill;
@@ -147,7 +153,7 @@ export const uiState = new Store<UiState>({
   debug: null,
   debugLight: false,
   toasts: [],
-  tool: 'select',
+  tool: DEFAULT_TOOL,
   priority: 2,
   selectedDwarf: null,
   colony: null,
