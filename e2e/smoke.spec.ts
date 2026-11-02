@@ -228,12 +228,19 @@ test('crafting and building: planks and a chest from a felled tree, then the Fur
   await expect(page.getByTestId('stored-fiber')).toBeVisible({ timeout: 30_000 });
 
   // Crafting (K): two crafts of planks by hand (a log makes two), then a chest from four planks.
+  // Paused while queuing, so the first plank can't be finished before the second click
+  // adds to its order.
+  const pause = page.getByTitle(/^Pause or resume/);
   await page.keyboard.press('KeyK');
   await expect(page.getByTestId('crafting-panel')).toBeVisible();
+  await pause.click();
+  await expect(pause).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('queue-planks-1').click();
   await page.getByTestId('queue-planks-1').click();
   await expect(page.getByTestId('craft-order')).toHaveCount(1);
   await expect(page.getByTestId('craft-order')).toContainText('of 2');
+  await pause.click();
+  await expect(pause).toHaveAttribute('aria-pressed', 'false');
   await page.screenshot({ path: testInfo.outputPath('m3-1-crafting.png') });
   await expect(page.getByTestId('craft-order')).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByTestId('stored-plank')).toBeVisible({ timeout: 30_000 });
