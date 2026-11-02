@@ -95,21 +95,23 @@ function RecipeRow({ recipe, stock }: { recipe: RecipeView; stock: ReadonlyMap<s
   return (
     <li class={`recipe${enough ? '' : ' short'}`} data-testid={`recipe-${recipe.id}`}>
       <img class="item-icon" src={recipe.output.icon} alt="" width={30} height={30} />
-      <span class="recipe-name">
-        <strong>{recipe.output.name}</strong>
-        {recipe.output.count > 1 && <span class="makes">{t('crafting.makes', { count: recipe.output.count })}</span>}
-      </span>
-      <span class="inputs">
-        {recipe.inputs.map((input) => {
-          const have = stock.get(input.id) ?? 0;
-          return (
-            <span key={input.id} class={`input${have < input.count ? ' short' : ''}`} title={t('crafting.have', { have, need: input.count, item: input.name })}>
-              <img class="item-icon small" src={input.icon} alt={input.name} width={20} height={20} />
-              {input.count}
-            </span>
-          );
-        })}
-        <span class="time">{t('crafting.time', { seconds: recipe.seconds })}</span>
+      <span class="recipe-main">
+        <span class="recipe-name">
+          <strong>{recipe.output.name}</strong>
+          {recipe.output.count > 1 && <span class="makes">{t('crafting.makes', { count: recipe.output.count })}</span>}
+        </span>
+        <span class="inputs">
+          {recipe.inputs.map((input) => {
+            const have = stock.get(input.id) ?? 0;
+            return (
+              <span key={input.id} class={`input${have < input.count ? ' short' : ''}`} title={t('crafting.have', { have, need: input.count, item: input.name })}>
+                <img class="item-icon small" src={input.icon} alt={input.name} width={20} height={20} />
+                {input.count}
+              </span>
+            );
+          })}
+          <span class="time">{t('crafting.time', { seconds: recipe.seconds })}</span>
+        </span>
       </span>
       <span class="add">
         {BATCHES.map((count) => (

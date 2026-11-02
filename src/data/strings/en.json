@@ -34,7 +34,7 @@
   "hud.menuLabel": "Menu",
   "hud.crafting": "Crafting ({key})",
   "hud.storage": "Storage ({key})",
-  "hud.hint": "Click blocks to dig and trees to fell (the Auto tool), or pick a tool on the left to build and furnish: your dwarves do the work · Move with {keys}, the screen edges or a middle-drag · Wheel to zoom",
+  "hud.hint": "Move: {keys}, screen edges or middle-drag · Zoom: wheel · Pause: Space · Hover the tools for help",
   "hud.minimap": "Map ({key}) — click to move the camera",
   "hover.sky": "Sky",
   "hover.unexplored": "Unexplored",
