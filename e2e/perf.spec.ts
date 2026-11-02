@@ -162,6 +162,23 @@ test('performance probe', async ({ page, browserErrors }, testInfo) => {
   await page.keyboard.press('Equal');
   await page.waitForTimeout(300);
 
+  // Forty monsters around the colony, and the cost of a simulation tick with them (dev server only).
+  const monsters = await page.evaluate(() => {
+    type Debug = { app: { session: { sim: { spawnCreatureNear(id: string, dx: number): unknown } } } };
+    const debug = (window as unknown as { debug?: Debug }).debug;
+    if (!debug) return 0;
+    const kinds = ['gloomling', 'cragskitter', 'burrowmaw', 'bilespitter'];
+    let made = 0;
+    for (let i = 0; made < 40 && i < 400; i++) if (debug.app.session.sim.spawnCreatureNear(kinds[i % 4]!, (i % 2 ? 1 : -1) * (8 + (i % 24)))) made++;
+    return made;
+  });
+  if (monsters > 0) {
+    windows.push(await measure(page, cdp, `game, zoom 2, ${monsters} monsters`));
+    const tickMs = await page.evaluate(() => (window as unknown as { debug: { app: { session: { tickCostMs: number } } } }).debug.app.session.tickCostMs);
+    testInfo.annotations.push({ type: 'tick cost', description: `${tickMs.toFixed(3)} ms per tick with ${monsters} monsters` });
+    await page.evaluate(() => (window as unknown as { debug: { killMonsters(): void } }).debug.killMonsters());
+  }
+
   // A CPU profile of panning, to spot script hot spots. (A Chrome trace showed the rest of
   // the time is SwiftShader drawing the frame, which the page then waits for.)
   await cdp.send('Profiler.enable');

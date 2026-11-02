@@ -8,14 +8,18 @@
  * material, a recipe's station...).
  */
 import biomesJson from '../data/biomes.json';
+import creaturesJson from '../data/creatures.json';
 import dwarvesJson from '../data/dwarves.json';
 import furnitureJson from '../data/furniture.json';
 import itemsJson from '../data/items.json';
 import recipesJson from '../data/recipes.json';
+import threatsJson from '../data/threats.json';
 import tilesJson from '../data/tiles.json';
 import timeJson from '../data/time.json';
 import worldgenJson from '../data/worldgen.json';
 import { RecipeBook } from './crafting/Recipes';
+import { CreatureRegistry } from './creatures/CreatureRegistry';
+import { parseThreatSettings, type ThreatSettings } from './creatures/threats';
 import { parseColonySettings, type ColonySettings } from './dwarves/settings';
 import { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ItemRegistry } from './items/ItemRegistry';
@@ -31,8 +35,10 @@ export const BIOMES = parseBiomes(biomesJson, TILES);
 export const WORLDGEN = parseWorldgenSettings(worldgenJson, TILES);
 export const COLONY = parseColonySettings(dwarvesJson);
 export const TIME = parseTimeSettings(timeJson);
+export const CREATURES = CreatureRegistry.fromJson(creaturesJson);
+export const THREATS = parseThreatSettings(threatsJson);
 
-checkLinks(TILES, ITEMS, FURNITURE, COLONY);
+checkLinks(TILES, ITEMS, FURNITURE, COLONY, CREATURES, BIOMES.ids);
 
 /** The content a running world uses (tests can swap in their own). */
 export interface GameContent {
@@ -42,16 +48,42 @@ export interface GameContent {
   recipes: RecipeBook;
   colony: ColonySettings;
   time: TimeSettings;
+  creatures: CreatureRegistry;
+  threats: ThreatSettings;
 }
 
-export const CONTENT: GameContent = { tiles: TILES, items: ITEMS, furniture: FURNITURE, recipes: RECIPES, colony: COLONY, time: TIME };
+export const CONTENT: GameContent = {
+  tiles: TILES,
+  items: ITEMS,
+  furniture: FURNITURE,
+  recipes: RECIPES,
+  colony: COLONY,
+  time: TIME,
+  creatures: CREATURES,
+  threats: THREATS,
+};
 
 /**
  * Check the ids the content files use to refer to each other, so a typo fails at start-up
  * instead of when a dwarf first digs that block or builds that chair.
  */
-export function checkLinks(tiles: TileRegistry, items: ItemRegistry, furniture: FurnitureRegistry, colony?: ColonySettings): void {
+export function checkLinks(
+  tiles: TileRegistry,
+  items: ItemRegistry,
+  furniture: FurnitureRegistry,
+  colony?: ColonySettings,
+  creatures?: CreatureRegistry,
+  biomes?: readonly string[],
+): void {
   const problems: string[] = [];
+  for (const def of creatures?.defs ?? []) {
+    for (const drop of def.drops) {
+      if (!items.has(drop.item)) problems.push(`creature "${def.id}" drops "${drop.item}", which is not in items.json`);
+    }
+    for (const biome of Object.keys(def.spawn.animal)) {
+      if (biomes && !biomes.includes(biome)) problems.push(`creature "${def.id}" lives in biome "${biome}", which is not in biomes.json`);
+    }
+  }
   for (const tile of tiles.tiles) {
     if (tile.drops !== null && !items.has(tile.drops)) problems.push(`tile "${tile.id}" drops "${tile.drops}", which is not in items.json`);
     const harvest = tile.harvest;

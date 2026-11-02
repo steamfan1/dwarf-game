@@ -308,6 +308,55 @@ body {
   color: var(--c-text-dim);
 }
 
+/* An invasion coming (amber, pulsing) or under way (red). */
+.threat {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.1em 0.5em;
+  border-radius: 3px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.threat .icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.threat.warning {
+  color: #ffd27a;
+  background: rgba(122, 64, 10, 0.55);
+  animation: threat-pulse 1.4s ease-in-out infinite;
+}
+
+.threat.open {
+  color: #ffe1dc;
+  background: rgba(150, 30, 40, 0.75);
+}
+
+@keyframes threat-pulse {
+  50% {
+    background: rgba(170, 92, 18, 0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .threat.warning {
+    animation: none;
+  }
+}
+
+.combat-line {
+  margin: 0 0 0.4em;
+  font-size: 0.9em;
+  color: var(--c-text-dim);
+}
+
+.lost-text {
+  margin: 0 0 1em;
+}
+
 .btn-speed {
   font-weight: 700;
   min-width: 2.6em;

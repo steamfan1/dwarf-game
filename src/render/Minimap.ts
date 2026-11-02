@@ -1,6 +1,7 @@
 /**
  * The minimap: the whole world at one pixel per tile on a 2D canvas, with the camera's
- * view outlined and the Hearth marked. Unexplored ground is dark.
+ * view outlined and the Hearth marked. Unexplored ground is dark. Monsters the colony can
+ * see show as red dots, and an invasion portal as a violet one.
  *
  * It keeps its own copy of the map pixels and only recomputes cells that changed
  * (TileChanged / ExploredChanged), then composites the camera outline on top. The HTML
@@ -13,6 +14,15 @@ import { rgb } from './world/tileArt';
 const UNEXPLORED: readonly [number, number, number] = [11, 12, 17];
 const VIEW_COLOR = 'rgba(255, 243, 214, 0.9)';
 const HEARTH_COLOR = '#ffb347';
+
+/** A dot on the map: a monster, or the portal. */
+export interface MapMarker {
+  x: number;
+  y: number;
+  color: string;
+  /** Size in map pixels (tiles). */
+  size: number;
+}
 
 export interface TileViewRect {
   x: number;
@@ -33,6 +43,7 @@ export class MinimapRenderer {
   private readonly skyColors: Uint8Array;
   private target: CanvasRenderingContext2D | null = null;
   private view: TileViewRect | null = null;
+  private markers: readonly MapMarker[] = [];
   private dirty = true;
 
   constructor(world: World, tiles: TileRegistry, sky: { top: string; bottom: string }) {
@@ -123,7 +134,15 @@ export class MinimapRenderer {
     this.dirty = true;
   }
 
-  /** Composite the map, the Hearth and the camera outline onto the attached canvas, if anything changed. */
+  /** Show these dots (monsters, the portal) from the next draw(). */
+  setMarkers(markers: readonly MapMarker[]): void {
+    const old = this.markers;
+    if (old.length === markers.length && old.every((m, i) => m.x === markers[i]!.x && m.y === markers[i]!.y && m.color === markers[i]!.color)) return;
+    this.markers = markers;
+    this.dirty = true;
+  }
+
+  /** Composite the map, the Hearth, the markers and the camera outline onto the attached canvas, if anything changed. */
   draw(): void {
     const ctx = this.target;
     if (!ctx || !this.dirty) return;
@@ -133,6 +152,11 @@ export class MinimapRenderer {
     const { spawn } = this.world;
     ctx.fillStyle = HEARTH_COLOR;
     ctx.fillRect(spawn.x - 2, spawn.y - 2, 5, 5);
+    for (const marker of this.markers) {
+      const half = Math.floor(marker.size / 2);
+      ctx.fillStyle = marker.color;
+      ctx.fillRect(marker.x - half, marker.y - half, marker.size, marker.size);
+    }
     if (this.view) {
       ctx.strokeStyle = VIEW_COLOR;
       ctx.lineWidth = 2;

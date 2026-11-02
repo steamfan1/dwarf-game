@@ -7,8 +7,8 @@
  */
 import { Validator } from '../../core/validate';
 
-export type ItemCategory = 'block' | 'material' | 'ore' | 'tool' | 'weapon' | 'armor' | 'food' | 'furniture';
-const CATEGORIES: readonly ItemCategory[] = ['block', 'material', 'ore', 'tool', 'weapon', 'armor', 'food', 'furniture'];
+export type ItemCategory = 'block' | 'material' | 'ore' | 'tool' | 'weapon' | 'armor' | 'food' | 'potion' | 'furniture';
+const CATEGORIES: readonly ItemCategory[] = ['block', 'material', 'ore', 'tool', 'weapon', 'armor', 'food', 'potion', 'furniture'];
 
 /** How the placeholder icon is painted (see render/assets/itemArt.ts). */
 export const ICON_STYLES = [
@@ -24,12 +24,15 @@ export const ICON_STYLES = [
   'bar',
   'fiber',
   'cloth',
+  'hide',
+  'wisp',
   'meat',
   'wheat',
   'bread',
   'berries',
   'mushroom',
   'bowl',
+  'potion',
   'ladder',
   'door',
   'chest',
@@ -43,6 +46,7 @@ export const ICON_STYLES = [
   'table',
   'chair',
   'trap',
+  'turret',
   'pickaxe',
   'sword',
   'crossbow',
@@ -57,15 +61,24 @@ export type IconStyle = (typeof ICON_STYLES)[number];
 export const EQUIP_SLOTS = ['head', 'body', 'weapon', 'tool', 'accessory'] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
+/** What a ranged weapon or a turret shoots. */
+export const PROJECTILE_KINDS = ['bolt', 'spit'] as const;
+export type ProjectileKind = (typeof PROJECTILE_KINDS)[number];
+
 /** What a dwarf can wear or wield. Higher tiers replace lower ones automatically. */
 export interface EquipStats {
   slot: EquipSlot;
   tier: number;
   /** Tools: how many times faster than bare hands it digs (1 = no better). */
   digSpeed: number;
-  /** Weapons: damage per hit (combat arrives in Milestone 5). */
+  /** Weapons: damage per hit. */
   damage: number;
-  /** Armour: damage taken off each hit (Milestone 5). */
+  /** Weapons: ticks between hits (0 = the colony's usual pace, see dwarves.json combat). */
+  attackTicks: number;
+  /** Weapons: reach in tiles; more than 1 shoots `projectile`s. */
+  range: number;
+  projectile: ProjectileKind | null;
+  /** Armour: how much it softens each hit (see threats.json armorScale). */
   armor: number;
 }
 
@@ -98,8 +111,10 @@ export interface ItemDef {
   /** Building with it places this, or null. */
   builds: BuildTarget | null;
   equip: EquipStats | null;
-  /** Food: hunger restored by eating one (needs arrive in Milestone 4). */
-  food: { hunger: number } | null;
+  /** Food: hunger restored by eating one, and health mended. */
+  food: { hunger: number; heal: number } | null;
+  /** Brings a fallen dwarf back to life, with this fraction of its health. */
+  revive: { health: number } | null;
 }
 
 export const DEFAULT_STACK = 50;
@@ -158,11 +173,17 @@ function parseEquip(v: Validator, raw: unknown, path: string): EquipStats | null
   const o = v.object(raw, path);
   const optional = (key: string, fallback: number, max: number): number =>
     o?.[key] === undefined ? fallback : v.number(o[key], `${path}.${key}`, 0, max);
+  const range = optional('range', 1, 30);
+  const projectile = o?.projectile === undefined ? null : (v.oneOf(o.projectile, PROJECTILE_KINDS, `${path}.projectile`) ?? null);
+  if (range > 1 && projectile === null) v.problem(`${path} has a range of ${range}, so it needs a "projectile"`);
   return {
     slot: v.oneOf(o?.slot, EQUIP_SLOTS, `${path}.slot`) ?? 'tool',
     tier: Math.round(v.number(o?.tier, `${path}.tier`, 0, 10)),
     digSpeed: optional('digSpeed', 1, 10),
     damage: optional('damage', 0, 1000),
+    attackTicks: Math.round(optional('attackTicks', 0, 1000)),
+    range,
+    projectile,
     armor: optional('armor', 0, 1000),
   };
 }
@@ -171,6 +192,7 @@ function parseItem(v: Validator, raw: unknown, path: string): ItemDef {
   const o = v.object(raw, path);
   const icon = v.object(o?.icon, `${path}.icon`);
   const food = o?.food === undefined ? null : v.object(o.food, `${path}.food`);
+  const revive = o?.revive === undefined ? null : v.object(o.revive, `${path}.revive`);
   return {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
@@ -186,6 +208,12 @@ function parseItem(v: Validator, raw: unknown, path: string): ItemDef {
     },
     builds: parseBuilds(v, o?.builds, `${path}.builds`),
     equip: parseEquip(v, o?.equip, `${path}.equip`),
-    food: food ? { hunger: v.number(food.hunger, `${path}.food.hunger`, 0, 100) } : null,
+    food: food
+      ? {
+          hunger: v.number(food.hunger, `${path}.food.hunger`, 0, 100),
+          heal: food.heal === undefined ? 0 : v.number(food.heal, `${path}.food.heal`, 0, 1000),
+        }
+      : null,
+    revive: revive ? { health: v.number(revive.health, `${path}.revive.health`, 0.05, 1) } : null,
   };
 }

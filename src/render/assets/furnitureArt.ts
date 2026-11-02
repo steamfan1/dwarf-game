@@ -144,6 +144,17 @@ const PAINTERS: Record<FurnitureStyle, Painter> = {
       rect(x + 2, 7, 1, 5, c.dark);
     }
   },
+  /** A crossbow on a post, aimed to the right. */
+  turret: ({ rect, box, colors: c }) => {
+    box(3, 13, 10, 2, c.dark); // foot
+    box(7, 8, 2, 5, c.accent); // post
+    box(2, 6, 9, 2, c.base); // stock
+    rect(2, 6, 9, 1, c.light);
+    box(11, 2, 1, 10, c.light); // bow
+    rect(10, 3, 1, 1, c.outline);
+    rect(10, 10, 1, 1, c.outline);
+    rect(12, 6, 2, 1, c.accent); // bolt tip
+  },
 };
 
 /** Paint every frame of a piece of furniture side by side, starting at the canvas's left edge. */

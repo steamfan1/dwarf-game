@@ -1,9 +1,11 @@
 /**
  * The words the HUD shows for whatever is under the pointer: a cell (what it is, how deep,
- * any planned work on it, and what the current tool would do there) or a dwarf (who, and
- * what it's doing). Pure, apart from looking up UI strings.
+ * any planned work on it, and what the current tool would do there), a dwarf (who, and
+ * what it's doing) or a creature (what, how hurt, and what it's up to). Pure, apart from
+ * looking up UI strings.
  */
 import { t, type StringKey } from '../../core/strings';
+import type { Creature } from '../../sim/creatures/Creature';
 import type { Dwarf } from '../../sim/dwarves/Dwarf';
 import type { Job, Priority } from '../../sim/jobs/JobBoard';
 import type { BuildStatus, DigStatus, Simulation } from '../../sim/Simulation';
@@ -37,6 +39,11 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
   if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1 && !isBuildTool(tool)) {
     return { title: t('hover.hearth'), detail: t('hover.hearthDetail'), action: 'none' };
   }
+  // The invasion portal covers 2 x 3 cells above its foot.
+  const portal = sim.portal;
+  if (portal && !isBuildTool(tool) && x >= portal.x - 1 && x <= portal.x + 1 && y >= portal.y - 2 && y <= portal.y) {
+    return { title: t('hover.portal'), detail: t(portal.open ? 'hover.portalOpen' : 'hover.portalSoon'), action: 'none' };
+  }
 
   // Depth is measured from the ground the colony stands on.
   const ground = hearth.y + 1;
@@ -54,6 +61,8 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
     if (piece.def.station) details.push(t('hover.station'));
     if (piece.def.storage > 0) details.push(t('hover.chest', { slots: piece.def.storage }));
     if (piece.def.light > 0) details.push(t('hover.light'));
+    if (piece.def.trap) details.push(t('hover.trap'));
+    if (piece.def.turret) details.push(t('hover.turret', { range: piece.def.turret.range }));
   } else if (tile !== AIR) title = tiles.tiles[tile]!.name;
   else if (liquid) title = liquid.name;
   else if (world.isSky(x, y)) title = wall === 0 ? t('hover.sky') : tiles.walls[wall]!.name; // a wall built in the open
@@ -61,6 +70,9 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
     title = t('hover.cave');
     details.push(t('hover.caveDetail', { wall: tiles.walls[wall]!.name }));
   } else title = tiles.tiles[AIR]!.name;
+
+  const damage = sim.tileDamage.get(i);
+  if (damage > 0 && tile !== AIR) details.push(t('hover.damaged', { percent: Math.min(99, Math.round((damage / sim.tileHp(tile)) * 100)) }));
 
   const room = sim.rooms.roomAt(x, y);
   if (room) {
@@ -108,6 +120,8 @@ function markStatus(sim: Simulation, job: Job): string {
   if (building && sim.waitingForSupport(job)) return t('mark.support');
   if (building) return priorityName(job.priority);
   if (job.type === 'dismantle') return t('mark.dismantle', { priority: priorityName(job.priority) });
+  if (job.type === 'hunt') return t('mark.hunt', { priority: priorityName(job.priority) });
+  if (job.type === 'revive') return job.missing ? t('mark.missing', { item: sim.items.get(job.inputs[0]!.item).name.toLowerCase() }) : t('mark.revive', { priority: priorityName(job.priority) });
   return t(job.type === 'dig' ? 'mark.dig' : 'mark.chop', { priority: priorityName(job.priority) });
 }
 
@@ -174,6 +188,40 @@ function toolHint(
   }
 }
 
+/** A dwarf under the pointer: who, and what it's doing; with Auto over a fallen one, what a click would do. */
+export function describeDwarf(sim: Simulation, dwarf: Dwarf, tool: Tool): HoverInfo {
+  const stranded = dwarf.phase !== 'dead' && !sim.homeMaps.canGetHome(sim.world.index(dwarf.x, dwarf.y));
+  const activity = describeActivity(sim, dwarf, stranded);
+  if (dwarf.phase !== 'dead' || tool !== 'auto') return { title: dwarf.name, detail: activity, action: 'none' };
+  if (!sim.revivable(dwarf)) return { title: dwarf.name, detail: `${activity} · ${t('tool.auto.lost')}`, action: 'blocked' };
+  const job = sim.reviveJobFor(dwarf.id);
+  if (job) return { title: dwarf.name, detail: `${describeMark(sim, job)} · ${t('tool.auto.unrevive')}`, action: 'ok' };
+  const potion = sim.items.items.findIndex((item) => item.revive !== null);
+  const inStore = potion >= 0 && sim.storage.available(potion) > 0;
+  return { title: dwarf.name, detail: `${activity} · ${t(inStore ? 'tool.auto.revive' : 'tool.auto.reviveNone')}`, action: 'ok' };
+}
+
+/** A creature under the pointer: what it is, how hurt, what it's up to, and (animals, with Auto) the hunt. */
+export function describeCreature(sim: Simulation, creature: Creature, tool: Tool): HoverInfo {
+  const def = sim.creatureDef(creature);
+  const details = [t(def.hostile ? 'hover.hostile' : 'hover.animal'), t('hover.health', { health: Math.max(0, Math.ceil(creature.health)), max: creature.maxHealth })];
+  if (def.hostile) {
+    const prey = creature.target !== 0 ? sim.dwarf(creature.target) : undefined;
+    if (creature.phase === 'breaking') details.push(t('hover.creatureBreaking'));
+    else if (prey && prey.phase !== 'dead') details.push(t('hover.creatureAfter', { name: prey.name }));
+    else details.push(t('hover.creatureProwling'));
+    if (tool === 'auto') details.push(t('tool.auto.monster'));
+    return { title: def.name, detail: details.join(' · '), action: 'none' };
+  }
+  details.push(t(creature.fleeTicks > 0 ? 'hover.creatureFleeing' : 'hover.creatureGrazing'));
+  const hunt = sim.huntJobFor(creature.id);
+  const hunter = hunt && hunt.claimedBy !== 0 ? sim.dwarf(hunt.claimedBy) : undefined;
+  if (hunter) details.push(t('hover.huntClaimed', { name: hunter.name }));
+  else if (hunt) details.push(t('hover.huntMarked'));
+  if (tool === 'auto') details.push(t(hunt ? 'tool.auto.unhunt' : 'tool.auto.hunt'));
+  return { title: def.name, detail: details.join(' · '), action: tool === 'auto' ? 'ok' : 'none' };
+}
+
 /** What a dwarf is doing, in a few words. */
 export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolean): string {
   const job = dwarf.jobId !== 0 ? sim.jobs.get(dwarf.jobId) : undefined;
@@ -182,7 +230,15 @@ export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolea
   const carried = list(dwarf.carrying);
   switch (dwarf.phase) {
     case 'dead':
-      return t('activity.dead');
+      return t(sim.revivable(dwarf) ? 'activity.deadRevivable' : 'activity.deadLost');
+    case 'fighting': {
+      const foe = job ? sim.creature(job.target) : undefined;
+      const creature = foe ? sim.creatureDef(foe).name : '';
+      if (job?.type === 'hunt') return t('activity.hunting', { creature });
+      return t(sim.weaponOf(dwarf).range > 1 ? 'activity.shooting' : 'activity.fighting', { creature });
+    }
+    case 'retreating':
+      return t('activity.retreating');
     case 'falling':
       return t('activity.falling');
     case 'to-supply':
@@ -204,6 +260,8 @@ export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolea
           return t(working ? 'activity.eating' : 'activity.toTable', { item: lower(job.target) });
         case 'sleep':
           return t(job.furnitureId !== 0 ? 'activity.toBed' : 'activity.toFloor');
+        case 'revive':
+          return t(working ? 'activity.reviving' : 'activity.toRevive', { name: sim.dwarf(job.target)?.name ?? '' });
         case 'harvest': {
           const crop = sim.tiles.tiles[job.target]?.harvest?.item;
           const item = crop && sim.items.has(crop) ? sim.items.get(sim.items.item(crop)).name.toLowerCase() : '';
@@ -241,7 +299,11 @@ export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolea
       return t('activity.storing', { item: carried });
     case 'wandering':
       return t('activity.wandering');
-    case 'idle':
-      return stranded ? t('activity.stranded') : t('activity.idle');
+    case 'idle': {
+      if (stranded) return t('activity.stranded');
+      const home = sim.storeArea;
+      const byTheHearth = Math.max(home.x0 - dwarf.x, 0, dwarf.x - home.x1, home.y0 - dwarf.y, 0, dwarf.y - home.y1) <= 2;
+      return t(byTheHearth && dwarf.health < dwarf.maxHealth - 0.5 ? 'activity.resting' : 'activity.idle');
+    }
   }
 }

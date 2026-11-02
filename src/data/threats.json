@@ -1,0 +1,30 @@
+{
+  "night": {
+    "minDistance": 14,
+    "maxDistance": 44,
+    "rows": [-18, 26],
+    "dwarfDistance": 9,
+    "maxLight": 4,
+    "base": 2,
+    "perDay": 1,
+    "max": 16,
+    "maxAlive": 12,
+    "spreadOver": 0.6
+  },
+  "dawn": { "leaveLight": 8, "leaveSeconds": 25 },
+  "animals": { "max": 5, "start": 3, "checkSeconds": 20, "minDistance": 18, "maxDistance": 140 },
+  "waves": {
+    "every": 5,
+    "warningSeconds": 90,
+    "base": 2,
+    "perDay": 0.6,
+    "perTier": 2,
+    "max": 40,
+    "portalDistance": [28, 50],
+    "spawnSeconds": 1.2
+  },
+  "scaling": { "healthPerDay": 0.05, "damagePerDay": 0.03, "maxFactor": 2.5 },
+  "projectiles": { "bolt": 0.8, "spit": 0.45 },
+  "tileHpPerHardness": 40,
+  "armorScale": 8
+}

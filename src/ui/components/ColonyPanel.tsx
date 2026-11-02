@@ -130,6 +130,9 @@ function DwarfDetails({ dwarf }: { dwarf: DwarfSummary }) {
       </ul>
 
       <h4>{t('dwarf.equipment')}</h4>
+      <p class="combat-line" data-testid="dwarf-combat">
+        {t('dwarf.combat', { weapon: dwarf.combat.weapon ?? t('dwarf.fists'), damage: dwarf.combat.damage, armor: dwarf.combat.armor })}
+      </p>
       <ul class="equipment" data-testid="dwarf-equipment">
         {dwarf.equipment.map(({ slot, item, icon }) => (
           <li key={slot}>

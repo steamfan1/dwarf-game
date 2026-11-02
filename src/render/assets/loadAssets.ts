@@ -10,6 +10,7 @@ import { Rng } from '../../core/Rng';
 import { FURNITURE } from '../../sim/content';
 import {
   ANIMATIONS,
+  CREATURE_TEXTURES,
   FURNITURE_TEXTURES,
   furnitureAnimationKey,
   furnitureTextureKey,
@@ -43,8 +44,10 @@ export function createGeneratedAssets(scene: Phaser.Scene): void {
   for (const [key, source] of Object.entries(TEXTURES) as [string, TextureSource][]) {
     if (source.kind === 'generated' && !scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
   }
-  for (const [key, source] of FURNITURE_TEXTURES) {
-    if (!scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
+  for (const textures of [FURNITURE_TEXTURES, CREATURE_TEXTURES]) {
+    for (const [key, source] of textures) {
+      if (!scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
+    }
   }
   createSynthSounds(scene);
   createAnimations(scene);

@@ -9,7 +9,7 @@
  *    the cached paths through the changed cell's chunk; the rest stay valid.
  */
 import type { World } from '../world/World';
-import type { PathGoal, PathOutcome, Pathfinder } from './Pathfinder';
+import type { NavGraph, PathGoal, PathOutcome, Pathfinder } from './Pathfinder';
 
 interface CachedPath {
   outcome: PathOutcome;
@@ -34,6 +34,11 @@ export class PathService {
   /** Totals for the debug overlay. */
   stats = { searches: 0, cacheHits: 0, busy: 0 };
 
+  /** Searches still allowed this tick. */
+  get searchesLeftThisTick(): number {
+    return this.searchesLeft;
+  }
+
   constructor(world: World, pathfinder: Pathfinder, options: PathServiceOptions) {
     this.world = world;
     this.pathfinder = pathfinder;
@@ -47,8 +52,12 @@ export class PathService {
     this.searchesLeft = this.searchesPerTick;
   }
 
-  /** Find a path, or 'busy' if this tick's searches are used up (ask again next tick). */
-  request(from: number, goal: PathGoal): PathOutcome | 'busy' {
+  /**
+   * Find a path, or 'busy' if this tick's searches are used up (ask again next tick).
+   * `graph` searches another set of moves than the pathfinder's own (a creature's); the
+   * goal's cacheKey must then tell the graphs apart.
+   */
+  request(from: number, goal: PathGoal, graph?: NavGraph): PathOutcome | 'busy' {
     const key = goal.cacheKey === undefined ? null : `${from}>${goal.cacheKey}`;
     if (key !== null) {
       const hit = this.cache.get(key);
@@ -66,7 +75,7 @@ export class PathService {
     }
     this.searchesLeft--;
     this.stats.searches++;
-    const outcome = this.pathfinder.find(from, goal);
+    const outcome = this.pathfinder.find(from, goal, graph);
     // Only found paths are cached: "unreachable" is cheap to re-ask once terrain changes,
     // and "too far" depends on the search limit rather than the terrain.
     if (key !== null && outcome.found) {

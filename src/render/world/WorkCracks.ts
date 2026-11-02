@@ -1,6 +1,8 @@
 /**
  * Cracks that spread through a block while a dwarf digs it, in four stages, so the
- * player can see how far along each dig is. One pooled sprite per dig in progress.
+ * player can see how far along each dig is; and through doors and blocks monsters are
+ * smashing, so the player can see how close they are to breaking in. One pooled sprite
+ * per cracked cell.
  */
 import type * as Phaser from 'phaser';
 import { TILE_SIZE } from '../../config';
@@ -18,18 +20,27 @@ export class WorkCracks {
 
   update(sim: Simulation): void {
     let used = 0;
-    for (const dwarf of sim.dwarves) {
-      if (dwarf.phase !== 'working' || dwarf.jobId === 0) continue;
-      const job = sim.jobs.get(dwarf.jobId);
-      if (!job || job.type !== 'dig' || job.progress === 0) continue;
-      const stage = Math.min(CRACK_FRAMES - 1, Math.floor(sim.jobProgress(job) * CRACK_FRAMES));
+    const show = (x: number, y: number, done: number): void => {
+      const stage = Math.min(CRACK_FRAMES - 1, Math.floor(done * CRACK_FRAMES));
       let image = this.pool[used];
       if (!image) {
         image = this.scene.add.image(0, 0, 'cracks', 0).setOrigin(0, 0).setDepth(DEPTH.cracks);
         this.pool.push(image);
       }
       used++;
-      image.setFrame(stage).setPosition(job.x * TILE_SIZE, job.y * TILE_SIZE).setVisible(true);
+      image.setFrame(stage).setPosition(x * TILE_SIZE, y * TILE_SIZE).setVisible(true);
+    };
+    for (const dwarf of sim.dwarves) {
+      if (dwarf.phase !== 'working' || dwarf.jobId === 0) continue;
+      const job = sim.jobs.get(dwarf.jobId);
+      if (!job || job.type !== 'dig' || job.progress === 0) continue;
+      show(job.x, job.y, sim.jobProgress(job));
+    }
+    const { world } = sim;
+    for (const [cell, damage] of sim.tileDamage.entries()) {
+      const x = cell % world.width;
+      const y = (cell - x) / world.width;
+      if (world.isVisible(x, y)) show(x, y, damage / sim.tileHp(world.fg[cell]!));
     }
     for (let i = used; i < this.pool.length; i++) this.pool[i]!.setVisible(false);
   }

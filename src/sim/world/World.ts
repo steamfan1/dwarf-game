@@ -13,6 +13,8 @@ import { AIR, NO_LIQUID, NO_WALL } from './TileRegistry';
 
 /** flags bit: the player has seen this cell. */
 export const FLAG_EXPLORED = 1;
+/** flags bit: the block in this cell was built by a dwarf (monsters that smash built things can break it). */
+export const FLAG_BUILT = 2;
 
 /** A liquid amount of 255 is a full cell; partial amounts are reserved for flowing liquids. */
 export const LIQUID_FULL = 255;

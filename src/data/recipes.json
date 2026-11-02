@@ -125,6 +125,15 @@
       "time": 120
     },
     {
+      "id": "leather",
+      "output": { "item": "leather", "count": 1 },
+      "inputs": [
+        { "item": "hide", "count": 1 }
+      ],
+      "station": "workbench",
+      "time": 60
+    },
+    {
       "id": "bricks",
       "output": { "item": "brick", "count": 2 },
       "inputs": [
@@ -265,6 +274,17 @@
       "time": 120
     },
     {
+      "id": "bolt_thrower",
+      "output": { "item": "bolt_thrower", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 2 },
+        { "item": "plank", "count": 3 },
+        { "item": "fiber", "count": 2 }
+      ],
+      "station": "anvil",
+      "time": 160
+    },
+    {
       "id": "gold_amulet",
       "output": { "item": "gold_amulet", "count": 1 },
       "inputs": [
@@ -293,6 +313,15 @@
       "time": 120
     },
     {
+      "id": "leather_jerkin",
+      "output": { "item": "leather_jerkin", "count": 1 },
+      "inputs": [
+        { "item": "leather", "count": 4 }
+      ],
+      "station": "loom",
+      "time": 140
+    },
+    {
       "id": "cooked_meat",
       "output": { "item": "cooked_meat", "count": 1 },
       "inputs": [
@@ -318,6 +347,17 @@
       ],
       "station": "kitchen",
       "time": 70
+    },
+    {
+      "id": "rekindling_draught",
+      "output": { "item": "rekindling_draught", "count": 1 },
+      "inputs": [
+        { "item": "dusk_essence", "count": 2 },
+        { "item": "crystal", "count": 1 },
+        { "item": "mushroom", "count": 2 }
+      ],
+      "station": "kitchen",
+      "time": 200
     }
   ]
 }

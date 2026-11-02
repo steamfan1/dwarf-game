@@ -190,6 +190,21 @@ const PIXELS = {
     '..XXXXXXXX..',
     '....XXXX....',
   ],
+  // A swirling portal, for invasions.
+  portal: [
+    '....XXXX....',
+    '..XX....XX..',
+    '.X..XXXX..X.',
+    '.X.X....X.X.',
+    'X.X..XX..X.X',
+    'X.X.X..X.X.X',
+    'X.X.X.XX.X.X',
+    'X.X..X...X.X',
+    '.X.X....X.X.',
+    '.X..XXXX..X.',
+    '..XX....XX..',
+    '....XXXX....',
+  ],
   // A chest.
   chest: [
     '............',

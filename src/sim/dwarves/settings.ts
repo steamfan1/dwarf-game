@@ -45,6 +45,28 @@ export interface NeedSettings {
   tableReach: number;
 }
 
+/** How dwarves fight (weapons and armour come from items.json). */
+export interface CombatSettings {
+  /** Damage per hit with no weapon. */
+  bareHandsDamage: number;
+  /** Ticks between hits, for bare hands and weapons that don't set their own. */
+  attackTicks: number;
+  /** Dwarves go after hostile creatures within this many tiles. */
+  engageRange: number;
+  /** ...if their health is at least this fraction of the most it can be. */
+  engageAbove: number;
+  /** Below this fraction of its health a dwarf breaks off and falls back to the Hearth. */
+  retreatBelow: number;
+  /** Health regained per day while resting by the Hearth. */
+  restHealPerDay: number;
+  /** Damage gained per combat level above 1 (0.08 = 8% more each level). */
+  damagePerLevel: number;
+  /** Combat experience for each hit landed. */
+  xpPerHit: number;
+  /** Ticks to pour a revival draught on a fallen dwarf. */
+  reviveTicks: number;
+}
+
 export interface ColonySettings {
   startingDwarves: number;
   maxDwarves: number;
@@ -101,6 +123,7 @@ export interface ColonySettings {
     xp: { digPerHardness: number; chop: number; build: number; craftPerSecond: number; harvest: number };
   };
   needs: NeedSettings;
+  combat: CombatSettings;
 }
 
 export function parseColonySettings(data: unknown): ColonySettings {
@@ -123,6 +146,7 @@ export function parseColonySettings(data: unknown): ColonySettings {
   const vision = section('vision');
   const work = section('work');
   const needs = section('needs');
+  const combat = section('combat');
   const skills = section('skills');
   const xp = v.object(skills?.xp, 'skills.xp');
   const text = (value: unknown, path: string): string => v.string(value, path);
@@ -206,10 +230,22 @@ export function parseColonySettings(data: unknown): ColonySettings {
       roomTableBonus: v.number(needs?.roomTableBonus, 'needs.roomTableBonus', 1, 10),
       tableReach: count(needs, 'tableReach', 'needs', 0, 400),
     },
+    combat: {
+      bareHandsDamage: v.number(combat?.bareHandsDamage, 'combat.bareHandsDamage', 0, 1000),
+      attackTicks: count(combat, 'attackTicks', 'combat', 1, 1000),
+      engageRange: count(combat, 'engageRange', 'combat', 1, 50),
+      engageAbove: v.number(combat?.engageAbove, 'combat.engageAbove', 0, 1),
+      retreatBelow: v.number(combat?.retreatBelow, 'combat.retreatBelow', 0, 1),
+      restHealPerDay: v.number(combat?.restHealPerDay, 'combat.restHealPerDay', 0, 10000),
+      damagePerLevel: v.number(combat?.damagePerLevel, 'combat.damagePerLevel', 0, 1),
+      xpPerHit: v.number(combat?.xpPerHit, 'combat.xpPerHit', 0, 1000),
+      reviveTicks: count(combat, 'reviveTicks', 'combat', 1, 10000),
+    },
   };
   if (settings.maxDwarves < settings.startingDwarves) v.problem('maxDwarves must be at least startingDwarves');
   if (settings.needs.hungryBelow > settings.needs.eatBelow) v.problem('needs.hungryBelow must not be above needs.eatBelow');
   if (settings.needs.sleepBelow > settings.needs.sleepAtNightBelow) v.problem('needs.sleepBelow must not be above needs.sleepAtNightBelow');
+  if (settings.combat.retreatBelow > settings.combat.engageAbove) v.problem('combat.retreatBelow must not be above combat.engageAbove');
   v.throwIfProblems();
   return settings;
 }

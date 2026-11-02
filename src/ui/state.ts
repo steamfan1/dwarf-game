@@ -39,7 +39,14 @@ export interface DebugStats {
   /** Rooms found, and the sun's strength now (0..1). */
   rooms: number;
   daylight: number;
+  /** Creatures alive, and missiles in flight. */
+  creatures: { hostile: number; animals: number; missiles: number };
+  /** Night monsters out so far tonight and how many may come, and the day of the next invasion. */
+  threat: { spawned: number; budget: number; waveDay: number };
 }
+
+/** An invasion, for the top bar: coming (seconds of game time to go), or under way (invaders left). */
+export type ThreatView = { phase: 'warning'; seconds: number; side: 'east' | 'west' } | { phase: 'open'; left: number; side: 'east' | 'west' } | null;
 
 /** The time of day, for the top bar. */
 export interface ClockView {
@@ -50,7 +57,7 @@ export interface ClockView {
 }
 
 /** A need a dwarf is short of, worst first: shown as a warning beside its name. */
-export type NeedWarning = 'starving' | 'hungry' | 'exhausted' | 'tired';
+export type NeedWarning = 'starving' | 'hungry' | 'exhausted' | 'tired' | 'wounded';
 
 /** What a click with the current tool would do to the cell under the pointer. */
 export type HoverAction = 'ok' | 'blocked' | 'none';
@@ -104,6 +111,8 @@ export interface DwarfSummary {
   carrying: Array<{ name: string; count: number; icon: string }>;
   /** Needs running short. */
   needs: NeedWarning[];
+  /** What it fights with, how hard it hits, and the armour it wears. */
+  combat: { weapon: string | null; damage: number; armor: number };
   dead: boolean;
   /** Can't walk back to the Hearth from where it is. */
   stranded: boolean;
@@ -220,6 +229,9 @@ export interface UiState {
   colony: ColonyView | null;
   catalogue: Catalogue | null;
   clock: ClockView | null;
+  threat: ThreatView;
+  /** Every dwarf has died: the "colony has fallen" dialog is up (until dismissed). */
+  colonyLost: boolean;
 }
 
 export const uiState = new Store<UiState>({
@@ -248,6 +260,8 @@ export const uiState = new Store<UiState>({
   colony: null,
   catalogue: null,
   clock: null,
+  threat: null,
+  colonyLost: false,
 });
 
 let nextToastId = 1;

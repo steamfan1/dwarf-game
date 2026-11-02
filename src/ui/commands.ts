@@ -65,6 +65,8 @@ export interface UiCommands {
   selectDwarf(id: number | null, focus?: boolean): void;
   /** Debug overlay: show light levels in place of the fog of war. */
   setDebugLight(on: boolean): void;
+  /** Close the "colony has fallen" dialog and keep watching the world. */
+  dismissColonyLost(): void;
 }
 
 export const CommandsContext = createContext<UiCommands | null>(null);

@@ -86,8 +86,17 @@
       "id": "spike_trap",
       "name": "Spike trap",
       "size": [1, 1],
+      "trap": { "damage": 14, "cooldownTicks": 30 },
       "mapColor": "#9aa1ab",
       "art": { "style": "trap", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de", "accent": "#6b4628" }
+    },
+    {
+      "id": "bolt_thrower",
+      "name": "Bolt thrower",
+      "size": [1, 1],
+      "turret": { "range": 8, "damage": 9, "cooldownTicks": 40 },
+      "mapColor": "#8a6a4a",
+      "art": { "style": "turret", "base": "#a87a4b", "dark": "#6b4628", "light": "#9aa1ab", "accent": "#5d636c" }
     }
   ]
 }

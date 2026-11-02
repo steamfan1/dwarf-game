@@ -175,10 +175,37 @@
       "icon": { "style": "cloth", "base": "#d8cfb8", "dark": "#9d927a", "light": "#f4eedd" }
     },
     {
+      "id": "hide",
+      "name": "Hide",
+      "category": "material",
+      "description": "A raw animal hide. Tan it into leather at a workbench.",
+      "icon": { "style": "hide", "base": "#a07a52", "dark": "#6a4c30", "light": "#c8a27a" }
+    },
+    {
+      "id": "leather",
+      "name": "Leather",
+      "category": "material",
+      "description": "Tanned hide, tough and supple: for jerkins.",
+      "icon": { "style": "cloth", "base": "#9a6236", "dark": "#62391c", "light": "#c48b5a" }
+    },
+    {
+      "id": "dusk_essence",
+      "name": "Dusk essence",
+      "category": "material",
+      "description": "A cold, glimmering wisp left behind by a creature of the dark.",
+      "icon": {
+        "style": "wisp",
+        "base": "#8a6ad8",
+        "dark": "#4a3488",
+        "light": "#d6c8ff",
+        "accent": "#ffffff"
+      }
+    },
+    {
       "id": "raw_meat",
       "name": "Raw meat",
       "category": "food",
-      "description": "Better cooked.",
+      "description": "From a hunt. Much better cooked.",
       "food": { "hunger": 15 },
       "icon": { "style": "meat", "base": "#c8504a", "dark": "#8a2f2c", "light": "#ef8f86" }
     },
@@ -186,8 +213,8 @@
       "id": "cooked_meat",
       "name": "Cooked meat",
       "category": "food",
-      "description": "A proper meal.",
-      "food": { "hunger": 45 },
+      "description": "A proper meal: it fills a dwarf up and mends a few cuts.",
+      "food": { "hunger": 45, "heal": 12 },
       "icon": { "style": "meat", "base": "#9a5a32", "dark": "#62351c", "light": "#c9874f" }
     },
     {
@@ -203,7 +230,7 @@
       "name": "Bread",
       "category": "food",
       "description": "Filling and keeps well.",
-      "food": { "hunger": 40 },
+      "food": { "hunger": 40, "heal": 4 },
       "icon": { "style": "bread", "base": "#c98f4a", "dark": "#8d5a26", "light": "#ecc387" }
     },
     {
@@ -233,13 +260,28 @@
       "name": "Mushroom stew",
       "category": "food",
       "description": "Hot and hearty: cooked at a kitchen stove.",
-      "food": { "hunger": 50 },
+      "food": { "hunger": 50, "heal": 10 },
       "icon": {
         "style": "bowl",
         "base": "#a8683a",
         "dark": "#5e3a1f",
         "light": "#e0b27a",
         "accent": "#c8503c"
+      }
+    },
+    {
+      "id": "rekindling_draught",
+      "name": "Rekindling draught",
+      "category": "potion",
+      "description": "Brewed from dusk essence over the stove. Poured on a fallen dwarf, it brings them back to life.",
+      "stack": 10,
+      "revive": { "health": 0.5 },
+      "icon": {
+        "style": "potion",
+        "base": "#ff8a3a",
+        "dark": "#a8441a",
+        "light": "#ffd27a",
+        "accent": "#d8e2ea"
       }
     },
     {
@@ -372,7 +414,7 @@
       "id": "spike_trap",
       "name": "Spike trap",
       "category": "furniture",
-      "description": "Hurts monsters that walk over it (from Milestone 5).",
+      "description": "Stabs any creature that walks over it. Dwarves step over it safely.",
       "icon": {
         "style": "trap",
         "base": "#9aa1ab",
@@ -381,6 +423,20 @@
         "accent": "#6b4628"
       },
       "builds": { "furniture": "spike_trap" }
+    },
+    {
+      "id": "bolt_thrower",
+      "name": "Bolt thrower",
+      "category": "furniture",
+      "description": "A crossbow on a post that shoots at monsters in range by itself.",
+      "icon": {
+        "style": "turret",
+        "base": "#a87a4b",
+        "dark": "#6b4628",
+        "light": "#9aa1ab",
+        "accent": "#5d636c"
+      },
+      "builds": { "furniture": "bolt_thrower" }
     },
     {
       "id": "copper_pickaxe",
@@ -433,7 +489,7 @@
       "category": "weapon",
       "description": "Better than a pick in a fight.",
       "stack": 1,
-      "equip": { "slot": "weapon", "tier": 1, "damage": 8 },
+      "equip": { "slot": "weapon", "tier": 1, "damage": 8, "attackTicks": 16 },
       "icon": {
         "style": "sword",
         "base": "#d07a3e",
@@ -448,7 +504,7 @@
       "category": "weapon",
       "description": "A soldier's blade.",
       "stack": 1,
-      "equip": { "slot": "weapon", "tier": 2, "damage": 12 },
+      "equip": { "slot": "weapon", "tier": 2, "damage": 12, "attackTicks": 16 },
       "icon": {
         "style": "sword",
         "base": "#9aa1ab",
@@ -461,9 +517,16 @@
       "id": "crossbow",
       "name": "Crossbow",
       "category": "weapon",
-      "description": "Hits from a distance.",
+      "description": "Shoots bolts at enemies up to seven tiles away.",
       "stack": 1,
-      "equip": { "slot": "weapon", "tier": 2, "damage": 9 },
+      "equip": {
+        "slot": "weapon",
+        "tier": 2,
+        "damage": 9,
+        "attackTicks": 30,
+        "range": 7,
+        "projectile": "bolt"
+      },
       "icon": { "style": "crossbow", "base": "#a87a4b", "dark": "#6b4628", "light": "#9aa1ab" }
     },
     {
@@ -474,6 +537,15 @@
       "stack": 1,
       "equip": { "slot": "body", "tier": 1, "armor": 1 },
       "icon": { "style": "tunic", "base": "#6a8fb8", "dark": "#3f5f85", "light": "#a6c2e0" }
+    },
+    {
+      "id": "leather_jerkin",
+      "name": "Leather jerkin",
+      "category": "armor",
+      "description": "Stiff leather that turns aside claws and teeth.",
+      "stack": 1,
+      "equip": { "slot": "body", "tier": 2, "armor": 2 },
+      "icon": { "style": "tunic", "base": "#9a6236", "dark": "#62391c", "light": "#c48b5a" }
     },
     {
       "id": "copper_helmet",
@@ -499,7 +571,7 @@
       "category": "armor",
       "description": "Heavy, and worth it.",
       "stack": 1,
-      "equip": { "slot": "body", "tier": 2, "armor": 4 },
+      "equip": { "slot": "body", "tier": 3, "armor": 4 },
       "icon": { "style": "chestplate", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de" }
     },
     {

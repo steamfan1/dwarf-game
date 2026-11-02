@@ -7,15 +7,15 @@ home from monsters at night, and finally build a gate to the next world.
 All names, art, sound and text are original to this project. Art and sound are generated
 at runtime as placeholders, so the game currently needs no image or audio files.
 
-**Status: Milestone 4 (needs, day and night).** Worlds are generated from a seed in a
-background worker (hills, caves, lakes, lava, ores, trees, two biomes) and drawn with
-chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to dig, trees to
-fell and wild plants to pick, plan blocks, walls, ladders, doors and furniture, and queue
-crafts; the dwarves do all of it, fetching materials from storage (the Hearth and any
-chests) and walking to the right crafting station. They get hungry and tired: they eat
-from storage and sleep through the night, better in a bed, at a table, or in a lit room.
-Days and nights pass, and at night only what something lights up is bright. See
-[Roadmap](#roadmap) for what each milestone adds.
+**Status: Milestone 5 (monsters, combat, invasions, defences).** Worlds are generated from
+a seed in a background worker (hills, caves, lakes, lava, ores, trees, two biomes) and
+drawn with chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to
+dig, trees to fell, plants to pick and animals to hunt, plan blocks, walls, ladders, doors
+and furniture, and queue crafts; the dwarves do all of it, fetching materials from storage
+(the Hearth and any chests). They eat, sleep through the night, and fight: monsters creep
+out of the dark at night and smash their way through doors and walls, and every fifth
+night an invasion pours through a portal. Light, doors, traps, bolt throwers, weapons and
+armour keep the colony alive. See [Roadmap](#roadmap) for what each milestone adds.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ Then open http://localhost:5173.
 | `npm run smoke` | Browser smoke tests against the build (run `npx playwright install chromium` once first) |
 | `npm run check` | Build, unit tests and smoke tests in one go |
 
-## Controls (Milestone 4)
+## Controls (Milestone 5)
 
 You never move dwarves or change the world yourself: you plan work, and idle dwarves
 take it on. Pick a tool from the toolbar on the left (or press its key), then click or
@@ -49,7 +49,7 @@ drag over the world.
 
 | Tool | Key | What a click or drag does |
 | --- | --- | --- |
-| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling, berry bushes and mushrooms for picking, furniture to take apart. A click on a mark removes it; a click on a dwarf selects it |
+| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling, berry bushes and mushrooms for picking, animals for hunting, furniture to take apart, fallen dwarves for revival. A click on a mark removes it; a click on a dwarf selects it |
 | Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
 | Dig | F | Mark blocks (and, with a click, ladders, doors and furniture) to dig out or take apart |
 | Fell trees | C | Mark a tree for felling (click any part of it) |
@@ -80,8 +80,12 @@ it can, red where it can't, and the readout in the top-left corner says why. Rig
 | Esc | Close a dialog or the crafting panel, put the tool down, deselect the dwarf, or open the in-game menu |
 | ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
 
-The top bar shows the day, the time and a sun or a moon. The readout in the top-left
-corner describes whatever is under the pointer, including the room it's in.
+The top bar shows the day, the time and a sun or a moon, and, when an invasion is coming,
+a countdown to the portal opening (then how many invaders are left). The readout in the
+top-left corner describes whatever is under the pointer: a block (and the room it's in,
+or how badly it's been smashed), a dwarf, or a creature (how hurt it is and what it's up
+to). Monsters the colony can see show as red dots on the minimap, the portal as a violet
+one.
 
 The interface is sized for easy reading at 100%; **Settings → Interface size** makes it
 smaller or larger (75% to 200%), and everything on screen scales together.
@@ -128,8 +132,8 @@ mark work while paused too.
   Each order shows how many are done and whether it's waiting for materials or for a
   station to be built. Crafting gives crafting experience, which makes dwarves quicker.
 - **Dwarves equip themselves.** A dwarf with nothing better to do takes better gear from
-  storage (a pickaxe, armour...) and puts back what it used before. Pickaxes make digging
-  faster; weapons and armour matter once monsters arrive (Milestone 5).
+  storage (a pickaxe, a sword, armour...) and puts back what it used before. Pickaxes
+  make digging faster; weapons and armour decide fights.
 - **Dwarves eat.** Hunger goes down all the time (a full dwarf lasts more than a day). Below
   about half, a dwarf fetches the most filling food in storage and eats it, at a table if
   one stands within 30 tiles: a meal there goes a quarter further, half again in a room.
@@ -145,7 +149,7 @@ mark work while paused too.
   cell of it, is a room (up to 400 cells; a big cave isn't one). A bed in a room with a
   light (a torch, a furnace or stove, the Hearth) gives half as much sleep again, and a table in a
   room the better meal. The readout shows the room under the pointer and what's in it, and
-  the debug overlay tints every room. From Milestone 5, monsters can't appear in rooms.
+  the debug overlay tints every room. Monsters never appear inside a room.
 - **Day and night.** A day is 6 minutes of daylight and 3 of night at normal speed
   (`src/data/time.json`). The light fades out over the last half minute of the day and
   comes back at dawn, and the sky turns deep blue. At night the sun gives a fifth of its
@@ -153,6 +157,41 @@ mark work while paused too.
 - **Wild food.** Berry bushes grow on the surface and mushrooms on cave floors; Auto marks
   them for picking. A bush gives 3 berries and grows more two days later; a picked
   mushroom is gone. A kitchen stove cooks 2 mushrooms into a filling stew.
+- **Monsters come out at night** on dark cells around the colony: never inside a room,
+  never in light, never right next to a dwarf, and a few more each night. Light is the
+  first defence (torches keep them off), doors and walls the second. At dawn those caught
+  in the light slink away; any that found a dark cave stay there.
+- **Four kinds of monster.** The Gloomling smashes doors and anything the dwarves built;
+  the Cragskitter runs up walls and leaps two tiles but can only break doors; the
+  Burrowmaw tunnels through earth and soft stone straight at its prey; the Bilespitter
+  can't break anything, but spits bile at dwarves it can see from seven tiles. Doors and
+  blocks have hit points: monsters weigh walking round to an open way in against
+  smashing the nearest door or wall, and cracks show how close they are to breaking it.
+  Monsters get a little tougher every day.
+- **Dwarves fight by themselves.** A dwarf that sees a monster within 7 tiles drops what
+  it's doing and fights it: with its fists, a sword, or a crossbow from a distance.
+  Weapons set the damage, armour softens every blow, and combat skill grows with every
+  hit. A badly hurt dwarf breaks off and runs for the Hearth, where it mends (and fights
+  back if cornered there). A sleeping dwarf wakes when it's attacked, when a monster comes
+  right up to it, or when a door is being smashed nearby. Meals mend a little too:
+  cooked meat most.
+- **Invasions.** Every fifth night a portal opens on the surface, some way off to one
+  side. The colony is warned a minute and a half before dusk (a horn, and a countdown in
+  the top bar), and the portal's place shows as a faint shimmer. At nightfall invaders
+  pour through it, more each time: their number grows with the day and with the best
+  gear the colony owns. At dawn the portal draws any survivors back.
+- **Defences.** Spike traps stab any creature that steps on them; bolt throwers (a
+  crossbow on a post) shoot monsters up to 8 tiles away by themselves. Both are built
+  like any furniture. Brick and stone walls take far longer to smash than planks.
+- **Hunting.** Mossbacks and Woolhorns graze on the hills by day. Click one with Auto and
+  a dwarf goes after it: a hurt animal runs, but dwarves are faster. Each leaves raw meat
+  (cook it at the kitchen stove) and hides (tan them into leather at a workbench, then
+  sew a leather jerkin at the loom).
+- **Death and revival.** A dwarf that dies stays where it fell. A rekindling draught,
+  brewed at the kitchen stove from dusk essence (which monsters sometimes leave behind),
+  a crystal and mushrooms, brings it back: click the fallen dwarf with Auto and a dwarf
+  pours one on it. Nothing brings back a dwarf lost in lava. If every dwarf dies, the
+  colony has fallen.
 - **Walls are for climbing.** Every block in the ground has a background wall behind it,
   and a dug-out block leaves its wall behind, so dwarves can climb straight up and down
   the shafts and caves they open (as they climb ladders).
@@ -194,9 +233,11 @@ src/
     light/         per-tile light (sunlight, lava, the Hearth) that also decides what's explored
     time/          day and night: the clock, the day count, how strong the sun is
     rooms/         room detection: enclosed spaces, found by flood fill
+    creatures/     the bestiary, creatures' moves (CreatureNav), CreatureAI, the Spawner
+    combat/        damage and armour, line of sight, missiles, damage to doors and blocks
     nav/           how dwarves move, A* pathfinding with a per-tick budget and a path cache
     jobs/          the job board: dig, fell, haul, build, craft, pick... jobs, claims and priorities
-    dwarves/       dwarves (data), their behaviour and needs (DwarfAI) and colony settings
+    dwarves/       dwarves (data), their behaviour, needs and fighting (DwarfAI), colony settings
     items/         the item registry, items lying in the world, and the colony's storage
     furniture/     the furniture registry and the furniture standing in the world
     crafting/      recipes and the queue of crafting orders
@@ -209,7 +250,7 @@ src/
   ui/              HTML/CSS overlay in Preact: menus, HUD, settings, debug panel
   debug/           window.debug helpers (dev builds only)
   data/            game content as JSON: tiles, biomes, world generation, items, furniture,
-                   recipes, dwarves, time of day, strings
+                   recipes, dwarves, time of day, creatures, threats, strings
 e2e/               browser smoke tests (Playwright)
 .github/workflows/ CI and GitHub Pages deployment
 ```
@@ -263,6 +304,22 @@ e2e/               browser smoke tests (Playwright)
   whole world into a typed array of room ids, rebuilt at most every 10 ticks and only after
   blocks, walls, doors or furniture change. Each room counts the beds, tables and lights
   in it.
+- **Creatures** (`sim/creatures/`) are plain data like dwarves, moved by `CreatureAI`.
+  Each kind gets its own set of moves (`CreatureNav`, the creature counterpart of
+  NavGrid): doors stop creatures, `jump` and `safeDrop` vary, climbers cling to walls,
+  and a creature that breaks things may plan a path *through* a door or block it can
+  smash, at an extra cost worked out from how long smashing it would take. So a single A*
+  search decides between walking round and breaking in. Creature searches are greedy (a
+  weighted heuristic: tunnelling makes costs high), capped at 5,000 cells, and have their
+  own budget of 2 per tick, so a horde never slows the dwarves' planning.
+- **The Spawner** (`sim/creatures/Spawner.ts`) brings monsters out at night, animals by
+  day and invasions every few nights, all from `threats.json`. Built blocks carry a flag
+  (`FLAG_BUILT` in the world's cell flags) so monsters that smash built things can tell
+  them from the ground.
+- **Combat** (`sim/combat/`): armour softens a hit of d to d × s / (s + armour); missiles
+  live in a pool (`Projectiles`) and are reused, as are their sprites and the puffs and
+  sparks on screen, so a long siege doesn't churn the garbage collector. Damage to doors
+  and blocks is kept per cell (`TileDamage`) and drawn as cracks.
 - **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`): walking, jumping,
   dropping, swimming and climbing ladders or background walls. The moves are worked out
   from the tile grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
@@ -313,9 +370,10 @@ at runtime.
   with the same keys.
 - **Items** are in `src/data/items.json`, **furniture** in `src/data/furniture.json`,
   **recipes** in `src/data/recipes.json`, **dwarves** (names, looks, speeds, skills,
-  needs) in `src/data/dwarves.json` and **day and night** in `src/data/time.json`, all
-  described below. **The tech tree, creatures and spells**
-  get their JSON files in Milestones 5 to 7, documented here as they arrive.
+  needs, fighting) in `src/data/dwarves.json`, **day and night** in `src/data/time.json`,
+  **creatures** in `src/data/creatures.json` and **threats** (night spawns, invasions,
+  animals) in `src/data/threats.json`, all described below. **The tech tree, creatures and spells**
+  get their JSON files in Milestones 6 and 7, documented here as they arrive.
 
 Every file is checked when the game starts. A mistake (a misspelt tile id, a colour that
 isn't `#rrggbb`, a range with min above max) stops the game with a message naming the
@@ -353,9 +411,10 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 | `drops` | Item id (from items.json) left behind when dug, or when a tree's trunk is felled. |
 | `replaceable` | Building or growing over it simply removes it (grass tufts, flowers). |
 | `climbable` | Dwarves climb up and down through it and can stand on it (ladders). |
-| `door` | Dwarves walk through it, but it stops light (and, from Milestone 5, monsters). |
+| `door` | Dwarves walk through it, but it stops light, and monsters (they must break it down). |
 | `transparent` | A solid block that lets light through (glass). |
 | `light` | Light it gives off, 0 to 15 (15 is daylight). Liquids can glow too (lava is 12). |
+| `hp` | Optional. Damage a monster must do to break it (a wooden door has 70). Without it: hardness × `tileHpPerHardness` from threats.json. |
 | `harvest` | Optional. A plant the dwarves can pick: `{ "item": "berries", "count": 3, "becomes": "berry_bush_bare", "regrowDays": 2 }`. `becomes` is the tile left behind (nothing if left out), which turns back into this one `regrowDays` days later (never if left out). |
 | `connect` | What the tile visually joins with: `solid` (default for solid tiles), `self` or `none`. |
 | `mapColor` | Colour on the minimap. |
@@ -412,12 +471,13 @@ in tiles.json and an ore rule here.
 | --- | --- |
 | `id` | snake_case, unique. Tiles' `drops`, walls' `material` and recipes refer to items by this id. |
 | `name`, `description` | Shown in the HUD. |
-| `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food` or `furniture`. |
+| `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food`, `potion` or `furniture`. |
 | `stack` | Most of the item in one pile on the ground or in a dwarf's arms, and in one storage slot (default 50). |
 | `icon` | The placeholder icon: a `style` (`lump`, `pile`, `ore`, `log`, `plank`, `bar`, `pickaxe`, `chest`, `torch`... see `ICON_STYLES` in `sim/items/ItemRegistry.ts`) with `base`, `dark` and `light` colours and an optional `accent`. |
 | `builds` | Optional. What building with it puts in the world: `{ "tile": "plank" }` (the Build tool's palette) or `{ "furniture": "chest" }` (the Furniture tool's). Items that are a wall's `material` appear in the Walls palette. |
-| `equip` | Optional. Gear: `slot` (`head`, `body`, `weapon`, `tool` or `accessory`), `tier` (dwarves swap up to higher tiers by themselves), and `digSpeed` (tools), `damage` (weapons) or `armor`. |
-| `food` | Optional. `{ "hunger": 40 }`: how much hunger eating one restores (a full dwarf is at 100). Dwarves eat the most filling food first. |
+| `equip` | Optional. Gear: `slot` (`head`, `body`, `weapon`, `tool` or `accessory`), `tier` (dwarves swap up to higher tiers by themselves), and `digSpeed` (tools), `armor`, or for weapons `damage`, `attackTicks` (ticks between blows) and, for ranged weapons, `range` and `projectile` (`bolt`). |
+| `food` | Optional. `{ "hunger": 45, "heal": 12 }`: how much hunger eating one restores (a full dwarf is at 100), and how much health it mends. Dwarves eat the most filling food first. |
+| `revive` | Optional. `{ "health": 0.5 }`: poured on a fallen dwarf, it brings them back with this fraction of their health (the rekindling draught). |
 
 Every tile's `drops` must name an item here; the game checks this at start-up. So a new
 ore takes three entries: the tile, its ore rule in worldgen.json, and the item it drops.
@@ -443,6 +503,8 @@ ore takes three entries: the tile, its ore rule in worldgen.json, and the item i
 | `station` | The crafting station it provides, named by recipes (`workbench`, `furnace`, `anvil`, `loom`, `kitchen`...). |
 | `light` | Light it gives off, 0 to 15. |
 | `use` | `bed` (a dwarf sleeps in it) or `table` (dwarves eat at it). |
+| `trap` | `{ "damage": 14, "cooldownTicks": 30 }`: it stabs any creature standing on it, then needs that long to reset. |
+| `turret` | `{ "range": 8, "damage": 9, "cooldownTicks": 40 }`: it shoots bolts at the nearest monster in range it has a clear shot at. |
 | `art` | Placeholder sprite: a `style` (see `FURNITURE_STYLES` in `sim/furniture/FurnitureRegistry.ts`) and colours. |
 
 Each piece of furniture is built from exactly one item whose `builds` names it, and that
@@ -494,6 +556,67 @@ rates are per in-game day:
 | `eatTicks` | How long a meal takes, in ticks. |
 | `tableBonus`, `roomTableBonus`, `tableReach` | How much further a meal at a table goes, at a table in a room, and how near (in tiles) a table must be. |
 
+`combat` sets how dwarves fight: `bareHandsDamage` and `attackTicks` (fists, and weapons
+that don't set their own pace), `engageRange` (tiles), `engageAbove` and `retreatBelow`
+(fractions of health: a dwarf only starts a fight above the first, and breaks off below
+the second), `restHealPerDay` (mending by the Hearth), `damagePerLevel` (combat skill),
+`xpPerHit` and `reviveTicks`.
+
+### Creatures: `src/data/creatures.json`
+
+```json
+{
+  "id": "gloomling",
+  "name": "Gloomling",
+  "hostile": true,
+  "attack": "melee",
+  "health": 26,
+  "damage": 6,
+  "attackTicks": 24,
+  "sight": 14,
+  "movement": { "walkTicks": 7, "jump": 1, "safeDrop": 6, "climbs": "ladders" },
+  "breaks": "built",
+  "breakDamage": 7,
+  "drops": [{ "item": "dusk_essence", "count": 1, "chance": 0.3 }],
+  "xp": 12,
+  "spawn": { "night": 10, "wave": 10, "fromDay": 1 },
+  "mapColor": "#b48cff",
+  "art": { "style": "gloomling", "base": "#4b4168", "dark": "#2a2340", "light": "#6e6394", "accent": "#ffd34d" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `hostile` | Monsters hunt dwarves; animals graze and can be hunted. |
+| `attack` | `melee` (it must stand next to its prey), `ranged` (it shoots its `projectile` from up to `range` tiles, if it can see its prey) or `none`. |
+| `health`, `armor`, `damage`, `attackTicks` | Hit points, armour (as a dwarf's), damage per blow and ticks between blows. Monsters get tougher every day (threats.json `scaling`). |
+| `sight` | Monsters notice dwarves within this many tiles (invaders always know where the colony is). |
+| `movement` | `walkTicks` per tile (dwarves take 5), `jump` (tiles up onto a ledge), `safeDrop` (the longest drop it takes) and `climbs`: `none`, `ladders`, or `walls` (ladders, background walls and the sides of blocks). |
+| `breaks` | What it smashes through: `none`, `doors`, `built` (doors and blocks dwarves built) or `soft` (also natural blocks up to `digHardness`: it tunnels). `breakDamage` per blow, every `breakTicks` (default `attackTicks`). |
+| `drops` | Items left where it dies, each with a `chance` (default 1). |
+| `xp` | Combat experience for the dwarf that kills it. |
+| `spawn` | Weights for night spawns and invasions (`night`, `wave`), the first day it appears (`fromDay`), and for animals, how common it is in each biome (`"animal": { "temperate": 6, "snow": 1 }`). |
+| `art` | A placeholder sprite `style` (see `CREATURE_STYLES` in `sim/creatures/CreatureRegistry.ts`) in these colours. |
+
+### Threats: `src/data/threats.json`
+
+- `night`: monsters appear between `minDistance` and `maxDistance` tiles (across) from the
+  Hearth, within `rows` above and below it, never closer than `dwarfDistance` to a dwarf,
+  only in cells at most `maxLight` bright, and never in a room. A night brings
+  `base + perDay * (day - 1)` of them (at most `max`, and `maxAlive` at once), spread over
+  the first `spreadOver` of the night.
+- `dawn`: night monsters in at least `leaveLight` light leave, one by one over
+  `leaveSeconds`.
+- `animals`: at most `max` on the hills (`start` when the world begins), a new one every
+  `checkSeconds` by day, between `minDistance` and `maxDistance` from the Hearth.
+- `waves`: an invasion every `every` nights, announced `warningSeconds` before dusk;
+  `base + perDay * day + perTier * tier` invaders (at most `max`), one every
+  `spawnSeconds`, through a portal `portalDistance` tiles from the Hearth. The tier is the
+  best tier of gear the colony owns, until Milestone 6's tech tree takes over.
+- `scaling`: health and damage grow by these fractions per day, up to `maxFactor`.
+- `projectiles`: missile speeds in tiles per tick; `tileHpPerHardness`; `armorScale` (the
+  `s` in the armour formula).
+
 ### Day and night: `src/data/time.json`
 
 | Field | Meaning |
@@ -520,7 +643,9 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   picture and that the sunlit surface is visible, marking blocks and a tree and watching
   the dwarves dig, fell and haul, crafting planks and a chest from the felled tree and
   setting the chest down (storage grows), building a block and a wall, the dwarf panel,
-  a world started at night (dark sky, the Hearth's light, the clock's moon),
+  a world started at night (dark sky, the Hearth's light, the clock's moon), dwarves
+  fighting off a monster and an invasion portal opening (dev server, through
+  `window.debug`),
   zooming and panning, the minimap, the simulation ticking at the right rate, pause, menu,
   settings, right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
   each test's browser console log go to `test-results/`. `e2e/perf.spec.ts` also records
@@ -538,15 +663,20 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   counts, and how far the dwarves can range from the Hearth. In the world it draws chunk
   borders, each dwarf's remaining path (cyan), the job it has reserved (gold) and every
   room (each tinted its own colour), and the "Show light levels" box swaps the fog of war
-  for the light map. It also counts the rooms and shows how strong the daylight is.
+  for the light map. It also counts the rooms, creatures and missiles, shows how strong
+  the daylight is, how many monsters have come out tonight, and the day of the next
+  invasion.
 - In dev builds (`npm run dev`), the browser console has `window.debug`:
   `debug.setSpeed(5)` runs the simulation 5x faster on top of the chosen speed,
   `debug.revealMap()` lifts the fog of war, `debug.spawnItem('stone', 20)` drops items
   beside the Hearth for the dwarves to store, `debug.give('plank', 20)` puts items straight
   into storage, and `debug.stockUp()` stocks a bit of every raw material plus one of each
-  crafting station, for trying out building and crafting quickly, and
-  `debug.skipToNight()` brings nightfall forward to now. To start a world at night, add
-  `?hour=22` to the address.
+  crafting station (and a few swords, traps, a bolt thrower and a rekindling draught), for
+  trying things out quickly. `debug.skipToNight()` brings nightfall forward to now,
+  `debug.spawnCreature('gloomling', 10)` puts a creature on the ground 10 tiles right of
+  the Hearth (negative: left), `debug.startWave()` brings an invasion on tonight (the
+  warning now, the portal at dusk) and `debug.killMonsters()` clears them all away. To
+  start a world at night, add `?hour=22` to the address.
 
 ## Deploying
 
@@ -591,8 +721,8 @@ static host works the same way: upload the contents of `dist/`.
 | 2 | Dwarves, pathfinding, job queue (dig, chop, haul); light shows the surface | Done |
 | 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Done |
 | 4 | Hunger and sleep, day/night, lighting overlay, room detection | Done |
-| 5 | Monsters, combat, invasion waves, defences | Next |
-| 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | |
+| 5 | Monsters, combat, invasion waves, defences | Done |
+| 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | Next |
 | 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | |
 | 8 | Release: bundle optimisation, cross-browser testing, publishing guides | |
 

@@ -14,6 +14,8 @@ export const DEPTH = {
   /** The Hearth. */
   objects: 20,
   items: 21,
+  /** Monsters and animals, just behind the dwarves. */
+  creatures: 21.5,
   dwarves: 22,
   /** What a dwarf carries, above its head. */
   carried: 23,

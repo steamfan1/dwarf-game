@@ -68,13 +68,18 @@ export interface TileDef {
   indestructible: boolean;
   /** Relative time to dig; 1 is dirt. */
   hardness: number;
+  /**
+   * Damage a monster must do to break it, or null for the usual: its hardness times
+   * threats.json's tileHpPerHardness.
+   */
+  hp: number | null;
   /** Item id dropped when dug or chopped (see items.json). */
   drops: string | null;
   /** Building or growing over it simply replaces it (grass tufts, leaves). */
   replaceable: boolean;
   /** Dwarves can climb up and down through it, and stand on top of it (ladders). */
   climbable: boolean;
-  /** A door: dwarves walk through it, but it blocks light (and, from Milestone 5, monsters). */
+  /** A door: dwarves walk through it, but it blocks light and monsters (they have to break it). */
   door: boolean;
   /** A solid block that lets light through (glass). */
   transparent: boolean;
@@ -283,6 +288,7 @@ function parseTile(v: Validator, raw: unknown, path: string): TileDef {
     solid,
     indestructible: o?.indestructible === undefined ? false : v.boolean(o.indestructible, `${path}.indestructible`),
     hardness: o?.hardness === undefined ? 1 : v.number(o.hardness, `${path}.hardness`, 0.1, 100),
+    hp: o?.hp === undefined ? null : v.number(o.hp, `${path}.hp`, 1, 100000),
     drops: o?.drops === undefined ? null : v.identifier(o.drops, `${path}.drops`),
     replaceable: o?.replaceable === undefined ? false : v.boolean(o.replaceable, `${path}.replaceable`),
     climbable: o?.climbable === undefined ? false : v.boolean(o.climbable, `${path}.climbable`),

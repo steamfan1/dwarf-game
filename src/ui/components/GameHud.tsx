@@ -69,6 +69,7 @@ export function GameHud() {
         </div>
 
         <Clock />
+        <Threat />
 
         <ResourceBar />
 
@@ -142,6 +143,28 @@ function Clock() {
       <Icon name={clock.night ? 'moon' : 'sun'} />
       <span class="clock-day">{t('hud.day', { day: clock.day })}</span>
       <span class="clock-time">{time}</span>
+    </div>
+  );
+}
+
+/** An invasion coming (a countdown to the portal opening) or under way (invaders left). */
+function Threat() {
+  const threat = useStore(uiState, (s) => s.threat);
+  if (!threat) return null;
+  const side = t(`side.${threat.side}`);
+  if (threat.phase === 'warning') {
+    const time = `${Math.floor(threat.seconds / 60)}:${String(threat.seconds % 60).padStart(2, '0')}`;
+    return (
+      <div class="threat warning" title={t('hud.waveWarningTip', { side })} data-testid="threat">
+        <Icon name="portal" />
+        <span>{t('hud.waveWarning', { time })}</span>
+      </div>
+    );
+  }
+  return (
+    <div class="threat open" title={t('hud.waveOpenTip')} data-testid="threat">
+      <Icon name="portal" />
+      <span>{t('hud.waveOpen', { count: threat.left })}</span>
     </div>
   );
 }

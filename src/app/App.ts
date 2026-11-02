@@ -25,7 +25,7 @@ import { generateWorldInWorker } from '../platform/worldgenClient';
 import { AudioService } from '../render/AudioService';
 import { createGame } from '../render/createGame';
 import { itemIconUrl } from '../render/assets/itemArt';
-import { MinimapRenderer, type TileViewRect } from '../render/Minimap';
+import { MinimapRenderer, type MapMarker, type TileViewRect } from '../render/Minimap';
 import { SceneKeys } from '../render/scenes/keys';
 import { ViewportManager } from '../render/ViewportManager';
 import { describeActivity } from '../render/world/describeCell';
@@ -49,6 +49,7 @@ import {
   type DwarfSummary,
   type HoverInfo,
   type NeedWarning,
+  type ThreatView,
   type Tool,
 } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
@@ -60,6 +61,11 @@ const SETTINGS_STORAGE_KEY = 'gatewright.settings';
 const SETTINGS_SAVE_DELAY_MS = 300;
 /** "Some work can't be reached" is said at most this often. */
 const BLOCKED_TOAST_GAP_MS = 20_000;
+/** "X is badly hurt and falls back" is said at most this often for each dwarf. */
+const RETREAT_TOAST_GAP_MS = 30_000;
+/** Map dots: monsters, and the invasion portal. */
+const MONSTER_DOT = '#ff4a3a';
+const PORTAL_DOT = '#c48cff';
 
 export interface AppElements {
   /** Wraps the canvas and the overlay. */
@@ -89,6 +95,7 @@ export class App implements UiCommands, GameContext {
   /** Bumped on every new game or quit, so a slow world generation can tell it was abandoned. */
   private generation = 0;
   private lastBlockedToast = -Infinity;
+  private readonly lastRetreatToast = new Map<number, number>();
 
   constructor(elements: AppElements) {
     this.elements = elements;
@@ -140,6 +147,16 @@ export class App implements UiCommands, GameContext {
   reportView(view: TileViewRect): void {
     if (!this.minimap || !uiState.get().minimapOpen) return;
     this.minimap.setView(view);
+    const sim = this.session?.sim;
+    if (sim) {
+      const markers: MapMarker[] = [];
+      for (const creature of sim.creatures) {
+        if (!creature.gone && sim.isHostile(creature) && sim.world.isVisible(creature.x, creature.y)) markers.push({ x: creature.x, y: creature.y, color: MONSTER_DOT, size: 3 });
+      }
+      const portal = sim.portal;
+      if (portal) markers.push({ x: portal.x, y: portal.y - 1, color: PORTAL_DOT, size: 5 });
+      this.minimap.setMarkers(markers);
+    }
     this.minimap.draw();
   }
 
@@ -160,7 +177,7 @@ export class App implements UiCommands, GameContext {
     const clock = { day: sim.time.day(sim.tick), hour, minute: minute - (minute % 10), night: sim.isNight() };
     const previous = uiState.get().clock;
     const same = previous && previous.day === clock.day && previous.hour === clock.hour && previous.minute === clock.minute && previous.night === clock.night;
-    uiState.set({ colony: summarizeColony(sim), ...(same ? {} : { clock }) });
+    uiState.set({ colony: summarizeColony(sim), threat: threatView(sim), ...(same ? {} : { clock }) });
   }
 
   get tool(): Tool {
@@ -328,6 +345,28 @@ export class App implements UiCommands, GameContext {
     uiState.set({ debugLight: on });
   }
 
+  dismissColonyLost(): void {
+    uiState.set({ colonyLost: false });
+  }
+
+  toggleHunt(creatureId: number): void {
+    const sim = this.session?.sim;
+    if (!sim) return;
+    const hunt = sim.huntJobFor(creatureId);
+    if (hunt) sim.jobs.remove(hunt.id);
+    else if (!sim.designateHunt(creatureId, uiState.get().priority)) return;
+    this.audio?.play(hunt ? 'uiClose' : 'uiClick');
+  }
+
+  toggleRevive(dwarfId: number): void {
+    const sim = this.session?.sim;
+    if (!sim) return;
+    const job = sim.reviveJobFor(dwarfId);
+    if (job) sim.jobs.remove(job.id);
+    else if (!sim.designateRevive(dwarfId, uiState.get().priority)) return;
+    this.audio?.play(job ? 'uiClose' : 'uiClick');
+  }
+
   togglePause(): void {
     this.session?.time.togglePause();
   }
@@ -417,8 +456,9 @@ export class App implements UiCommands, GameContext {
         session.bus.on('SkillUp', ({ name, skill, level }) => {
           pushToast(t('toast.skillUp', { name, skill: t(`skill.${skill}`), level }), 'info', 5000);
         }),
-        session.bus.on('DwarfDied', ({ name, cause }) => {
-          pushToast(t('toast.dwarfDied', { name, cause: t(`toast.cause.${cause}`) }), 'error', 9000);
+        session.bus.on('DwarfDied', ({ name, cause, by, revivable }) => {
+          const why = cause === 'monster' ? t('toast.cause.monster', { creature: by ?? '' }) : t(`toast.cause.${cause}`);
+          pushToast(`${t('toast.dwarfDied', { name, cause: why })}${revivable ? ` ${t('toast.reviveHint')}` : ''}`, 'error', 10000);
         }),
         session.bus.on('JobBlocked', () => {
           const now = performance.now();
@@ -437,6 +477,22 @@ export class App implements UiCommands, GameContext {
         session.bus.on('CraftOrderDone', ({ item, count }) => {
           pushToast(t('toast.orderDone', { count, item: session.sim.items.get(item).name }), 'info', 4000);
         }),
+        session.bus.on('NightThreat', () => pushToast(t('toast.nightThreat'), 'warning', 7000)),
+        session.bus.on('WaveWarning', ({ x }) => {
+          const side = x < session.sim.hearth.x ? 'west' : 'east';
+          pushToast(t('toast.waveWarning', { side: t(`side.${side}`) }), 'error', 10000);
+          this.audio?.play('horn', 0.9);
+        }),
+        session.bus.on('WaveStarted', ({ size }) => pushToast(t('toast.waveStarted', { size }), 'error', 8000)),
+        session.bus.on('WaveEnded', ({ defeated }) => pushToast(t(defeated ? 'toast.waveDefeated' : 'toast.waveRetreat'), 'info', 7000)),
+        session.bus.on('DwarfRetreating', ({ dwarf, name }) => {
+          const now = performance.now();
+          if (now - (this.lastRetreatToast.get(dwarf) ?? -Infinity) < RETREAT_TOAST_GAP_MS) return;
+          this.lastRetreatToast.set(dwarf, now);
+          pushToast(t('toast.retreating', { name }), 'warning', 6000);
+        }),
+        session.bus.on('DwarfRevived', ({ name }) => pushToast(t('toast.dwarfRevived', { name }), 'info', 6000)),
+        session.bus.on('ColonyLost', () => uiState.set({ colonyLost: true })),
       );
       uiState.set({
         loading: { stage: 'building', progress: 0.97 },
@@ -594,7 +650,16 @@ export class App implements UiCommands, GameContext {
 }
 
 /** The HUD's colony state for a world that has just started (or ended). */
-const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null, craftingOpen: false } as const;
+const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null, craftingOpen: false, threat: null, colonyLost: false } as const;
+
+/** An invasion coming or under way, for the top bar. */
+function threatView(sim: Simulation): ThreatView {
+  const wave = sim.waveView();
+  if (!wave) return null;
+  const side = wave.side < 0 ? 'west' : 'east';
+  if (wave.phase === 'warning') return { phase: 'warning', seconds: Math.ceil(wave.ticksLeft / 20), side };
+  return { phase: 'open', left: wave.left, side };
+}
 
 function paletteOf(catalogue: Catalogue, tool: BuildTool): Catalogue['blocks'] {
   return tool === 'build' ? catalogue.blocks : tool === 'wall' ? catalogue.walls : catalogue.furniture;
@@ -664,6 +729,7 @@ function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {
     }),
     carrying: dwarf.carrying.map(({ item, count }) => ({ name: sim.items.get(item).name, count, icon: itemIconUrl(sim.items, item) })),
     needs: dead ? [] : needWarnings(sim, dwarf),
+    combat: combatSummary(sim, dwarf),
     dead,
     stranded,
     tunic: sim.colony.looks.tunic[dwarf.looks.tunic] ?? '#888888',
@@ -678,7 +744,18 @@ function needWarnings(sim: Simulation, dwarf: Dwarf): NeedWarning[] {
   else if (dwarf.hunger < n.hungryBelow) warnings.push('hungry');
   if (dwarf.energy <= 0) warnings.push('exhausted');
   else if (dwarf.energy < n.tiredBelow) warnings.push('tired');
+  if (dwarf.health < sim.colony.combat.engageAbove * dwarf.maxHealth) warnings.push('wounded');
   return warnings;
+}
+
+/** What a dwarf fights with (null: bare hands), the damage of a blow, and its armour. */
+function combatSummary(sim: Simulation, dwarf: Dwarf): DwarfSummary['combat'] {
+  const weapon = dwarf.equipment.weapon;
+  return {
+    weapon: weapon === null ? null : sim.items.get(weapon).name.toLowerCase(),
+    damage: Math.round(sim.weaponOf(dwarf).damage * 10) / 10,
+    armor: sim.armorOf(dwarf),
+  };
 }
 
 function applyUiScale(scale: number): void {

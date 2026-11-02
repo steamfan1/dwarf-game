@@ -7,7 +7,9 @@
  *     there as at the Hearth;
  *   - `station`: a crafting station, named by recipes (workbench, furnace, anvil...);
  *   - `light`: it glows (torches, furnaces);
- *   - `use`: "bed" (dwarves sleep in it) or "table" (dwarves eat at it).
+ *   - `use`: "bed" (dwarves sleep in it) or "table" (dwarves eat at it);
+ *   - `trap`: it hurts any creature that walks over it (dwarves step over it safely);
+ *   - `turret`: it shoots at hostile creatures in range by itself.
  * `mount` says what it needs: "floor" (solid ground under its whole width, the default)
  * or "wall" (a background wall behind it, or a block beside or below it).
  */
@@ -31,6 +33,7 @@ export const FURNITURE_STYLES = [
   'table',
   'chair',
   'trap',
+  'turret',
 ] as const;
 export type FurnitureStyle = (typeof FURNITURE_STYLES)[number];
 
@@ -40,6 +43,19 @@ export interface FurnitureArt {
   dark: string;
   light: string;
   accent?: string;
+}
+
+/** A trap: damage to a creature standing on it, then a pause before it can strike again. */
+export interface TrapStats {
+  damage: number;
+  cooldownTicks: number;
+}
+
+/** A turret: shoots bolts at hostile creatures within `range` tiles it can see. */
+export interface TurretStats {
+  range: number;
+  damage: number;
+  cooldownTicks: number;
 }
 
 export interface FurnitureDef {
@@ -55,6 +71,8 @@ export interface FurnitureDef {
   station: string | null;
   light: number;
   use: FurnitureUse | null;
+  trap: TrapStats | null;
+  turret: TurretStats | null;
   mapColor: string;
   art: FurnitureArt;
 }
@@ -108,6 +126,8 @@ function parseFurniture(v: Validator, raw: unknown, path: string): FurnitureDef 
   const size = v.array(o?.size, `${path}.size`).map((n, i) => Math.round(v.number(n, `${path}.size[${i}]`, 1, 4)));
   if (size.length !== 2) v.problem(`${path}.size must be [width, height]`);
   const art = v.object(o?.art, `${path}.art`);
+  const trap = o?.trap === undefined ? null : v.object(o.trap, `${path}.trap`);
+  const turret = o?.turret === undefined ? null : v.object(o.turret, `${path}.turret`);
   return {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
@@ -118,6 +138,19 @@ function parseFurniture(v: Validator, raw: unknown, path: string): FurnitureDef 
     station: o?.station === undefined ? null : v.identifier(o.station, `${path}.station`),
     light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
     use: o?.use === undefined ? null : (v.oneOf(o.use, ['bed', 'table'] as const, `${path}.use`) ?? null),
+    trap: trap
+      ? {
+          damage: v.number(trap.damage, `${path}.trap.damage`, 0, 10000),
+          cooldownTicks: Math.round(v.number(trap.cooldownTicks, `${path}.trap.cooldownTicks`, 1, 10000)),
+        }
+      : null,
+    turret: turret
+      ? {
+          range: Math.round(v.number(turret.range, `${path}.turret.range`, 1, 30)),
+          damage: v.number(turret.damage, `${path}.turret.damage`, 0, 10000),
+          cooldownTicks: Math.round(v.number(turret.cooldownTicks, `${path}.turret.cooldownTicks`, 1, 10000)),
+        }
+      : null,
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: {
       style: v.oneOf(art?.style, FURNITURE_STYLES, `${path}.art.style`) ?? 'chest',

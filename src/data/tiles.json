@@ -427,6 +427,7 @@
       "solid": false,
       "door": true,
       "hardness": 1,
+      "hp": 70,
       "drops": "wooden_door",
       "connect": "none",
       "mapColor": "#8a5a32",

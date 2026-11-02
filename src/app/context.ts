@@ -53,6 +53,10 @@ export interface GameContext {
   dropTool(): void;
   readonly selectedDwarf: number | null;
   selectDwarf(id: number | null): void;
+  /** Auto tool on an animal: mark it for hunting, or call the hunt off. */
+  toggleHunt(creatureId: number): void;
+  /** Auto tool on a fallen dwarf: mark it for revival, or call that off. */
+  toggleRevive(dwarfId: number): void;
   /** Debug overlay option: show light levels instead of the fog of war. */
   readonly debugLight: boolean;
 }

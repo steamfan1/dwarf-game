@@ -5,8 +5,11 @@
  *   debug.setSpeed(5)          run the simulation 5x faster on top of the chosen speed
  *   debug.spawnItem('stone', 20)   drop items at the Hearth (the dwarves store them)
  *   debug.give('plank', 20)    put items straight into storage
- *   debug.stockUp()            a bit of every raw material, plus one of each crafting station
+ *   debug.stockUp()            a bit of every raw material, one of each crafting station, a few defences
  *   debug.skipToNight()        bring nightfall forward to now
+ *   debug.spawnCreature('gloomling', 10)   a creature on the ground 10 tiles right of the Hearth
+ *   debug.startWave()          an invasion tonight: the warning now, the portal at dusk
+ *   debug.killMonsters()       every hostile creature drops dead
  *   debug.revealMap()
  */
 import type { App } from '../app/App';
@@ -16,6 +19,9 @@ export interface DebugApi {
   give(id: string, count?: number): void;
   stockUp(): void;
   skipToNight(): void;
+  spawnCreature(id: string, dx?: number): void;
+  startWave(): void;
+  killMonsters(): void;
   revealMap(): void;
   setSpeed(multiplier: number): void;
   /** The running app, for poking around in the console. */
@@ -50,6 +56,10 @@ const STARTER_KIT: ReadonlyArray<[string, number]> = [
   ['anvil', 1],
   ['loom', 1],
   ['kitchen', 1],
+  ['copper_sword', 3],
+  ['spike_trap', 2],
+  ['bolt_thrower', 1],
+  ['rekindling_draught', 1],
 ];
 
 export function installDebugApi(app: App): void {
@@ -101,6 +111,41 @@ export function installDebugApi(app: App): void {
       sim.skipToNight();
       console.info(`Night falls on day ${sim.time.day(sim.tick)}.`);
     },
+    spawnCreature: (id, dx = 10) => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.spawnCreature() needs a running game: start a new game first.');
+        return;
+      }
+      if (!sim.creatureKinds.has(id)) {
+        console.warn(`No creature "${id}". Try one of: ${sim.creatureKinds.defs.map((def) => def.id).join(', ')}`);
+        return;
+      }
+      const creature = sim.spawnCreatureNear(id, dx);
+      if (creature) console.info(`A ${sim.creatureDef(creature).name} appears at ${creature.x}, ${creature.y}.`);
+      else console.warn(`Nowhere for a ${id} to stand ${dx} tiles from the Hearth.`);
+    },
+    startWave: () => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.startWave() needs a running game: start a new game first.');
+        return;
+      }
+      sim.startWave();
+      console.info('An invasion is coming tonight.');
+    },
+    killMonsters: () => {
+      const sim = app.session?.sim;
+      if (!sim) return;
+      let n = 0;
+      for (const creature of [...sim.creatures]) {
+        if (!creature.gone && sim.isHostile(creature)) {
+          sim.killCreature(creature, 0);
+          n++;
+        }
+      }
+      console.info(`${n} monster(s) dropped dead.`);
+    },
     revealMap: () => {
       if (app.revealMap()) console.info('Fog of war lifted over the whole map.');
       else console.info('debug.revealMap() needs a running game: start a new world first.');
@@ -115,5 +160,5 @@ export function installDebugApi(app: App): void {
     },
     app,
   };
-  console.info('Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, revealMap, setSpeed).');
+  console.info('Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).');
 }

@@ -22,6 +22,11 @@
  * a lit room). Rooms are found by flood fill (RoomMap) whenever blocks, walls, doors or
  * furniture change.
  *
+ * Threats: the Spawner brings monsters out of the dark at night and through a portal
+ * every few nights, and animals onto the hills by day; CreatureAI moves them. Dwarves
+ * fight back by themselves (DwarfAI), helped by traps and turrets. Monsters break doors
+ * and blocks to get at dwarves (TileDamage); missiles fly in a pool (Projectiles).
+ *
  * Pure TypeScript: no Phaser and no DOM, so it runs in unit tests and could move into a
  * worker. All randomness comes from `rng`, never Math.random(), so a world can be
  * replayed exactly from its seed and the player's orders.
@@ -30,14 +35,22 @@ import type { EventBus } from '../core/EventBus';
 import { Rng } from '../core/Rng';
 import { CraftQueue, type CraftOrder } from './crafting/CraftQueue';
 import { HAND_CRAFTED, type Recipe, type RecipeBook } from './crafting/Recipes';
-import { createDwarf, skillSpeed, type Dwarf, type Skill } from './dwarves/Dwarf';
-import { DwarfAI, type ColonyContext, type NeedRates } from './dwarves/DwarfAI';
+import { armoredDamage, lineOfSight as clearShot, Projectiles, seeThrough, type Projectile, type ProjectileImpact } from './combat/Combat';
+import { TileDamage } from './combat/TileDamage';
+import { createCreature, toughness, type Creature, type CreatureOrigin } from './creatures/Creature';
+import { CreatureAI, type CreatureContext } from './creatures/CreatureAI';
+import { CreatureNav, type Breaker } from './creatures/CreatureNav';
+import type { CreatureDef, CreatureRegistry } from './creatures/CreatureRegistry';
+import { Spawner, type SpawnerContext, type SpawnerEvent } from './creatures/Spawner';
+import type { ThreatSettings } from './creatures/threats';
+import { createDwarf, gainXp, skillSpeed, type Dwarf, type Skill } from './dwarves/Dwarf';
+import { DwarfAI, type ColonyContext, type NeedRates, type Weapon } from './dwarves/DwarfAI';
 import type { ColonySettings } from './dwarves/settings';
 import type { DeathCause, GameEvents } from './events';
 import { FurnitureSet, type PlacedFurniture } from './furniture/Furniture';
 import type { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ColonyStorage, GroundItems } from './items/Items';
-import { EQUIP_SLOTS, type ItemCount, type ItemRegistry } from './items/ItemRegistry';
+import { EQUIP_SLOTS, type ItemCount, type ItemRegistry, type ProjectileKind } from './items/ItemRegistry';
 import { DEFAULT_PRIORITY, HAUL_PRIORITY, JobBoard, PERSONAL_JOBS, type Job, type Priority } from './jobs/JobBoard';
 import { HEARTH_LIGHT, Lighting } from './light/Lighting';
 import { HomeMaps } from './nav/HomeMaps';
@@ -48,7 +61,7 @@ import { RoomMap } from './rooms/RoomMap';
 import { TimeOfDay, type TimeSettings } from './time/TimeOfDay';
 import { AIR, NO_LIQUID, type TileRegistry } from './world/TileRegistry';
 import { TreeFinder, type Tree } from './world/trees';
-import type { CellRect, World } from './world/World';
+import { FLAG_BUILT, type CellRect, type World } from './world/World';
 
 /** Why a block can or can't be marked for digging. */
 export type DigStatus =
@@ -102,6 +115,18 @@ const STORAGE_FULL_NOTICE_TICKS = 400;
 const ROOM_REBUILD_TICKS = 10;
 /** Picked plants are checked for regrowth this often (ticks). */
 const REGROWTH_CHECK_TICKS = 20;
+/** Creatures get their own path searches each tick, apart from the dwarves'. */
+export const CREATURE_SEARCHES_PER_TICK = 2;
+/** Cells one creature search may expand (they hunt nearby prey, or head for the Hearth). */
+const CREATURE_SEARCH_LIMIT = 5000;
+/** A door or block being smashed wakes dwarves asleep within this many tiles... */
+const NOISE_RADIUS = 8;
+/** ...for this many ticks after each blow. */
+const NOISE_TICKS = 30;
+/** The portal's glow. */
+const PORTAL_LIGHT = 10;
+/** A hurt animal runs for this long (ticks). */
+const ANIMAL_FLEE_TICKS = 70;
 
 const NEIGHBOURS = [
   [1, 0],
@@ -118,12 +143,17 @@ export interface SimulationOptions {
   recipes: RecipeBook;
   colony: ColonySettings;
   time: TimeSettings;
+  creatures: CreatureRegistry;
+  threats: ThreatSettings;
   bus: EventBus<GameEvents>;
   /** The hour the world starts at, instead of time.json's (from the page address, for testing). */
   startHour?: number;
 }
 
-export class Simulation implements ColonyContext {
+/** What the HUD shows of an invasion: coming (with ticks to go), or under way (invaders left). */
+export type WaveView = { phase: 'warning'; ticksLeft: number; side: -1 | 1 } | { phase: 'open'; left: number; side: -1 | 1 } | null;
+
+export class Simulation implements ColonyContext, CreatureContext, SpawnerContext {
   readonly world: World;
   readonly tiles: TileRegistry;
   readonly items: ItemRegistry;
@@ -152,6 +182,18 @@ export class Simulation implements ColonyContext {
   readonly rooms: RoomMap;
   readonly needRates: NeedRates;
   readonly dwarves: Dwarf[] = [];
+  readonly creatureKinds: CreatureRegistry;
+  readonly threats: ThreatSettings;
+  /** Every creature in the world: monsters and animals. */
+  readonly creatures: Creature[] = [];
+  /** Missiles in flight. */
+  readonly projectiles = new Projectiles();
+  /** Doors and blocks monsters have damaged. */
+  readonly tileDamage = new TileDamage();
+  /** Path searches for creatures, with their own budget. */
+  readonly creaturePaths: PathService;
+  readonly creatureRng: Rng;
+  readonly spawner: Spawner;
   /** Number of ticks simulated since the world began. */
   tick = 0;
   /** Bumped whenever a block appears or disappears (the home maps go out of date). */
@@ -179,16 +221,31 @@ export class Simulation implements ColonyContext {
   private readonly regrowth: Array<{ cell: number; from: number; to: number; at: number }> = [];
   /** When each starving dwarf was last announced. */
   private readonly starvingNotices = new Map<number, number>();
+  private readonly creatureAI: CreatureAI;
+  /** How each kind of creature gets about, by kind. */
+  private readonly creatureNavs: CreatureNav[];
+  private nextCreatureId = 1;
+  /** The latest loud noise (a door being smashed), which wakes sleepers near it. */
+  private noise: { x: number; y: number; tick: number } | null = null;
+  private portalLight: { x: number; y: number } | null = null;
+  private colonyLost = false;
+  /** Hunting marks by creature id (the job's id). */
+  private readonly hunts = new Map<number, number>();
+  /** The item that brings fallen dwarves back (-1 if none does). */
+  private readonly reviveItem: number;
 
-  constructor({ world, tiles, items, furniture, recipes, colony, time, bus, startHour }: SimulationOptions) {
+  constructor({ world, tiles, items, furniture, recipes, colony, time, creatures, threats, bus, startHour }: SimulationOptions) {
     this.world = world;
     this.tiles = tiles;
     this.items = items;
     this.furnitureKinds = furniture;
     this.recipes = recipes;
     this.colony = colony;
+    this.creatureKinds = creatures;
+    this.threats = threats;
     this.bus = bus;
     this.rng = new Rng(`${world.seed}:simulation`);
+    this.creatureRng = this.rng.fork('creatures');
     this.hearth = { ...world.spawn };
     this.storeArea = { x0: this.hearth.x - 1, y0: this.hearth.y, x1: this.hearth.x + 1, y1: this.hearth.y };
     this.hearthArea = { ...this.storeArea, y0: this.hearth.y - 1 };
@@ -199,6 +256,7 @@ export class Simulation implements ColonyContext {
       if (item.builds && 'furniture' in item.builds) this.furnitureItems.set(furniture.id(item.builds.furniture), i);
     });
     this.gear = items.items.flatMap((item, i) => (item.equip ? [i] : []));
+    this.reviveItem = items.items.findIndex((item) => item.revive !== null);
     this.foods = items.items
       .flatMap((item, i) => (item.food ? [i] : []))
       .sort((a, b) => items.get(b).food!.hunger - items.get(a).food!.hunger || a - b);
@@ -234,12 +292,22 @@ export class Simulation implements ColonyContext {
     this.ai = new DwarfAI(this);
     this.rebuildMaps();
     this.rebuildRooms();
+
+    this.creatureNavs = creatures.defs.map((def) => new CreatureNav(world, tiles, def.movement, this.breakerFor(def)));
+    this.creaturePaths = new PathService(world, new Pathfinder(this.nav, { maxExpanded: CREATURE_SEARCH_LIMIT }), {
+      searchesPerTick: CREATURE_SEARCHES_PER_TICK,
+      cacheSize: 64,
+    });
+    this.creatureAI = new CreatureAI(this);
+    this.spawner = new Spawner(this, this.rng.fork('spawner'));
+    this.spawner.populate();
   }
 
   /** Advance the world by exactly one tick (1/20 s of game time at 1x). */
   step(): void {
     this.tick++;
     this.paths.beginTick();
+    this.creaturePaths.beginTick();
     if (this.mapsVersion !== this.terrainVersion && this.tick - this.mapsTick >= MAP_REBUILD_TICKS) this.rebuildMaps();
     for (const stack of this.ground.step()) {
       if (stack.haulJob !== 0) this.jobs.remove(stack.haulJob);
@@ -260,7 +328,23 @@ export class Simulation implements ColonyContext {
       this.wasNight = night;
       this.bus.emit(night ? 'NightStarted' : 'DayStarted', { day: this.time.day(this.tick) });
     }
+    this.spawner.step();
     for (const dwarf of this.dwarves) this.ai.update(dwarf);
+    for (const creature of this.creatures) {
+      this.creatureAI.update(creature);
+      // Hunting marks follow their animal.
+      const hunt = this.huntJobFor(creature.id);
+      if (hunt) {
+        hunt.x = creature.x;
+        hunt.y = creature.y;
+      }
+    }
+    this.projectiles.step(
+      (projectile, x, y) => this.projectileHits(projectile, x, y),
+      (projectile, hit) => this.projectileLands(projectile, hit),
+    );
+    this.stepDefences();
+    for (let i = this.creatures.length - 1; i >= 0; i--) if (this.creatures[i]!.gone) this.creatures.splice(i, 1);
   }
 
   /** Whether it is night now. */
@@ -375,18 +459,28 @@ export class Simulation implements ColonyContext {
     return true;
   }
 
-  /** Remove the work marked in a rectangle, in both layers (dwarves on those jobs stop). Returns how many jobs. */
+  /** Remove the work marked in a rectangle, in both layers, with hunting and revival marks (dwarves on those jobs stop). Returns how many jobs. */
   cancelDesignations(rect: CellRect): number {
-    const jobs = this.jobs.inRect(this.clampRect(rect));
+    const jobs = this.marksIn(rect);
     for (const job of jobs) this.jobs.remove(job.id);
     return jobs.length;
   }
 
   /** Change the priority of the work marked in a rectangle. Returns how many jobs. */
   prioritize(rect: CellRect, priority: Priority): number {
-    const jobs = this.jobs.inRect(this.clampRect(rect));
+    const jobs = this.marksIn(rect);
     for (const job of jobs) this.jobs.setPriority(job.id, priority);
     return jobs.length;
+  }
+
+  /** The player's marks in a rectangle: work on cells, animals to hunt and fallen dwarves to revive. */
+  private marksIn(rect: CellRect): Job[] {
+    const r = this.clampRect(rect);
+    const jobs = this.jobs.inRect(r);
+    for (const job of this.jobs.all()) {
+      if ((job.type === 'hunt' || job.type === 'revive') && job.x >= r.x0 && job.x <= r.x1 && job.y >= r.y0 && job.y <= r.y1) jobs.push(job);
+    }
+    return jobs;
   }
 
   /** Whether a block can be planned in a cell with this item, and if not, why. */
@@ -502,6 +596,8 @@ export class Simulation implements ColonyContext {
         return work.harvestTicks / speed('farming');
       case 'eat':
         return colony.needs.eatTicks;
+      case 'revive':
+        return colony.combat.reviveTicks;
       default:
         return 0;
     }
@@ -539,7 +635,7 @@ export class Simulation implements ColonyContext {
   jobWorkable(job: Job): boolean {
     const { world, homeMaps } = this;
     if (job.type === 'haul') return world.inBounds(job.x, job.y) && homeMaps.workable(world.index(job.x, job.y));
-    if (job.type === 'craft' || PERSONAL_JOBS.has(job.type)) return true;
+    if (job.type === 'craft' || job.type === 'hunt' || PERSONAL_JOBS.has(job.type)) return true;
     const area = this.jobArea(job);
     for (let y = area.y0 - 1; y <= area.y1 + 1; y++) {
       for (let x = area.x0 - 1; x <= area.x1 + 1; x++) {
@@ -557,6 +653,10 @@ export class Simulation implements ColonyContext {
    */
   jobArea(job: Job): CellRect {
     if (job.type === 'place') return this.furniture.footprint(job.target, job.x, job.y);
+    if (job.type === 'hunt' || job.type === 'fight') {
+      const creature = this.creature(job.target);
+      if (creature) return { x0: creature.x, y0: creature.y, x1: creature.x, y1: creature.y };
+    }
     if (job.furnitureId !== 0 && job.type !== 'equip') {
       const piece = this.furniture.get(job.furnitureId);
       if (piece) return piece.rect;
@@ -584,6 +684,13 @@ export class Simulation implements ColonyContext {
         return this.furniture.get(job.furnitureId) !== undefined;
       case 'harvest':
         return this.world.fg[this.world.index(job.x, job.y)] === job.target;
+      case 'hunt':
+      case 'fight':
+        return this.creature(job.target) !== undefined;
+      case 'revive': {
+        const dwarf = this.dwarf(job.target);
+        return dwarf !== undefined && this.revivable(dwarf);
+      }
       case 'craft': {
         if (this.isHandCraft(job)) return true;
         const station = this.furniture.get(job.furnitureId);
@@ -607,9 +714,17 @@ export class Simulation implements ColonyContext {
       case 'equip':
       case 'eat':
       case 'sleep':
+      case 'fight':
         return false;
       case 'harvest':
         return this.siteValid(job);
+      case 'hunt': {
+        // Only a dwarf fit to fight goes hunting, after an animal the player can see.
+        const creature = this.creature(job.target);
+        return creature !== undefined && this.world.isVisible(creature.x, creature.y) && dwarf.health >= this.colony.combat.engageAbove * dwarf.maxHealth;
+      }
+      case 'revive':
+        return this.storage.hasAll(job.inputs) && this.siteValid(job);
       case 'craft': {
         if (!this.storage.hasAll(job.inputs)) return false;
         return this.isHandCraft(job) || this.freeStation(this.recipes.recipes[job.target]!.station, dwarf) !== null;
@@ -781,6 +896,7 @@ export class Simulation implements ColonyContext {
     const n = this.colony.needs;
     const bonus = !table ? 1 : this.rooms.roomAt(table.x, table.y) ? n.roomTableBonus : n.tableBonus;
     by.hunger = Math.min(100, by.hunger + food.hunger * bonus);
+    by.health = Math.min(by.maxHealth, by.health + food.heal);
     return true;
   }
 
@@ -820,14 +936,10 @@ export class Simulation implements ColonyContext {
     const i = world.index(x, y);
     const drops = tiles.tiles[world.fg[i]!]!.drops;
     world.fg[i] = AIR;
+    world.flags[i] = world.flags[i]! & ~FLAG_BUILT;
+    this.tileDamage.clear(i);
     this.bus.emit('TileChanged', { x, y });
-
-    // Grass tufts, flowers and the like would float without the block under them.
-    const above = world.fgAt(x, y - 1);
-    if (y > 0 && !tiles.solid[above] && tiles.replaceable[above] && tiles.tiles[above]?.art.style === 'sprite') {
-      world.fg[world.index(x, y - 1)] = AIR;
-      this.bus.emit('TileChanged', { x, y: y - 1 });
-    }
+    this.clearLooseTop(x, y);
     // What comes out lands at the digger's feet, never in a pocket nobody can reach.
     if (drops) this.dropItems(this.items.item(drops), 1, by.x, by.y);
     this.terrainChanged(x, y);
@@ -900,11 +1012,26 @@ export class Simulation implements ColonyContext {
     this.bus.emit('Equipped', { dwarf: dwarf.id, name: dwarf.name, item });
   }
 
-  /** Put a block into a cell. Items lying there are pushed out to `by`'s feet. */
+  /** Grass tufts, flowers and the like would float without the block under them. */
+  private clearLooseTop(x: number, y: number): void {
+    const { world, tiles } = this;
+    const above = world.fgAt(x, y - 1);
+    if (y > 0 && !tiles.solid[above] && tiles.replaceable[above] && tiles.tiles[above]?.art.style === 'sprite') {
+      world.fg[world.index(x, y - 1)] = AIR;
+      this.bus.emit('TileChanged', { x, y: y - 1 });
+    }
+  }
+
+  /**
+   * Put a block into a cell. Items lying there are pushed out to `by`'s feet. A block or
+   * door a dwarf builds is marked as built: monsters that smash built things can break it.
+   */
   placeBlock(x: number, y: number, tile: number, by?: Dwarf): void {
     const { world } = this;
     const i = world.index(x, y);
     world.fg[i] = tile;
+    this.tileDamage.clear(i);
+    if (this.tiles.solid[tile] || this.tiles.door[tile]) world.flags[i] = world.flags[i]! | FLAG_BUILT;
     if (this.tiles.solid[tile]) {
       world.liquidType[i] = NO_LIQUID;
       world.liquidAmount[i] = 0;
@@ -983,8 +1110,17 @@ export class Simulation implements ColonyContext {
     if (revealed) this.bus.emit('ExploredChanged', revealed);
   }
 
-  dwarfDied(dwarf: Dwarf, cause: DeathCause): void {
-    this.bus.emit('DwarfDied', { dwarf: dwarf.id, name: dwarf.name, cause });
+  dwarfDied(dwarf: Dwarf, cause: DeathCause, by: string | null): void {
+    this.bus.emit('DwarfDied', { dwarf: dwarf.id, name: dwarf.name, cause, by, revivable: this.revivable(dwarf) && this.reviveItem >= 0 });
+    if (!this.colonyLost && this.dwarves.every((d) => d.phase === 'dead')) {
+      this.colonyLost = true;
+      this.bus.emit('ColonyLost');
+    }
+  }
+
+  /** Every dwarf has died. */
+  get lost(): boolean {
+    return this.colonyLost;
   }
 
   skillUp(dwarf: Dwarf, skill: Skill): void {
@@ -994,6 +1130,464 @@ export class Simulation implements ColonyContext {
   /** Debug: lift the fog of war everywhere. */
   revealAll(): void {
     this.bus.emit('ExploredChanged', this.world.revealAll());
+  }
+
+  // ---- Creatures and combat ----------------------------------------------------------------------
+
+  /** A living creature by id. */
+  creature(id: number): Creature | undefined {
+    if (id === 0) return undefined;
+    const creature = this.creatures.find((c) => c.id === id);
+    return creature && !creature.gone ? creature : undefined;
+  }
+
+  creatureDef(creature: Creature): CreatureDef {
+    return this.creatureKinds.get(creature.kind);
+  }
+
+  isHostile(creature: Creature): boolean {
+    return this.creatureKinds.get(creature.kind).hostile;
+  }
+
+  /** How a kind of creature gets about. */
+  navFor(kind: number): CreatureNav {
+    return this.creatureNavs[kind]!;
+  }
+
+  /** Hostile creatures in the world now. */
+  get hostileCount(): number {
+    let n = 0;
+    for (const creature of this.creatures) if (!creature.gone && this.isHostile(creature)) n++;
+    return n;
+  }
+
+  /** Put a creature into the world; monsters are tougher the later the day. */
+  spawnCreature(kind: number, x: number, y: number, origin: CreatureOrigin): Creature {
+    const def = this.creatureKinds.get(kind);
+    const day = this.time.day(this.tick);
+    const s = this.threats.scaling;
+    const scaling = { health: toughness(day, s.healthPerDay, s.maxFactor), damage: toughness(day, s.damagePerDay, s.maxFactor) };
+    const creature = createCreature(this.nextCreatureId++, kind, def, x, y, origin, scaling, x < this.hearth.x ? 1 : -1);
+    this.creatures.push(creature);
+    this.bus.emit('CreatureSpawned', { id: creature.id, kind, x, y, origin });
+    return creature;
+  }
+
+  /** Debug: a creature (creatures.json id) standing on the ground `dx` tiles from the Hearth. Null if there's nowhere to stand. */
+  spawnCreatureNear(id: string, dx: number): Creature | null {
+    if (!this.creatureKinds.has(id)) return null;
+    const kind = this.creatureKinds.id(id);
+    const nav = this.navFor(kind);
+    const x = Math.max(0, Math.min(this.world.width - 1, this.hearth.x + dx));
+    for (let y = this.hearth.y - 12; y <= this.hearth.y + 12; y++) {
+      if (this.world.inBounds(x, y) && nav.open(x, y) && nav.standable(x, y)) return this.spawnCreature(kind, x, y, 'debug');
+    }
+    return null;
+  }
+
+  /** Debug: an invasion tonight: by day the clock moves on to `warningTicks` before dusk. */
+  startWave(warningTicks = 200): void {
+    this.spawner.debugWave(warningTicks);
+  }
+
+  inRoom(x: number, y: number): boolean {
+    return this.rooms.roomAt(x, y) !== undefined;
+  }
+
+  /**
+   * How far along the colony is, for the size of invasions: the best tier of gear it owns
+   * (copper is 1, iron 2...). Milestone 6's tech tree takes this over.
+   */
+  techTier(): number {
+    let tier = 0;
+    const consider = (item: number): void => {
+      tier = Math.max(tier, this.items.get(item).equip?.tier ?? 0);
+    };
+    for (const { item } of this.storage.entries()) consider(item);
+    for (const dwarf of this.dwarves) {
+      if (dwarf.phase === 'dead') continue;
+      for (const slot of EQUIP_SLOTS) {
+        const item = dwarf.equipment[slot];
+        if (item !== null) consider(item);
+      }
+    }
+    return tier;
+  }
+
+  setPortalLight(at: { x: number; y: number } | null): void {
+    const old = this.portalLight;
+    if (old) this.bus.emit('LightChanged', this.lighting.setPointLight(old.x, Math.max(0, old.y - 1), 0));
+    this.portalLight = at;
+    if (at) this.bus.emit('LightChanged', this.lighting.setPointLight(at.x, Math.max(0, at.y - 1), PORTAL_LIGHT));
+  }
+
+  announce(event: SpawnerEvent): void {
+    switch (event.type) {
+      case 'NightThreat':
+        this.bus.emit('NightThreat', { day: event.day });
+        break;
+      case 'WaveWarning':
+        this.bus.emit('WaveWarning', { day: event.day, x: event.x, y: event.y, ticks: event.ticks });
+        break;
+      case 'WaveStarted':
+        this.bus.emit('WaveStarted', { day: event.day, x: event.x, y: event.y, size: event.size });
+        break;
+      case 'WaveEnded':
+        this.bus.emit('WaveEnded', { day: event.day, defeated: event.defeated });
+        break;
+    }
+  }
+
+  /** The invasion as the HUD shows it: coming (ticks to go), under way (invaders left), or none. */
+  waveView(): WaveView {
+    const wave = this.spawner.wave;
+    if (!wave || wave.phase === 'over') return null;
+    const side = wave.portal.x < this.hearth.x ? -1 : 1;
+    if (wave.phase === 'warning') return { phase: 'warning', ticksLeft: Math.max(0, wave.nextSpawnTick - this.tick), side };
+    let alive = 0;
+    for (const creature of this.creatures) if (!creature.gone && creature.origin === 'wave') alive++;
+    return { phase: 'open', left: alive + Math.max(0, wave.size - wave.spawned), side };
+  }
+
+  /** Where the invasion portal stands while it's open (or about to open), or null. */
+  get portal(): { x: number; y: number; open: boolean } | null {
+    const wave = this.spawner.wave;
+    if (!wave || wave.phase === 'over') return null;
+    return { ...wave.portal, open: wave.phase === 'open' };
+  }
+
+  // ---- Blows, missiles and deaths -------------------------------------------------------------
+
+  /** A creature strikes a dwarf. */
+  hitDwarf(dwarf: Dwarf, damage: number, by: Creature): void {
+    this.hurtDwarf(dwarf, damage, by.id, this.creatureKinds.get(by.kind).name);
+  }
+
+  /** Damage through the dwarf's armour; at 0 health it dies. */
+  private hurtDwarf(dwarf: Dwarf, damage: number, byId: number, byName: string): void {
+    if (dwarf.phase === 'dead') return;
+    const amount = armoredDamage(damage, this.armorOf(dwarf), this.threats.armorScale);
+    dwarf.health -= amount;
+    dwarf.hurtTicks = 0;
+    dwarf.lastAttacker = byId;
+    dwarf.lastHurtTick = this.tick;
+    this.bus.emit('DwarfHurt', { dwarf: dwarf.id, amount, x: dwarf.x, y: dwarf.y });
+    if (dwarf.health <= 0) this.ai.kill(dwarf, 'monster', byName);
+  }
+
+  /** A creature is struck (by dwarf `by`, or 0 for a trap or turret); a hurt animal runs. */
+  hitCreature(creature: Creature, damage: number, by: number): void {
+    if (creature.gone) return;
+    const def = this.creatureKinds.get(creature.kind);
+    const amount = armoredDamage(damage, def.armor, this.threats.armorScale);
+    creature.health -= amount;
+    creature.hurtTicks = 0;
+    if (by !== 0) creature.lastHitBy = by;
+    if (!def.hostile) {
+      creature.fleeTicks = ANIMAL_FLEE_TICKS;
+      creature.path = null;
+    }
+    this.bus.emit('CreatureHurt', { id: creature.id, amount, x: creature.x, y: creature.y });
+    if (creature.health <= 0) this.killCreature(creature, by);
+  }
+
+  /** A creature dies: it drops what it drops, and the dwarf that killed it learns from it. */
+  killCreature(creature: Creature, by: number): void {
+    if (creature.gone) return;
+    creature.gone = true;
+    creature.health = 0;
+    const def = this.creatureKinds.get(creature.kind);
+    for (const drop of def.drops) {
+      if (this.creatureRng.chance(drop.chance)) this.dropItems(this.items.item(drop.item), drop.count, creature.x, creature.y);
+    }
+    const killer = by !== 0 ? this.dwarf(by) : undefined;
+    if (killer && killer.phase !== 'dead') this.learnCombat(killer, def.xp);
+    this.forgetCreature(creature);
+    this.bus.emit('CreatureDied', { id: creature.id, kind: creature.kind, x: creature.x, y: creature.y, by });
+  }
+
+  /** A creature of the night leaves (at dawn, or back through the portal). */
+  creatureLeaves(creature: Creature): void {
+    if (creature.gone) return;
+    creature.gone = true;
+    this.forgetCreature(creature);
+    this.bus.emit('CreatureLeft', { id: creature.id, x: creature.x, y: creature.y });
+  }
+
+  /** A creature that's gone takes its hunting mark with it (dwarves fighting it notice by themselves). */
+  private forgetCreature(creature: Creature): void {
+    const hunt = this.huntJobFor(creature.id);
+    if (hunt) this.jobs.remove(hunt.id);
+    this.hunts.delete(creature.id);
+  }
+
+  /** A dwarf lands a blow on a creature. */
+  strikeCreature(dwarf: Dwarf, creature: Creature, damage: number): void {
+    this.hitCreature(creature, damage, dwarf.id);
+  }
+
+  dwarfShoots(dwarf: Dwarf, creature: Creature, weapon: Weapon): void {
+    this.shoot(weapon.projectile ?? 'bolt', 'colony', dwarf.x + 0.5, dwarf.y + 0.5, creature.x + 0.5, creature.y + 0.5, weapon.damage, weapon.range, dwarf.id, -1);
+  }
+
+  creatureShoots(creature: Creature, def: CreatureDef, target: Dwarf): void {
+    const kind = def.projectile ?? 'spit';
+    this.shoot(kind, 'monster', creature.x + 0.5, creature.y + 0.5, target.x + 0.5, target.y + 0.5, creature.damage, def.range, creature.id, creature.kind);
+  }
+
+  private shoot(kind: ProjectileKind, team: 'colony' | 'monster', fromX: number, fromY: number, toX: number, toY: number, damage: number, range: number, source: number, sourceKind: number): void {
+    this.projectiles.fire(kind, team, fromX, fromY, toX, toY, this.threats.projectileSpeed[kind], damage, range, source, sourceKind);
+    this.bus.emit('ProjectileFired', { kind, x: fromX, y: fromY, colony: team === 'colony' });
+  }
+
+  /** What a missile strikes in a cell: a wall, or someone on the other side. */
+  private projectileHits(projectile: Projectile, x: number, y: number): ProjectileImpact | null {
+    const { world } = this;
+    if (!seeThrough(world, this.tiles, x, y)) return { kind: 'wall' };
+    const cell = y * world.width + x;
+    if (projectile.team === 'colony') {
+      for (const creature of this.creatures) {
+        if (!creature.gone && (creature.y * world.width + creature.x === cell || creature.movement?.to === cell)) return { kind: 'creature', id: creature.id };
+      }
+      return null;
+    }
+    for (const dwarf of this.dwarves) {
+      if (dwarf.phase !== 'dead' && (dwarf.y * world.width + dwarf.x === cell || dwarf.movement?.to === cell)) return { kind: 'dwarf', id: dwarf.id };
+    }
+    return null;
+  }
+
+  private projectileLands(projectile: Projectile, hit: ProjectileImpact | null): void {
+    if (!hit) return;
+    if (hit.kind === 'creature') {
+      const creature = this.creature(hit.id);
+      if (creature) {
+        this.hitCreature(creature, projectile.damage, projectile.team === 'colony' ? projectile.source : 0);
+        const shooter = projectile.source !== 0 ? this.dwarf(projectile.source) : undefined;
+        if (shooter && shooter.phase !== 'dead') this.learnCombat(shooter, this.colony.combat.xpPerHit);
+      }
+    } else if (hit.kind === 'dwarf') {
+      const dwarf = this.dwarf(hit.id);
+      const name = projectile.sourceKind >= 0 ? this.creatureKinds.get(projectile.sourceKind).name : '';
+      if (dwarf) this.hurtDwarf(dwarf, projectile.damage, projectile.source, name);
+    }
+    this.bus.emit('ProjectileHit', { kind: projectile.kind, x: projectile.x, y: projectile.y });
+  }
+
+  /** Combat experience, with the level-up news. */
+  learnCombat(dwarf: Dwarf, xp: number): void {
+    if (gainXp(dwarf, 'combat', xp, this.colony.skills.levels)) this.skillUp(dwarf, 'combat');
+  }
+
+  /** A creature strikes a door or block: it breaks once its damage reaches its hit points. */
+  damageTile(x: number, y: number, damage: number, _by: Creature): void {
+    const i = this.world.index(x, y);
+    const total = this.tileDamage.add(i, damage);
+    this.noise = { x, y, tick: this.tick };
+    this.bus.emit('TileDamaged', { x, y });
+    if (total >= this.tileHp(this.world.fg[i]!)) this.breakTile(x, y);
+  }
+
+  /** How much damage a tile takes to break: its "hp", or its hardness times threats.json's tileHpPerHardness. */
+  tileHp(tile: number): number {
+    const def = this.tiles.tiles[tile]!;
+    return def.hp ?? def.hardness * this.threats.tileHpPerHardness;
+  }
+
+  /** A monster broke a door or block: nothing is left of it. */
+  breakTile(x: number, y: number): void {
+    const { world } = this;
+    const i = world.index(x, y);
+    world.fg[i] = AIR;
+    world.flags[i] = world.flags[i]! & ~FLAG_BUILT;
+    this.tileDamage.clear(i);
+    this.bus.emit('TileChanged', { x, y });
+    this.clearLooseTop(x, y);
+    const job = this.jobs.at(x, y);
+    if (job?.type === 'dig') this.jobs.remove(job.id);
+    this.terrainChanged(x, y);
+    this.bus.emit('TileBroken', { x, y });
+  }
+
+  /** Whether something loud (a door being smashed) happened near (x, y) just now. */
+  noiseNear(x: number, y: number, radius = NOISE_RADIUS): boolean {
+    const noise = this.noise;
+    return noise !== null && this.tick - noise.tick <= NOISE_TICKS && Math.max(Math.abs(noise.x - x), Math.abs(noise.y - y)) <= radius;
+  }
+
+  lineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
+    return clearShot(this.world, this.tiles, x0, y0, x1, y1);
+  }
+
+  /** What a dwarf fights with: its weapon, or its fists. Combat skill makes every blow harder. */
+  weaponOf(dwarf: Dwarf): Weapon {
+    const c = this.colony.combat;
+    const item = dwarf.equipment.weapon;
+    const equip = item !== null ? this.items.get(item).equip : null;
+    const skill = 1 + c.damagePerLevel * (dwarf.skills.combat.level - 1);
+    return {
+      damage: (equip ? equip.damage : c.bareHandsDamage) * skill,
+      attackTicks: equip && equip.attackTicks > 0 ? equip.attackTicks : c.attackTicks,
+      range: equip?.range ?? 1,
+      projectile: equip?.projectile ?? null,
+    };
+  }
+
+  /** The armour a dwarf wears, all told. */
+  armorOf(dwarf: Dwarf): number {
+    let armor = 0;
+    for (const slot of EQUIP_SLOTS) {
+      const item = dwarf.equipment[slot];
+      if (item !== null) armor += this.items.get(item).equip?.armor ?? 0;
+    }
+    return armor;
+  }
+
+  /** The nearest hostile creature within `range` tiles of a dwarf that it isn't steering clear of. */
+  nearestHostile(dwarf: Dwarf, range: number): Creature | undefined {
+    let best: Creature | undefined;
+    let bestDistance = Infinity;
+    for (const creature of this.creatures) {
+      if (creature.gone || !this.isHostile(creature) || dwarf.ignoring.some((entry) => entry.creature === creature.id)) continue;
+      const distance = Math.max(Math.abs(creature.x - dwarf.x), Math.abs(creature.y - dwarf.y));
+      if (distance <= range && distance < bestDistance) {
+        best = creature;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  /** A dwarf squares up to a creature: a fight of its own, claimed at once. */
+  startFight(dwarf: Dwarf, creature: Creature): Job {
+    const job = this.jobs.add({ type: 'fight', x: creature.x, y: creature.y, priority: 4, tick: this.tick, target: creature.id });
+    this.jobs.claim(job.id, dwarf.id);
+    return job;
+  }
+
+  dwarfRetreating(dwarf: Dwarf): void {
+    this.bus.emit('DwarfRetreating', { dwarf: dwarf.id, name: dwarf.name });
+  }
+
+  // ---- Hunting and reviving (player orders) ------------------------------------------------
+
+  /** The hunting mark on a creature, if it has one. */
+  huntJobFor(creatureId: number): Job | undefined {
+    const id = this.hunts.get(creatureId);
+    if (id === undefined) return undefined;
+    const job = this.jobs.get(id);
+    if (job && job.type === 'hunt') return job;
+    this.hunts.delete(creatureId);
+    return undefined;
+  }
+
+  /** Mark an animal the player can see to be hunted. */
+  designateHunt(creatureId: number, priority: Priority): boolean {
+    const creature = this.creature(creatureId);
+    if (!creature || this.isHostile(creature) || !this.world.isVisible(creature.x, creature.y) || this.huntJobFor(creatureId)) return false;
+    const job = this.jobs.add({ type: 'hunt', x: creature.x, y: creature.y, priority, tick: this.tick, target: creature.id });
+    this.hunts.set(creature.id, job.id);
+    return true;
+  }
+
+  /** A fallen dwarf that a revival draught could bring back (not one lost in lava). */
+  revivable(dwarf: Dwarf): boolean {
+    return dwarf.phase === 'dead' && dwarf.deathCause !== 'lava';
+  }
+
+  /** The revival mark on a fallen dwarf, if it has one. */
+  reviveJobFor(dwarfId: number): Job | undefined {
+    for (const job of this.jobs.all()) if (job.type === 'revive' && job.target === dwarfId) return job;
+    return undefined;
+  }
+
+  /** Mark a fallen dwarf to be brought back: a dwarf fetches a revival draught and pours it. */
+  designateRevive(dwarfId: number, priority: Priority): boolean {
+    const dwarf = this.dwarf(dwarfId);
+    if (!dwarf || !this.revivable(dwarf) || this.reviveItem < 0 || this.reviveJobFor(dwarfId)) return false;
+    const job = this.jobs.add({ type: 'revive', x: dwarf.x, y: dwarf.y, priority, tick: this.tick, target: dwarfId, inputs: [{ item: this.reviveItem, count: 1 }] });
+    this.flagIfBlocked(job);
+    return true;
+  }
+
+  /** A dwarf pours the revival draught it carries on a fallen dwarf, who gets up again. */
+  completeRevive(job: Job, by: Dwarf): boolean {
+    const dwarf = this.dwarf(job.target);
+    const potion = this.items.get(job.inputs[0]!.item).revive;
+    if (!dwarf || !this.revivable(dwarf) || !potion || !takeFrom(by.carrying, job.inputs)) return false;
+    this.jobs.remove(job.id);
+    this.ai.revive(dwarf, potion.health);
+    this.bus.emit('DwarfRevived', { dwarf: dwarf.id, name: dwarf.name, by: by.id });
+    return true;
+  }
+
+  // ---- Traps and turrets -----------------------------------------------------------------------
+
+  /** Traps stab the creatures standing on them; turrets shoot the nearest monster they can see. */
+  private stepDefences(): void {
+    for (const piece of this.furniture.all()) {
+      const { trap, turret } = piece.def;
+      if (!trap && !turret) continue;
+      if (piece.cooldown > 0) {
+        piece.cooldown--;
+        continue;
+      }
+      if (trap) {
+        const victim = this.creatures.find((c) => !c.gone && c.x === piece.x && c.y === piece.y);
+        if (!victim) continue;
+        piece.cooldown = trap.cooldownTicks;
+        this.bus.emit('TrapSprung', { x: piece.x, y: piece.y });
+        this.hitCreature(victim, trap.damage, 0);
+      } else if (turret) {
+        const target = this.turretTarget(piece.x, piece.y, turret.range);
+        if (!target) continue;
+        piece.cooldown = turret.cooldownTicks;
+        this.shoot('bolt', 'colony', piece.x + 0.5, piece.y + 0.3, target.x + 0.5, target.y + 0.5, turret.damage, turret.range, 0, -1);
+      }
+    }
+  }
+
+  /** The nearest hostile creature within range that a turret at (x, y) has a clear shot at. */
+  private turretTarget(x: number, y: number, range: number): Creature | undefined {
+    let best: Creature | undefined;
+    let bestDistance = range * range;
+    for (const creature of this.creatures) {
+      if (creature.gone || !this.isHostile(creature)) continue;
+      const dx = creature.x - x;
+      const dy = creature.y - y;
+      const distance = dx * dx + dy * dy;
+      if (distance > bestDistance || !this.lineOfSight(x, y, creature.x, creature.y)) continue;
+      best = creature;
+      bestDistance = distance;
+    }
+    return best;
+  }
+
+  /** What each kind of creature can smash its way through (null: nothing). */
+  private breakerFor(def: CreatureDef): Breaker | null {
+    if (def.breaks === 'none' || def.breakDamage <= 0) return null;
+    return {
+      canBreak: (x, y) => this.canBreak(def, x, y),
+      cost: (x, y) => {
+        const i = this.world.index(x, y);
+        const left = Math.max(1, this.tileHp(this.world.fg[i]!) - this.tileDamage.get(i));
+        return (Math.ceil(left / def.breakDamage) * def.breakTicks) / def.movement.walkTicks;
+      },
+    };
+  }
+
+  private canBreak(def: CreatureDef, x: number, y: number): boolean {
+    const { world, tiles } = this;
+    if (!world.inBounds(x, y)) return false;
+    const i = world.index(x, y);
+    const tile = world.fg[i]!;
+    // Never ladders, bedrock, open air or plants, nor what holds up the Hearth, a tree or furniture.
+    if (!tiles.diggable[tile] || tiles.climbable[tile] || world.liquidType[i] === this.lavaType) return false;
+    if (this.blockReason(x, y) !== null) return false;
+    if (tiles.door[tile]) return true;
+    if (def.breaks === 'doors') return false;
+    if ((world.flags[i]! & FLAG_BUILT) !== 0) return true;
+    return def.breaks === 'soft' && tiles.solid[tile] === 1 && tiles.tiles[tile]!.hardness <= def.digHardness;
   }
 
   // ---- Internals --------------------------------------------------------------------------------
@@ -1304,7 +1898,14 @@ export class Simulation implements ColonyContext {
         continue;
       }
       // Plans overtaken by events (something else filled the spot, the furniture is gone) go.
-      const planned = job.type === 'build' || job.type === 'wall' || job.type === 'place' || job.type === 'dismantle' || job.type === 'harvest';
+      const planned =
+        job.type === 'build' ||
+        job.type === 'wall' ||
+        job.type === 'place' ||
+        job.type === 'dismantle' ||
+        job.type === 'harvest' ||
+        job.type === 'hunt' ||
+        job.type === 'revive';
       if (planned && job.claimedBy === 0 && !this.siteValid(job)) {
         this.jobs.remove(job.id);
         continue;
@@ -1381,6 +1982,7 @@ export class Simulation implements ColonyContext {
   /** The ways dwarves can move near (x, y) changed (a block, ladder or wall came or went), and maybe the rooms. */
   private navChanged(x: number, y: number): void {
     this.paths.terrainChanged(x, y);
+    this.creaturePaths.terrainChanged(x, y);
     this.jobs.terrainChanged(x, y);
     this.terrainVersion++;
     this.roomsDirty = true;
@@ -1455,6 +2057,7 @@ function needRates(colony: ColonySettings, time: TimeOfDay): NeedRates {
     sleep: n.sleepPerNight / nightTicks,
     heal: n.healPerNight / nightTicks,
     starve: n.starvingDamagePerDay / cycle,
+    rest: colony.combat.restHealPerDay / cycle,
   };
 }
 

@@ -5,6 +5,7 @@
  * what a dwarf does each tick; this file only creates dwarves and handles their skills.
  */
 import type { Rng } from '../../core/Rng';
+import type { DeathCause } from '../events';
 import type { ItemCount } from '../items/ItemRegistry';
 import type { MoveKind } from '../nav/NavGrid';
 import type { ColonySettings } from './settings';
@@ -30,6 +31,9 @@ export interface SkillState {
  *   idle -> to-supply -> fetching (-> to-job) -> working          eat (at a table, if one is near)
  *   idle -> to-job -> sleeping                                    sleep (in a bed, or by the Hearth)
  *   idle -> to-job -> working                                     harvest
+ *   idle -> to-supply -> fetching -> to-job -> working            revive (a revival draught)
+ *   idle -> fighting                                           hunt, or a monster came near
+ *   fighting -> retreating -> idle                             badly hurt: back to the Hearth
  *   idle -> wandering                                          nothing to do
  * "Supply" and "storage" are the same places (the Hearth and the chests): whichever is
  * nearest. A hand-made craft is worked right where its materials were fetched. Falling
@@ -46,6 +50,8 @@ export type Phase =
   | 'to-supply'
   | 'fetching'
   | 'sleeping'
+  | 'fighting'
+  | 'retreating'
   | 'wandering'
   | 'falling'
   | 'dead';
@@ -97,6 +103,22 @@ export interface Dwarf {
   restTicks: number;
   /** Where a wandering dwarf is strolling to (a cell), or -1. */
   wanderTarget: number;
+  /** Ticks until it can strike again, and since it last struck (for the swing). */
+  attackCooldown: number;
+  strikeTicks: number;
+  /** Ticks until it next looks around for danger. */
+  scanTicks: number;
+  /** Chasing a creature: the cell its path leads to, and ticks until it may plan again. */
+  chaseGoal: number;
+  chaseTicks: number;
+  /** The creature that hurt it last (0: none), when (tick), and ticks since (for the red flash). */
+  lastAttacker: number;
+  lastHurtTick: number;
+  hurtTicks: number;
+  /** Creatures it couldn't get to, and until which tick it won't try again. */
+  ignoring: Array<{ creature: number; until: number }>;
+  /** How it died (null while alive): a dwarf lost in lava can't be brought back. */
+  deathCause: DeathCause | null;
 }
 
 /**
@@ -141,6 +163,16 @@ export function createDwarf(id: number, x: number, y: number, rng: Rng, colony: 
     waitTicks: 0,
     restTicks: rng.int(0, 20),
     wanderTarget: -1,
+    attackCooldown: 0,
+    strikeTicks: 1000,
+    scanTicks: id % 4,
+    chaseGoal: -1,
+    chaseTicks: 0,
+    lastAttacker: 0,
+    lastHurtTick: -1000,
+    hurtTicks: 1000,
+    ignoring: [],
+    deathCause: null,
   };
 }
 

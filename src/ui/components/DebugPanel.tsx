@@ -62,6 +62,7 @@ export function DebugPanel() {
                 build: stats.jobs.build + stats.jobs.wall + stats.jobs.place + stats.jobs.dismantle,
                 craft: stats.jobs.craft,
                 haul: stats.jobs.haul,
+                fight: stats.jobs.fight + stats.jobs.hunt,
                 blocked: stats.jobs.blocked,
               })
             : '—'}
@@ -72,6 +73,12 @@ export function DebugPanel() {
         <dd>{stats ? t('debug.homeValue', { from: stats.homeCells.fromHome, to: stats.homeCells.toHome }) : '—'}</dd>
         <dt>{t('debug.rooms')}</dt>
         <dd data-testid="debug-rooms">{stats ? stats.rooms : '—'}</dd>
+        <dt>{t('debug.creatures')}</dt>
+        <dd data-testid="debug-creatures">
+          {stats ? t('debug.creaturesValue', { hostile: stats.creatures.hostile, animals: stats.creatures.animals, missiles: stats.creatures.missiles }) : '—'}
+        </dd>
+        <dt>{t('debug.threat')}</dt>
+        <dd>{stats ? t('debug.threatValue', { spawned: stats.threat.spawned, budget: stats.threat.budget, wave: stats.threat.waveDay }) : '—'}</dd>
         <dt>{t('debug.daylight')}</dt>
         <dd data-testid="debug-daylight">{stats ? `${Math.round(stats.daylight * 100)}%` : '—'}</dd>
         <dt>{t('debug.seed')}</dt>

@@ -12,8 +12,20 @@
  * overestimates and paths are the cheapest possible. Ties go to the cell that has come further, and
  * nothing depends on timing or randomness, so the same question always gets the same path.
  */
-import type { CellRect } from '../world/World';
-import type { NavGrid } from './NavGrid';
+import type { CellRect, World } from '../world/World';
+import type { MoveKind } from './NavGrid';
+
+/**
+ * The moves something can make through the tile grid: dwarves (NavGrid) or a kind of
+ * creature (CreatureNav). The graph is implicit, worked out from the tiles on demand.
+ */
+export interface NavGraph {
+  readonly world: World;
+  /** Whether it can stay in this cell without falling. */
+  standable(x: number, y: number): boolean;
+  /** Call `visit` for every move from the cell `from` (a cell index). */
+  forEachMove(from: number, visit: (to: number, cost: number, kind: MoveKind) => void): void;
+}
 
 export interface PathGoal {
   /** The cells to get near (inclusive). */
@@ -26,6 +38,13 @@ export interface PathGoal {
   accept?: (cell: number) => boolean;
   /** Identifies this goal for the path cache; goals without one are never cached. */
   cacheKey?: string;
+  /**
+   * Weight on the heuristic (default 1: always the cheapest path). Above 1 the search
+   * heads more greedily for the goal and expands far fewer cells, at the price of
+   * slightly longer paths: fine for monsters, whose moves (tunnelling, smashing doors)
+   * can cost many times the distance they cover.
+   */
+  greed?: number;
 }
 
 export type PathOutcome =
@@ -38,7 +57,8 @@ export interface PathfinderOptions {
 }
 
 export class Pathfinder {
-  readonly nav: NavGrid;
+  /** The graph searched unless `find` is given another one. */
+  readonly nav: NavGraph;
   private readonly maxExpanded: number;
 
   private readonly g: Float32Array;
@@ -53,7 +73,7 @@ export class Pathfinder {
   private heapG = new Float32Array(1024);
   private heapSize = 0;
 
-  constructor(nav: NavGrid, options: PathfinderOptions) {
+  constructor(nav: NavGraph, options: PathfinderOptions) {
     this.nav = nav;
     this.maxExpanded = options.maxExpanded;
     const cells = nav.world.width * nav.world.height;
@@ -68,8 +88,8 @@ export class Pathfinder {
     return distanceToGoal(cell, this.nav.world.width, goal) <= goal.reach && (goal.accept?.(cell) ?? true);
   }
 
-  find(from: number, goal: PathGoal): PathOutcome {
-    const { nav, g, parent, seen, closed } = this;
+  find(from: number, goal: PathGoal, nav: NavGraph = this.nav): PathOutcome {
+    const { g, parent, seen, closed } = this;
     const width = nav.world.width;
     if (this.search === 0xffffffff) {
       seen.fill(0);
@@ -80,7 +100,8 @@ export class Pathfinder {
     const x = from % width;
     if (!nav.standable(x, (from - x) / width)) return { found: false, reason: 'unreachable', expanded: 0 };
 
-    const heuristic = (cell: number): number => Math.max(0, distanceToGoal(cell, width, goal) - goal.reach);
+    const greed = goal.greed ?? 1;
+    const heuristic = (cell: number): number => greed * Math.max(0, distanceToGoal(cell, width, goal) - goal.reach);
     this.heapSize = 0;
     g[from] = 0;
     parent[from] = -1;

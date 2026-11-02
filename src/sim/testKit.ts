@@ -4,6 +4,8 @@
  */
 import { EventBus } from '../core/EventBus';
 import { CONTENT, TILES } from './content';
+import type { ThreatSettings } from './creatures/threats';
+import type { ColonySettings } from './dwarves/settings';
 import type { GameEvents } from './events';
 import { Simulation } from './Simulation';
 import { AIR } from './world/TileRegistry';
@@ -35,10 +37,29 @@ export function makeWorld(): World {
   return world;
 }
 
-/** A simulation on `world` (the test world by default); `startHour` sets the clock (8:00 otherwise). */
-export function newSim(world = makeWorld(), options: { startHour?: number } = {}) {
+/** The game's threats with nothing coming: no night monsters, animals or invasions (the default for tests). */
+export const PEACEFUL: ThreatSettings = {
+  ...CONTENT.threats,
+  night: { ...CONTENT.threats.night, base: 0, perDay: 0, max: 0 },
+  animals: { ...CONTENT.threats.animals, max: 0, start: 0 },
+  waves: { ...CONTENT.threats.waves, every: 1_000_000 },
+};
+
+/**
+ * A simulation on `world` (the test world by default). `startHour` sets the clock (8:00
+ * otherwise); `threats` brings monsters, animals and invasions (none by default); `colony`
+ * replaces dwarves.json's settings.
+ */
+export function newSim(world = makeWorld(), options: { startHour?: number; threats?: ThreatSettings; colony?: ColonySettings } = {}) {
   const bus = new EventBus<GameEvents>();
-  const sim = new Simulation({ world, ...CONTENT, bus, startHour: options.startHour });
+  const sim = new Simulation({
+    world,
+    ...CONTENT,
+    colony: options.colony ?? CONTENT.colony,
+    threats: options.threats ?? PEACEFUL,
+    bus,
+    startHour: options.startHour,
+  });
   const run = (ticks: number): void => {
     for (let i = 0; i < ticks; i++) sim.step();
   };

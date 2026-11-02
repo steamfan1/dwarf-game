@@ -2,15 +2,17 @@
  * Every cross-system message in the game and its payload. Systems emit these on the
  * session's EventBus; renderers, the HTML UI, audio and other systems subscribe.
  *
- * Later milestones add NightStarted, WaveIncoming and so on here, so this file doubles
- * as a catalogue of what can happen.
+ * Later milestones add their events here too, so this file doubles as a catalogue of
+ * what can happen.
  */
 import type { TimeState } from '../core/TimeControl';
+import type { CreatureOrigin } from './creatures/Creature';
 import type { Skill } from './dwarves/Dwarf';
+import type { ProjectileKind } from './items/ItemRegistry';
 import type { JobType } from './jobs/JobBoard';
 import type { CellRect } from './world/World';
 
-export type DeathCause = 'fall' | 'lava' | 'starvation';
+export type DeathCause = 'fall' | 'lava' | 'starvation' | 'monster';
 
 export type GameEvents = {
   /** Speed or pause state changed (player input, menu, tab visibility, debug console). */
@@ -53,7 +55,39 @@ export type GameEvents = {
   StorageFull: void;
   /** A dwarf's skill went up a level. */
   SkillUp: { dwarf: number; name: string; skill: Skill; level: number };
-  DwarfDied: { dwarf: number; name: string; cause: DeathCause };
+  /** `by`: the creature that killed it, by name, if one did. `revivable`: a revival draught can bring it back. */
+  DwarfDied: { dwarf: number; name: string; cause: DeathCause; by: string | null; revivable: boolean };
+  /** A dwarf was brought back to life by `by`. */
+  DwarfRevived: { dwarf: number; name: string; by: number };
+  /** Every dwarf is dead. */
+  ColonyLost: void;
+  /** A creature struck a dwarf. */
+  DwarfHurt: { dwarf: number; amount: number; x: number; y: number };
+  /** A badly hurt dwarf broke off a fight and is falling back to the Hearth. */
+  DwarfRetreating: { dwarf: number; name: string };
+  CreatureSpawned: { id: number; kind: number; x: number; y: number; origin: CreatureOrigin };
+  CreatureHurt: { id: number; amount: number; x: number; y: number };
+  /** `by`: the dwarf that finished it off (0: a trap, a turret, lava). */
+  CreatureDied: { id: number; kind: number; x: number; y: number; by: number };
+  /** A creature of the night slunk away at dawn (or an invader went back through the portal). */
+  CreatureLeft: { id: number; x: number; y: number };
+  /** A bolt or a glob of bile was shot from (x, y), by the colony or by a monster. */
+  ProjectileFired: { kind: ProjectileKind; x: number; y: number; colony: boolean };
+  ProjectileHit: { kind: ProjectileKind; x: number; y: number };
+  /** A monster struck a door or block (cracks show how close it is to breaking). */
+  TileDamaged: { x: number; y: number };
+  /** A monster broke a door or block. */
+  TileBroken: { x: number; y: number };
+  /** A trap struck a creature. */
+  TrapSprung: { x: number; y: number };
+  /** The first monster of the night has come out near the colony. */
+  NightThreat: { day: number };
+  /** An invasion is coming: a portal opens at (x, y) at nightfall, `ticks` from now. */
+  WaveWarning: { day: number; x: number; y: number; ticks: number };
+  /** The portal opened: `size` invaders are coming through. */
+  WaveStarted: { day: number; x: number; y: number; size: number };
+  /** The invasion is over: every invader died (`defeated`), or dawn drove the rest back. */
+  WaveEnded: { day: number; defeated: boolean };
   /** A dwarf has nothing left to eat and is losing health. */
   DwarfStarving: { dwarf: number; name: string };
   /** A dwarf ran out of energy and fell asleep where it stood. */

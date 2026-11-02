@@ -13,9 +13,12 @@
  * The terrain atlas is special: its layout follows tiles.json (see render/world/tileAtlas.ts),
  * so a hand-made replacement has to keep that layout. Furniture sprites follow
  * furniture.json: one texture per piece, `width` x `height` cells of 16 px per frame.
+ * Creature sprites follow creatures.json: one texture per kind, CREATURE_FRAMES.count
+ * frames of 16 x 16 (stand, walk, walk, strike), facing right.
  */
 import type { Rng } from '../../core/Rng';
-import { FURNITURE, ITEMS, TILES } from '../../sim/content';
+import { CREATURES, FURNITURE, ITEMS, TILES } from '../../sim/content';
+import type { CreatureDef } from '../../sim/creatures/CreatureRegistry';
 import type { FurnitureDef } from '../../sim/furniture/FurnitureRegistry';
 import { createAtlasLayout, paintAtlas } from '../world/tileAtlas';
 import {
@@ -30,6 +33,27 @@ import {
   paintMarks,
   type DwarfColours,
 } from './colonyArt';
+import {
+  BOLT_SIZE,
+  COMBAT_MARK_SIZE,
+  CREATURE_FRAME_SIZE,
+  CREATURE_FRAMES,
+  paintBolt,
+  paintCombatMarks,
+  paintCreatureSheet,
+  paintPortal,
+  paintPuff,
+  paintSpark,
+  paintSpit,
+  PORTAL_FRAMES,
+  PORTAL_HEIGHT,
+  PORTAL_WIDTH,
+  PUFF_FRAMES,
+  PUFF_SIZE,
+  SPARK_FRAMES,
+  SPARK_SIZE,
+  SPIT_SIZE,
+} from './creatureArt';
 import { furnitureFrames, paintFurniture } from './furnitureArt';
 import { ITEM_ICON_SIZE, paintItemAtlas } from './itemArt';
 import {
@@ -156,13 +180,47 @@ export const TEXTURES = {
   marks: { kind: 'generated', width: 16 * MARK_FRAMES, height: 16, paint: paintMarks },
   /** "Zz" over a sleeping dwarf. */
   sleep: { kind: 'generated', width: SLEEP_SIZE.width, height: SLEEP_SIZE.height, paint: paintSleepZ },
-  /** Cracks in a block being dug, in four stages. */
+  /** Cracks in a block being dug, or smashed by a monster, in four stages. */
   cracks: {
     kind: 'generated',
     width: 16 * CRACK_FRAMES,
     height: 16,
     frames: { frameWidth: 16, frameHeight: 16, count: CRACK_FRAMES },
     paint: paintCracks,
+  },
+  /** The invasion portal, swirling (2 x 3 tiles a frame). */
+  portal: {
+    kind: 'generated',
+    width: PORTAL_WIDTH * PORTAL_FRAMES,
+    height: PORTAL_HEIGHT,
+    frames: { frameWidth: PORTAL_WIDTH, frameHeight: PORTAL_HEIGHT, count: PORTAL_FRAMES },
+    paint: paintPortal,
+  },
+  bolt: { kind: 'generated', width: BOLT_SIZE.width, height: BOLT_SIZE.height, paint: paintBolt },
+  spit: { kind: 'generated', width: SPIT_SIZE.width, height: SPIT_SIZE.height, paint: paintSpit },
+  /** Smoke spreading out (white: tinted for each use). */
+  puff: {
+    kind: 'generated',
+    width: PUFF_SIZE * PUFF_FRAMES,
+    height: PUFF_SIZE,
+    frames: { frameWidth: PUFF_SIZE, frameHeight: PUFF_SIZE, count: PUFF_FRAMES },
+    paint: paintPuff,
+  },
+  /** A burst where a blow lands (white: tinted for each use). */
+  spark: {
+    kind: 'generated',
+    width: SPARK_SIZE * SPARK_FRAMES,
+    height: SPARK_SIZE,
+    frames: { frameWidth: SPARK_SIZE, frameHeight: SPARK_SIZE, count: SPARK_FRAMES },
+    paint: paintSpark,
+  },
+  /** Crosshairs over a hunted animal, a flame over a fallen dwarf to revive (see COMBAT_MARKS). */
+  combatMarks: {
+    kind: 'generated',
+    width: COMBAT_MARK_SIZE * 2,
+    height: COMBAT_MARK_SIZE,
+    frames: { frameWidth: COMBAT_MARK_SIZE, frameHeight: COMBAT_MARK_SIZE, count: 2 },
+    paint: paintCombatMarks,
   },
 } satisfies Record<string, TextureSource>;
 
@@ -195,10 +253,30 @@ export const FURNITURE_TEXTURES: ReadonlyMap<string, GeneratedTexture> = new Map
   }),
 );
 
+/** Texture key of a creature's sprite sheet (creatures.json id). */
+export function creatureTextureKey(def: CreatureDef): string {
+  return `creature:${def.id}`;
+}
+
+/** One sheet per creature kind in creatures.json. */
+export const CREATURE_TEXTURES: ReadonlyMap<string, GeneratedTexture> = new Map(
+  CREATURES.defs.map((def) => {
+    const texture: GeneratedTexture = {
+      kind: 'generated',
+      width: CREATURE_FRAME_SIZE * CREATURE_FRAMES.count,
+      height: CREATURE_FRAME_SIZE,
+      frames: { frameWidth: CREATURE_FRAME_SIZE, frameHeight: CREATURE_FRAME_SIZE, count: CREATURE_FRAMES.count },
+      paint: (ctx) => paintCreatureSheet(ctx, def.art),
+    };
+    return [creatureTextureKey(def), texture];
+  }),
+);
+
 /** Animations built from frame grids; keys are what sprites call `play()` with. */
 export const ANIMATIONS = {
   dwarfWalk: { texture: 'dwarf', frames: [1, 2, 3, 4], frameRate: 8, repeat: -1 },
   hearthFire: { texture: 'hearth', frames: [0, 1, 2, 1], frameRate: 7, repeat: -1 },
+  portalSwirl: { texture: 'portal', frames: [0, 1, 2, 3], frameRate: 8, repeat: -1 },
 } satisfies Record<string, { texture: TextureKey; frames: number[]; frameRate: number; repeat: number }>;
 
 export type AnimationKey = keyof typeof ANIMATIONS;
@@ -261,6 +339,71 @@ export const SOUNDS = {
     tones: [
       { wave: 'noise', freq: 0, duration: 0.09, attack: 0.002, release: 0.08, volume: 0.55 },
       { wave: 'triangle', freq: 190, freqEnd: 85, duration: 0.08, release: 0.07, volume: 0.6 },
+    ],
+  },
+  /** A blow landing: a dull thud. */
+  hit: {
+    kind: 'synth',
+    tones: [
+      { wave: 'noise', freq: 0, duration: 0.05, attack: 0.002, release: 0.05, volume: 0.5 },
+      { wave: 'triangle', freq: 150, freqEnd: 70, duration: 0.08, release: 0.07, volume: 0.7 },
+    ],
+  },
+  /** A crossbow or bolt thrower loosing: a short twang. */
+  shoot: {
+    kind: 'synth',
+    tones: [
+      { wave: 'square', freq: 520, freqEnd: 260, duration: 0.06, release: 0.05, volume: 0.25 },
+      { wave: 'noise', freq: 0, duration: 0.03, release: 0.03, volume: 0.2 },
+    ],
+  },
+  /** Bile spat: a wet splutter. */
+  spit: {
+    kind: 'synth',
+    tones: [
+      { wave: 'noise', freq: 0, duration: 0.08, attack: 0.01, release: 0.07, volume: 0.35 },
+      { wave: 'sine', freq: 300, freqEnd: 520, duration: 0.06, release: 0.05, volume: 0.3 },
+    ],
+  },
+  /** A creature falls: a falling squeal. */
+  creatureDie: {
+    kind: 'synth',
+    tones: [
+      { wave: 'square', freq: 640, freqEnd: 180, duration: 0.22, release: 0.2, volume: 0.25 },
+      { wave: 'noise', freq: 0, start: 0.05, duration: 0.12, release: 0.1, volume: 0.2 },
+    ],
+  },
+  /** A door or block smashed in: a crunch. */
+  smash: {
+    kind: 'synth',
+    tones: [
+      { wave: 'noise', freq: 0, duration: 0.16, attack: 0.002, release: 0.15, volume: 0.6 },
+      { wave: 'triangle', freq: 110, freqEnd: 55, duration: 0.15, release: 0.14, volume: 0.6 },
+    ],
+  },
+  /** A trap springing: a metal clank. */
+  trap: {
+    kind: 'synth',
+    tones: [
+      { wave: 'square', freq: 880, freqEnd: 700, duration: 0.05, release: 0.05, volume: 0.25 },
+      { wave: 'square', freq: 1320, start: 0.02, duration: 0.06, release: 0.06, volume: 0.15 },
+    ],
+  },
+  /** An invasion is coming: two low horn calls. */
+  horn: {
+    kind: 'synth',
+    tones: [
+      { wave: 'saw', freq: 147, duration: 0.5, attack: 0.06, release: 0.3, volume: 0.3 },
+      { wave: 'saw', freq: 147, start: 0.65, duration: 0.7, attack: 0.06, release: 0.45, volume: 0.32 },
+      { wave: 'sine', freq: 294, start: 0.65, duration: 0.7, attack: 0.06, release: 0.45, volume: 0.15 },
+    ],
+  },
+  /** The portal tearing open: a rising, wavering whoosh. */
+  portal: {
+    kind: 'synth',
+    tones: [
+      { wave: 'noise', freq: 0, duration: 0.9, attack: 0.3, release: 0.5, volume: 0.35 },
+      { wave: 'sine', freq: 90, freqEnd: 420, duration: 0.9, attack: 0.2, release: 0.5, volume: 0.3 },
     ],
   },
   /** New game: two anvil-like strikes. */

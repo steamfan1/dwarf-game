@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import furnitureJson from '../data/furniture.json';
 import recipesJson from '../data/recipes.json';
-import { checkLinks, FURNITURE, ITEMS, RECIPES, TILES } from './content';
+import { checkLinks, CREATURES, FURNITURE, ITEMS, RECIPES, TILES } from './content';
 import { CraftQueue, MAX_ORDER } from './crafting/CraftQueue';
 import { HAND_CRAFTED, RecipeBook } from './crafting/Recipes';
 import { FurnitureRegistry } from './furniture/FurnitureRegistry';
@@ -17,7 +17,7 @@ function problems(run: () => unknown): string {
 }
 
 describe('shipped content', () => {
-  it('has around forty starter items, every one reachable by digging, felling, picking or crafting', () => {
+  it('has around forty starter items, every one reachable by digging, felling, picking, hunting or crafting', () => {
     expect(ITEMS.items.length).toBeGreaterThanOrEqual(40);
     const obtainable = new Set<string>();
     for (const tile of TILES.tiles) {
@@ -25,8 +25,9 @@ describe('shipped content', () => {
       if (tile.harvest) obtainable.add(tile.harvest.item);
     }
     for (const recipe of RECIPES.recipes) obtainable.add(ITEMS.get(recipe.output.item).id);
-    // Meat and wheat come from hunting and farming (Milestones 4 and 5).
-    const later = new Set(['raw_meat', 'wheat']);
+    for (const creature of CREATURES.defs) for (const drop of creature.drops) obtainable.add(drop.item);
+    // Wheat comes from farming (Milestone 6).
+    const later = new Set(['wheat']);
     const unreachable = ITEMS.items.filter((item) => !obtainable.has(item.id) && !later.has(item.id)).map((item) => item.id);
     expect(unreachable).toEqual([]);
   });

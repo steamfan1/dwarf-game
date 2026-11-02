@@ -16,7 +16,7 @@
  *
  * Changes in the world arrive as events (TileChanged, DesignationChanged, ExploredChanged,
  * FurnitureChanged) and redraw only what they concern; the fog texture is uploaded at
- * most once per frame.
+ * most once per frame. Fights show as puffs, sparks and sounds, from their own events.
  */
 import * as Phaser from 'phaser';
 import { gameContext } from '../../app/context';
@@ -27,14 +27,17 @@ import type { Job } from '../../sim/jobs/JobBoard';
 import type { CellRect } from '../../sim/world/World';
 import { isBuildTool, type Tool } from '../../ui/state';
 import { markFrame, type MarkKind } from '../assets/colonyArt';
-import { TERRAIN_LAYOUT } from '../assets/manifest';
+import { TERRAIN_LAYOUT, type SoundKey } from '../assets/manifest';
 import { CameraController } from '../CameraController';
 import { DEPTH } from '../depths';
 import { ColonyDebug } from '../world/ColonyDebug';
-import { describeActivity, describeCell } from '../world/describeCell';
+import { CombatEffects } from '../world/CombatEffects';
+import { CreatureSprites } from '../world/CreatureSprites';
+import { describeCell, describeCreature, describeDwarf } from '../world/describeCell';
 import { DwarfSprites } from '../world/DwarfSprites';
 import { FogOverlay } from '../world/FogOverlay';
 import { FurnitureSprites } from '../world/FurnitureSprites';
+import { HealthBars } from '../world/HealthBars';
 import { ItemSprites } from '../world/ItemSprites';
 import { PlanGhosts, type PlanPicture } from '../world/PlanGhosts';
 import { SelectionBox } from '../world/SelectionBox';
@@ -53,6 +56,11 @@ const HOVER_REFRESH_MS = 200;
 const LIGHT_VIEW_REFRESH_MS = 500;
 /** Don't play the same work sound more often than this. */
 const WORK_SOUND_GAP_MS = 120;
+/** Puff colours: creatures of the dark arriving or leaving, dust from smashed blocks, a creature falling. */
+const DARK_PUFF = 0x8a6ad8;
+const DUST_PUFF = 0xc9a77a;
+const DEATH_PUFF = 0xd8d0c8;
+const BLOOD_SPARK = 0xff5a4a;
 
 type Cell = { x: number; y: number };
 
@@ -64,6 +72,9 @@ export class GameScene extends Phaser.Scene {
   private cursor!: TileCursor;
   private selection!: SelectionBox;
   private dwarfSprites!: DwarfSprites;
+  private creatureSprites!: CreatureSprites;
+  private combat!: CombatEffects;
+  private healthBars!: HealthBars;
   private itemSprites!: ItemSprites;
   private furnitureSprites!: FurnitureSprites;
   private plans!: PlanGhosts;
@@ -133,6 +144,9 @@ export class GameScene extends Phaser.Scene {
     this.plans = new PlanGhosts(this, sim, TERRAIN_LAYOUT);
     this.itemSprites = new ItemSprites(this);
     this.dwarfSprites = new DwarfSprites(this, world, sim.colony);
+    this.creatureSprites = new CreatureSprites(this);
+    this.combat = new CombatEffects(this, world);
+    this.healthBars = new HealthBars(this);
     this.cracks = new WorkCracks(this);
     this.fog = new FogOverlay(this, world, sim.lighting, sim.daylight);
     this.selection = new SelectionBox(this);
@@ -178,6 +192,33 @@ export class GameScene extends Phaser.Scene {
         const crafter = sim.dwarf(dwarf);
         if (crafter) this.workSound('craft', crafter.x, crafter.y);
       }),
+      // Fights: puffs, sparks and sounds where they can be seen.
+      session.bus.on('CreatureSpawned', ({ x, y }) => this.effectAt(x, y, () => this.combat.puff(cx(x), cy(y), DARK_PUFF))),
+      session.bus.on('CreatureLeft', ({ x, y }) => this.effectAt(x, y, () => this.combat.puff(cx(x), cy(y), DARK_PUFF))),
+      session.bus.on('CreatureDied', ({ x, y }) => {
+        this.effectAt(x, y, () => this.combat.puff(cx(x), cy(y), DEATH_PUFF, 1.3));
+        this.workSound('creatureDie', x, y);
+      }),
+      session.bus.on('CreatureHurt', ({ x, y }) => {
+        this.effectAt(x, y, () => this.combat.spark(cx(x), cy(y) - 2, 0xffffff));
+        this.workSound('hit', x, y);
+      }),
+      session.bus.on('DwarfHurt', ({ x, y }) => {
+        this.effectAt(x, y, () => this.combat.spark(cx(x), cy(y) - 2, BLOOD_SPARK));
+        this.workSound('hit', x, y);
+      }),
+      session.bus.on('TileDamaged', ({ x, y }) => {
+        this.effectAt(x, y, () => this.combat.spark(cx(x), cy(y), DUST_PUFF));
+        this.workSound('hit', x, y);
+      }),
+      session.bus.on('TileBroken', ({ x, y }) => {
+        this.effectAt(x, y, () => this.combat.puff(cx(x), cy(y), DUST_PUFF, 1.4));
+        this.workSound('smash', x, y);
+      }),
+      session.bus.on('TrapSprung', ({ x, y }) => this.workSound('trap', x, y)),
+      session.bus.on('ProjectileFired', ({ kind, x, y }) => this.workSound(kind === 'bolt' ? 'shoot' : 'spit', Math.floor(x), Math.floor(y))),
+      session.bus.on('ProjectileHit', ({ x, y }) => this.effectAt(Math.floor(x), Math.floor(y), () => this.combat.puff(x * TILE_SIZE, y * TILE_SIZE, DUST_PUFF, 0.5))),
+      session.bus.on('WaveStarted', () => gameContext().audio?.play('portal', 0.8)),
     );
     this.listenForPointer();
 
@@ -209,7 +250,10 @@ export class GameScene extends Phaser.Scene {
     const alpha = this.session.alpha;
     this.plans.update();
     this.itemSprites.update(sim.ground, alpha);
-    this.dwarfSprites.update(sim.dwarves, alpha, sim.tick, time, context.selectedDwarf);
+    this.healthBars.clear();
+    this.dwarfSprites.update(sim.dwarves, alpha, sim.tick, time, context.selectedDwarf, { revive: (dwarf) => sim.reviveJobFor(dwarf.id) !== undefined }, this.healthBars);
+    this.creatureSprites.update(sim, alpha, time, this.healthBars);
+    this.combat.update(sim.projectiles, alpha, frameMs, sim.portal, time);
     this.cracks.update(sim);
     this.updateLightView(frameMs);
     this.fog.flush();
@@ -255,9 +299,26 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (!pointer.leftButtonDown() || !this.hovered) return;
-      // Select picks a dwarf (or none); Auto picks a dwarf if one is under the pointer.
+      // Select picks a dwarf (or none); Auto picks a dwarf if one is under the pointer
+      // (marking a fallen one for revival), and marks an animal for hunting.
       const world = this.pointerWorld!;
-      const dwarf = this.dwarfSprites.dwarfAt(world.x, world.y, this.session.sim.dwarves);
+      const { sim } = this.session;
+      const dwarf = this.dwarfSprites.dwarfAt(world.x, world.y, sim.dwarves);
+      if (context.tool === 'auto') {
+        const fallen = dwarf !== null ? sim.dwarf(dwarf) : undefined;
+        if (fallen && fallen.phase === 'dead') {
+          context.toggleRevive(fallen.id);
+          this.hoverDirty = true;
+          return;
+        }
+        const creature = dwarf === null ? this.creatureSprites.creatureAt(world.x, world.y, sim) : null;
+        const animal = creature !== null ? sim.creature(creature) : undefined;
+        if (animal && !sim.isHostile(animal)) {
+          context.toggleHunt(animal.id);
+          this.hoverDirty = true;
+          return;
+        }
+      }
       if (context.tool === 'select' || (context.tool === 'auto' && dwarf !== null)) {
         context.selectDwarf(dwarf);
         return;
@@ -348,9 +409,16 @@ export class GameScene extends Phaser.Scene {
     const dwarfId = world && !isBuildTool(context.tool) ? this.dwarfSprites.dwarfAt(world.x, world.y, sim.dwarves) : null;
     const dwarf = dwarfId === null ? undefined : sim.dwarf(dwarfId);
     if (dwarf && this.dragFrom === null) {
-      const stranded = dwarf.phase !== 'dead' && !sim.homeMaps.canGetHome(sim.world.index(dwarf.x, dwarf.y));
       this.cursor.hide();
-      context.reportHover({ title: dwarf.name, detail: describeActivity(sim, dwarf, stranded), action: 'none' });
+      context.reportHover(describeDwarf(sim, dwarf, context.tool));
+      return;
+    }
+    // Likewise a creature (except with a build tool in hand).
+    const creatureId = world && !isBuildTool(context.tool) ? this.creatureSprites.creatureAt(world.x, world.y, sim) : null;
+    const creature = creatureId === null ? undefined : sim.creature(creatureId);
+    if (creature && this.dragFrom === null) {
+      this.cursor.hide();
+      context.reportHover(describeCreature(sim, creature, context.tool));
       return;
     }
 
@@ -391,16 +459,25 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
-  /** Work finished in view: a knock for digging and building, a ring for crafting. */
-  private workSound(sound: 'dig' | 'build' | 'craft', x: number, y: number): void {
-    const view = this.cameraControl.view;
-    const px = (x + 0.5) * TILE_SIZE;
-    const py = (y + 0.5) * TILE_SIZE;
-    if (px < view.x || px > view.x + view.width || py < view.y || py > view.y + view.height) return;
+  /** Something happened in view: a knock for digging and building, a ring for crafting, a thud for a blow... */
+  private workSound(sound: SoundKey, x: number, y: number): void {
+    if (!this.inView(x, y)) return;
     const last = this.lastSound.get(sound) ?? -Infinity;
     if (this.time.now - last < WORK_SOUND_GAP_MS) return;
     this.lastSound.set(sound, this.time.now);
     gameContext().audio?.play(sound, sound === 'craft' ? 0.4 : 0.55);
+  }
+
+  /** Show an effect for something at a cell, if the colony can see that cell. */
+  private effectAt(x: number, y: number, show: () => void): void {
+    if (this.session.world.isVisible(x, y) && this.inView(x, y)) show();
+  }
+
+  private inView(x: number, y: number): boolean {
+    const view = this.cameraControl.view;
+    const px = (x + 0.5) * TILE_SIZE;
+    const py = (y + 0.5) * TILE_SIZE;
+    return px >= view.x - TILE_SIZE && px <= view.x + view.width + TILE_SIZE && py >= view.y - TILE_SIZE && py <= view.y + view.height + TILE_SIZE;
   }
 
   // ---- Resizing, debug, cleanup -------------------------------------------------------------
@@ -477,6 +554,16 @@ export class GameScene extends Phaser.Scene {
       homeCells: { ...sim.homeMaps.sizes },
       rooms: sim.rooms.size,
       daylight: sim.daylight,
+      creatures: {
+        hostile: sim.hostileCount,
+        animals: sim.creatures.length - sim.hostileCount,
+        missiles: sim.projectiles.activeCount,
+      },
+      threat: {
+        spawned: sim.spawner.nightSpawned,
+        budget: sim.spawner.nightBudget(sim.time.day(sim.tick)),
+        waveDay: sim.spawner.nextWaveDay(),
+      },
     });
   }
 
@@ -487,6 +574,9 @@ export class GameScene extends Phaser.Scene {
     this.cameraControl.destroy();
     this.worldView.destroy();
     this.dwarfSprites.destroy();
+    this.creatureSprites.destroy();
+    this.combat.destroy();
+    this.healthBars.destroy();
     this.itemSprites.destroy();
     this.furnitureSprites.destroy();
     this.plans.destroy();
@@ -499,6 +589,15 @@ export class GameScene extends Phaser.Scene {
     this.dragTo = null;
     this.hovered = null;
   }
+}
+
+/** The middle of a cell, in world pixels. */
+function cx(x: number): number {
+  return (x + 0.5) * TILE_SIZE;
+}
+
+function cy(y: number): number {
+  return (y + 0.5) * TILE_SIZE;
 }
 
 /** What a job's mark shows in one of its cells: on furniture, the icon goes in its bottom-left cell only. */

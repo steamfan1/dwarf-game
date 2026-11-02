@@ -343,10 +343,12 @@ test('night, dev build: tired dwarves lie down by the Hearth and sleep', async (
   test.skip(testInfo.project.name !== 'dev', 'window.debug exists only in dev builds');
   await page.goto('./?hour=22');
   await createWorld(page, { seed: 'smoke-test' });
-  // Wear the dwarves out (through the dev build's window.debug), rather than waiting.
+  // Wear the dwarves out (through the dev build's window.debug), rather than waiting; and
+  // send off the night's first monster, so nothing wakes them (the next comes a minute later).
   await page.evaluate(() => {
-    const debug = (window as unknown as { debug: { app: { session: { sim: { dwarves: Array<{ energy: number }> } } } } }).debug;
+    const debug = (window as unknown as { debug: { killMonsters(): void; app: { session: { sim: { dwarves: Array<{ energy: number }> } } } } }).debug;
     for (const dwarf of debug.app.session.sim.dwarves) dwarf.energy = 40;
+    debug.killMonsters();
   });
   // No beds yet, so all three sleep on the floor by the Hearth.
   await expect(page.getByTestId('roster-dwarf')).toHaveText([/Asleep on the floor/, /Asleep on the floor/, /Asleep on the floor/], {
@@ -354,6 +356,47 @@ test('night, dev build: tired dwarves lie down by the Hearth and sleep', async (
   });
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath('night-asleep.png') });
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
+/** The dev build's window.debug, as far as these tests use it. */
+interface DevDebug {
+  spawnCreature(id: string, dx?: number): void;
+  startWave(): void;
+  app: {
+    centerCameraOn(x: number, y: number): void;
+    session: { sim: { portal: { x: number; y: number } | null } };
+  };
+}
+
+test('monsters, dev build: dwarves fight off a gloomling, and an invasion portal opens at dusk', async ({ page, browserErrors }, testInfo) => {
+  test.skip(testInfo.project.name !== 'dev', 'window.debug exists only in dev builds');
+  test.setTimeout(90_000);
+  await page.goto('./');
+  await createWorld(page, { seed: 'smoke-test' });
+  await page.keyboard.press('Backquote'); // the debug overlay counts the creatures
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.spawnCreature('gloomling', 7));
+  await expect(page.getByTestId('debug-creatures')).toContainText(/^1 hostile/);
+  await expect(page.getByTestId('roster-dwarf').filter({ hasText: 'Fighting a Gloomling' }).first()).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: testInfo.outputPath('m5-1-fight.png') });
+  await page.keyboard.press('Digit3');
+  await expect(page.getByTestId('debug-creatures')).toContainText(/^0 hostile/, { timeout: 30_000 });
+
+  // An invasion tonight: a warning with a countdown in the top bar, then the portal opens at dusk.
+  await page.keyboard.press('Backquote');
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.startWave());
+  await expect(page.getByTestId('threat')).toContainText(/Invasion in \d:\d\d/);
+  await page.screenshot({ path: testInfo.outputPath('m5-2-warning.png') });
+  await expect(page.getByTestId('threat')).toContainText(/Invaders: \d+/, { timeout: 30_000 });
+  await page.keyboard.press('Digit1');
+  await page.evaluate(() => {
+    const debug = (window as unknown as { debug: DevDebug }).debug;
+    const portal = debug.app.session.sim.portal;
+    if (portal) debug.app.centerCameraOn(portal.x, portal.y - 2);
+  });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: testInfo.outputPath('m5-3-portal.png') });
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 

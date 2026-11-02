@@ -22,6 +22,8 @@ export interface PlacedFurniture {
   readonly rect: CellRect;
   /** The dwarf using it as a crafting station, or 0. */
   user: number;
+  /** Traps and turrets: ticks until it can strike or shoot again. */
+  cooldown: number;
 }
 
 export class FurnitureSet {
@@ -78,7 +80,7 @@ export class FurnitureSet {
   place(kind: number, x: number, y: number): PlacedFurniture {
     const rect = this.footprint(kind, x, y);
     if (!this.isFree(rect)) throw new Error(`Furniture can't go at ${x},${y}: something is in the way`);
-    const piece: PlacedFurniture = { id: this.nextId++, kind, def: this.registry.get(kind), x, y, rect, user: 0 };
+    const piece: PlacedFurniture = { id: this.nextId++, kind, def: this.registry.get(kind), x, y, rect, user: 0, cooldown: 0 };
     this.pieces.set(piece.id, piece);
     this.fill(rect, piece.id);
     this.version++;

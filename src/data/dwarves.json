@@ -70,6 +70,17 @@
     "roomTableBonus": 1.5,
     "tableReach": 30
   },
+  "combat": {
+    "bareHandsDamage": 4,
+    "attackTicks": 16,
+    "engageRange": 7,
+    "engageAbove": 0.45,
+    "retreatBelow": 0.3,
+    "restHealPerDay": 80,
+    "damagePerLevel": 0.08,
+    "xpPerHit": 3,
+    "reviveTicks": 80
+  },
   "skills": {
     "levels": [0, 60, 150, 280, 450, 680, 960, 1300, 1700, 2200],
     "speedPerLevel": 0.12,

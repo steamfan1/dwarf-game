@@ -8,7 +8,7 @@
  *
  * Doors close a room off but don't belong to it. Rooms matter for what's in them: a bed
  * in a room with a light gives a better night's sleep, a table in a room a better meal,
- * and from Milestone 5 monsters can't appear inside one.
+ * and monsters never appear inside one.
  *
  * Rebuilding looks at every open cell once (about 80,000 in a full world), so the
  * simulation does it at most every few ticks, and only after blocks, walls, doors or

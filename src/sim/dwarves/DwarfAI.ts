@@ -25,6 +25,13 @@
  * an empty stomach costs health, and a dwarf that runs out of energy falls asleep where it
  * stands.
  *
+ * Danger comes before everything: every few ticks a dwarf looks around, and if a monster
+ * is within `combat.engageRange` it drops what it's doing and fights (bare-handed, with a
+ * sword, or with a crossbow from a distance). A badly hurt dwarf breaks off and falls back
+ * to the Hearth, where it mends; it fights back if cornered there. A sleeping dwarf wakes
+ * when it's attacked, when a monster comes right up to it, or when a door is being
+ * smashed nearby. Hunting an animal the player marked works the same way as a fight.
+ *
  * Paths come from the PathService, which may say 'busy' when this tick's pathfinding
  * budget is used up; the dwarf then asks again next tick. Work progress is kept on the
  * job, so an interrupted dig or craft isn't lost.
@@ -33,9 +40,10 @@
  * keeps lighting, pathfinding, the job board, storage and the renderer in step.
  */
 import type { Rng } from '../../core/Rng';
+import type { Creature } from '../creatures/Creature';
 import type { ColonyStorage, GroundItems } from '../items/Items';
-import type { ItemRegistry } from '../items/ItemRegistry';
-import type { Job, JobBoard } from '../jobs/JobBoard';
+import type { ItemRegistry, ProjectileKind } from '../items/ItemRegistry';
+import { PERSONAL_JOBS, type Job, type JobBoard } from '../jobs/JobBoard';
 import type { HomeMaps } from '../nav/HomeMaps';
 import type { NavGrid } from '../nav/NavGrid';
 import { distanceToArea, type PathGoal } from '../nav/Pathfinder';
@@ -59,6 +67,16 @@ export interface NeedRates {
   heal: number;
   /** Health lost per tick while starving. */
   starve: number;
+  /** Health regained per tick resting by the Hearth. */
+  rest: number;
+}
+
+/** What a dwarf fights with: damage per blow, ticks between blows, reach, and what it shoots (if it does). */
+export interface Weapon {
+  damage: number;
+  attackTicks: number;
+  range: number;
+  projectile: ProjectileKind | null;
 }
 
 /** Everything the dwarves need from the simulation. */
@@ -142,12 +160,36 @@ export interface ColonyContext {
   dropItems(item: number, count: number, x: number, y: number, skipDwarf?: number): void;
   /** Uncover the cells around a dwarf. */
   reveal(x: number, y: number, radius: number): void;
-  dwarfDied(dwarf: Dwarf, cause: DeathCause): void;
+  dwarfDied(dwarf: Dwarf, cause: DeathCause, by: string | null): void;
   skillUp(dwarf: Dwarf, skill: Skill): void;
+  /** A living creature by id. */
+  creature(id: number): Creature | undefined;
+  isHostile(creature: Creature): boolean;
+  /** The nearest hostile creature within `range` tiles that the dwarf isn't steering clear of. */
+  nearestHostile(dwarf: Dwarf, range: number): Creature | undefined;
+  /** A fight of the dwarf's own with a creature, claimed at once. */
+  startFight(dwarf: Dwarf, creature: Creature): Job;
+  weaponOf(dwarf: Dwarf): Weapon;
+  strikeCreature(dwarf: Dwarf, creature: Creature, damage: number): void;
+  dwarfShoots(dwarf: Dwarf, creature: Creature, weapon: Weapon): void;
+  learnCombat(dwarf: Dwarf, xp: number): void;
+  /** Whether a missile could fly between two cells. */
+  lineOfSight(x0: number, y0: number, x1: number, y1: number): boolean;
+  /** Whether a door or block is being smashed near (x, y) right now. */
+  noiseNear(x: number, y: number): boolean;
+  /** A badly hurt dwarf is falling back to the Hearth. */
+  dwarfRetreating(dwarf: Dwarf): void;
+  /** A dwarf poured the revival draught it carries on a fallen dwarf. */
+  completeRevive(job: Job, by: Dwarf): boolean;
 }
 
 function isDead(dwarf: Dwarf): boolean {
   return dwarf.phase === 'dead';
+}
+
+/** Tiles between a dwarf and a creature (king moves). */
+function distance(dwarf: Dwarf, creature: Creature): number {
+  return Math.max(Math.abs(creature.x - dwarf.x), Math.abs(creature.y - dwarf.y));
 }
 
 /** On its feet and able to act: not dead and not in the middle of a fall. */
@@ -163,6 +205,18 @@ const WANDER_CHANCE = 0.25;
 const MAX_WAIT_TICKS = 100;
 /** Before a block goes in, dwarves this close (tiles) are checked to still have a way home. */
 const PLACE_SAFETY_RADIUS = 8;
+/** Dwarves look around for danger this often (ticks). */
+const SCAN_TICKS = 4;
+/** A dwarf hurt this recently (ticks) knows it is under attack. */
+const UNDER_ATTACK_TICKS = 40;
+/** A monster this close (tiles) wakes a sleeping dwarf. */
+const WAKE_DISTANCE = 3;
+/** A creature a dwarf couldn't get to is left alone this long (ticks). */
+const IGNORE_TICKS = 300;
+/** A dwarf chasing a creature plans a new path at most this often (ticks). */
+const CHASE_REPLAN_TICKS = 10;
+/** "By the Hearth": within this many tiles of it, a dwarf rests and mends. */
+const HEARTH_REST_DISTANCE = 2;
 
 export class DwarfAI {
   private readonly ctx: ColonyContext;
@@ -177,6 +231,10 @@ export class DwarfAI {
 
     this.tickNeeds(dwarf);
     if (isDead(dwarf)) return;
+    dwarf.hurtTicks++;
+    dwarf.strikeTicks++;
+    if (dwarf.attackCooldown > 0) dwarf.attackCooldown--;
+    if (dwarf.chaseTicks > 0) dwarf.chaseTicks--;
     if (!dwarf.movement && isActive(dwarf) && !nav.standable(dwarf.x, dwarf.y)) this.startFalling(dwarf);
     // Out of energy: it drops whatever it was doing and falls asleep on the spot.
     if (!dwarf.movement && isActive(dwarf) && dwarf.phase !== 'sleeping' && dwarf.energy <= 0) this.collapse(dwarf);
@@ -188,6 +246,12 @@ export class DwarfAI {
       if (!isActive(dwarf)) return;
     }
 
+    this.watchForDanger(dwarf);
+    // A fighter stops as soon as its foe is within reach, and plans again if the foe has moved on.
+    if (dwarf.phase === 'fighting' && dwarf.path) {
+      const foe = this.foe(dwarf);
+      if (!foe || this.canStrike(dwarf, foe, this.ctx.weaponOf(dwarf)) || (dwarf.chaseTicks === 0 && this.foeMoved(dwarf, foe))) dwarf.path = null;
+    }
     if (dwarf.path && this.followPath(dwarf)) return;
 
     if (dwarf.restTicks > 0) dwarf.restTicks--;
@@ -202,7 +266,11 @@ export class DwarfAI {
       case 'to-storage':
       case 'to-supply':
       case 'wandering':
+      case 'retreating':
         this.travel(dwarf);
+        break;
+      case 'fighting':
+        this.fight(dwarf);
         break;
       case 'working':
         this.work(dwarf);
@@ -227,7 +295,7 @@ export class DwarfAI {
 
   // ---- Needs ---------------------------------------------------------------------------------
 
-  /** Hunger and energy run down (energy comes back while asleep); starving costs health. */
+  /** Hunger and energy run down (energy comes back while asleep); starving costs health; the Hearth mends. */
   private tickNeeds(dwarf: Dwarf): void {
     const rates = this.ctx.needRates;
     dwarf.hunger = Math.max(0, dwarf.hunger - rates.hunger);
@@ -237,6 +305,9 @@ export class DwarfAI {
       dwarf.health = Math.min(dwarf.maxHealth, dwarf.health + rates.heal * rate);
     } else if (dwarf.phase !== 'falling') {
       dwarf.energy = Math.max(0, dwarf.energy - rates.energy);
+      if (dwarf.phase !== 'fighting' && dwarf.hunger > 0 && this.byTheHearth(dwarf)) {
+        dwarf.health = Math.min(dwarf.maxHealth, dwarf.health + rates.rest);
+      }
     }
     if (dwarf.hunger > 0) return;
     dwarf.health -= rates.starve;
@@ -316,6 +387,14 @@ export class DwarfAI {
       return this.ctx.canTake(candidate, dwarf) && (stranded || this.ctx.jobWorkable(candidate));
     });
     if (job && this.ctx.takeJob(job, dwarf)) {
+      if (job.type === 'hunt') {
+        // A hunt is a fight with an animal: go after it.
+        dwarf.jobId = job.id;
+        dwarf.phase = 'fighting';
+        dwarf.path = null;
+        dwarf.chaseTicks = 0;
+        return;
+      }
       this.begin(dwarf, job, job.type === 'haul' ? 'to-item' : job.inputs.length > 0 ? 'to-supply' : 'to-job');
       return;
     }
@@ -384,6 +463,7 @@ export class DwarfAI {
       if (dwarf.phase === 'to-supply' && !this.myJob(dwarf)) return null;
       return this.ctx.storageGoal();
     }
+    if (dwarf.phase === 'retreating') return { area: this.ctx.storeArea, reach: HEARTH_REST_DISTANCE, cacheKey: 'hearth' };
     const job = this.myJob(dwarf);
     if (!job) return null;
     const stranded = this.isStranded(dwarf);
@@ -454,6 +534,11 @@ export class DwarfAI {
         dwarf.wanderTarget = -1;
         dwarf.restTicks = this.ctx.rng.int(40, 140);
         break;
+      case 'retreating':
+        // Home: rest by the Hearth a while.
+        dwarf.phase = 'idle';
+        dwarf.restTicks = 40;
+        break;
       default:
         break;
     }
@@ -462,7 +547,7 @@ export class DwarfAI {
   /** No way to the goal: skip that job, or put down what the dwarf carries. */
   private cannotReach(dwarf: Dwarf): void {
     const { jobs } = this.ctx;
-    const wasWandering = dwarf.phase === 'wandering';
+    const wasWandering = dwarf.phase === 'wandering' || dwarf.phase === 'retreating';
     if (dwarf.phase === 'to-storage' && dwarf.carrying.length > 0) {
       // No way to any store: leave the load here for someone else (or later).
       const job = this.myJob(dwarf);
@@ -582,15 +667,213 @@ export class DwarfAI {
     dwarf.movement = { from, to: from + world.width, kind: 'fall', elapsed: 0, duration: colony.movement.fallTicksPerRow };
   }
 
-  private die(dwarf: Dwarf, cause: DeathCause): void {
+  private die(dwarf: Dwarf, cause: DeathCause, by: string | null = null): void {
     if (dwarf.jobId !== 0) this.ctx.jobs.release(dwarf.jobId, dwarf.id);
     this.dropAll(dwarf);
     dwarf.health = 0;
     dwarf.phase = 'dead';
+    dwarf.deathCause = cause;
     dwarf.jobId = 0;
     dwarf.path = null;
     dwarf.movement = null;
-    this.ctx.dwarfDied(dwarf, cause);
+    this.ctx.dwarfDied(dwarf, cause, by);
+  }
+
+  /** Killed (by a monster's blow or missile). */
+  kill(dwarf: Dwarf, cause: DeathCause, by: string | null): void {
+    if (!isDead(dwarf)) this.die(dwarf, cause, by);
+  }
+
+  /** Brought back to life (by a revival draught) with this fraction of its health. */
+  revive(dwarf: Dwarf, health: number): void {
+    if (!isDead(dwarf)) return;
+    dwarf.phase = 'idle';
+    dwarf.deathCause = null;
+    dwarf.health = Math.max(1, dwarf.maxHealth * health);
+    dwarf.hunger = Math.max(dwarf.hunger, 50);
+    dwarf.energy = Math.max(dwarf.energy, 50);
+    dwarf.jobId = 0;
+    dwarf.path = null;
+    dwarf.movement = null;
+    dwarf.fallRows = 0;
+    dwarf.restTicks = 20;
+    dwarf.lastAttacker = 0;
+    dwarf.ignoring = [];
+  }
+
+  // ---- Fighting --------------------------------------------------------------------------------
+
+  /**
+   * Every few ticks: look around. Monsters near (or one that just struck it) mean a fight,
+   * or for a badly hurt dwarf, a run for the Hearth. A sleeper only wakes for close danger.
+   */
+  private watchForDanger(dwarf: Dwarf): void {
+    if (!isActive(dwarf) || --dwarf.scanTicks > 0) return;
+    dwarf.scanTicks = SCAN_TICKS;
+    const { ctx } = this;
+    const combat = ctx.colony.combat;
+    if (dwarf.phase === 'retreating') return;
+    const tick = ctx.tick;
+    if (dwarf.ignoring.length > 0) dwarf.ignoring = dwarf.ignoring.filter((entry) => entry.until > tick);
+    const underAttack = tick - dwarf.lastHurtTick < UNDER_ATTACK_TICKS;
+    const attacker = underAttack ? ctx.creature(dwarf.lastAttacker) : undefined;
+    const near = ctx.nearestHostile(dwarf, combat.engageRange);
+    const enemy = attacker && distance(dwarf, attacker) <= combat.engageRange + 3 ? attacker : near;
+    const badlyHurt = dwarf.health < combat.retreatBelow * dwarf.maxHealth;
+
+    if (dwarf.phase === 'fighting') {
+      const foe = this.foe(dwarf);
+      if (foe && ctx.isHostile(foe)) {
+        if (badlyHurt && !this.cornered(dwarf, foe)) this.retreat(dwarf);
+        return;
+      }
+      // Hunting an animal: a monster comes first.
+      if (!enemy) return;
+    }
+
+    if (dwarf.phase === 'sleeping') {
+      const close = enemy !== undefined && distance(dwarf, enemy) <= WAKE_DISTANCE;
+      if (!underAttack && !close && !ctx.noiseNear(dwarf.x, dwarf.y)) return;
+      this.wake(dwarf);
+    }
+    if (!enemy) return;
+    if (dwarf.health < combat.engageAbove * dwarf.maxHealth && !this.cornered(dwarf, enemy)) {
+      if (!this.byTheHearth(dwarf) && !this.isStranded(dwarf)) this.retreat(dwarf);
+      return;
+    }
+    this.engage(dwarf, enemy);
+  }
+
+  /** Nowhere to run: at the Hearth already, or with no way home, and the enemy is upon it. */
+  private cornered(dwarf: Dwarf, enemy: Creature): boolean {
+    const underAttack = this.ctx.tick - dwarf.lastHurtTick < UNDER_ATTACK_TICKS;
+    return (this.byTheHearth(dwarf) || this.isStranded(dwarf)) && (underAttack || distance(dwarf, enemy) <= 1);
+  }
+
+  private byTheHearth(dwarf: Dwarf): boolean {
+    const home = this.ctx.storeArea;
+    return Math.max(home.x0 - dwarf.x, 0, dwarf.x - home.x1, home.y0 - dwarf.y, 0, dwarf.y - home.y1) <= HEARTH_REST_DISTANCE;
+  }
+
+  /** Drop everything and take on a creature. */
+  private engage(dwarf: Dwarf, enemy: Creature): void {
+    this.dropJob(dwarf);
+    const fight = this.ctx.startFight(dwarf, enemy);
+    dwarf.jobId = fight.id;
+    dwarf.phase = 'fighting';
+    dwarf.chaseTicks = 0;
+  }
+
+  /** Break off and run for the Hearth. */
+  private retreat(dwarf: Dwarf): void {
+    this.dropJob(dwarf);
+    dwarf.phase = 'retreating';
+    this.ctx.dwarfRetreating(dwarf);
+    this.travel(dwarf);
+  }
+
+  private wake(dwarf: Dwarf): void {
+    this.dropJob(dwarf);
+  }
+
+  /** Give up the current job (its own jobs, like a nap, simply end); what it carries stays in its arms. */
+  private dropJob(dwarf: Dwarf): void {
+    const job = this.myJob(dwarf);
+    if (job) {
+      if (PERSONAL_JOBS.has(job.type)) this.ctx.jobs.remove(job.id);
+      else this.ctx.jobs.release(job.id, dwarf.id);
+    }
+    this.toIdle(dwarf);
+  }
+
+  /** The creature the dwarf is fighting or hunting, if it's still about. */
+  private foe(dwarf: Dwarf): Creature | undefined {
+    const job = this.myJob(dwarf);
+    return job && (job.type === 'fight' || job.type === 'hunt') ? this.ctx.creature(job.target) : undefined;
+  }
+
+  /** Strike if the foe is within reach; otherwise go after it. */
+  private fight(dwarf: Dwarf): void {
+    const { ctx } = this;
+    const job = this.myJob(dwarf);
+    const foe = this.foe(dwarf);
+    if (!job || !foe) {
+      // It's dead, gone, or the fight was called off.
+      if (job) ctx.jobs.remove(job.id);
+      this.toIdle(dwarf);
+      return;
+    }
+    const weapon = ctx.weaponOf(dwarf);
+    if (this.canStrike(dwarf, foe, weapon)) {
+      dwarf.path = null;
+      if (foe.x !== dwarf.x) dwarf.facing = foe.x > dwarf.x ? 1 : -1;
+      if (dwarf.attackCooldown > 0) return;
+      dwarf.attackCooldown = weapon.attackTicks;
+      dwarf.strikeTicks = 0;
+      if (weapon.range > 1 && weapon.projectile) {
+        ctx.dwarfShoots(dwarf, foe, weapon);
+      } else {
+        ctx.strikeCreature(dwarf, foe, weapon.damage);
+        ctx.learnCombat(dwarf, ctx.colony.combat.xpPerHit);
+      }
+      return;
+    }
+    if (!dwarf.path) this.chase(dwarf, job, foe);
+  }
+
+  /** Whether the foe has moved away from where the dwarf's path leads. */
+  private foeMoved(dwarf: Dwarf, foe: Creature): boolean {
+    const width = this.ctx.world.width;
+    if (dwarf.chaseGoal < 0) return true;
+    const gx = dwarf.chaseGoal % width;
+    const gy = (dwarf.chaseGoal - gx) / width;
+    return Math.max(Math.abs(gx - foe.x), Math.abs(gy - foe.y)) > 1;
+  }
+
+  /** Plan a way to the foe (somewhere it can get home from, unless it can't anyway). */
+  private chase(dwarf: Dwarf, job: Job, foe: Creature): void {
+    const { ctx } = this;
+    const stranded = this.isStranded(dwarf);
+    const goal: PathGoal = {
+      area: { x0: foe.x, y0: foe.y, x1: foe.x, y1: foe.y },
+      reach: 1,
+      accept: (cell) => stranded || ctx.homeMaps.workable(cell),
+    };
+    const outcome = ctx.paths.request(ctx.world.index(dwarf.x, dwarf.y), goal);
+    if (outcome === 'busy') return;
+    dwarf.chaseTicks = CHASE_REPLAN_TICKS;
+    if (!outcome.found) {
+      // Out of reach: leave it be for a while.
+      dwarf.ignoring.push({ creature: foe.id, until: ctx.tick + IGNORE_TICKS });
+      if (job.type === 'hunt') {
+        ctx.jobs.markUnreachable(job.id, dwarf.id);
+        ctx.jobs.release(job.id, dwarf.id);
+      } else {
+        ctx.jobs.remove(job.id);
+      }
+      this.toIdle(dwarf);
+      dwarf.restTicks = IDLE_CHECK_TICKS;
+      return;
+    }
+    dwarf.path = outcome.cells;
+    dwarf.pathIndex = 0;
+    dwarf.chaseGoal = ctx.world.index(foe.x, foe.y);
+  }
+
+  /** Whether the dwarf could strike (or shoot) the creature from where it stands. */
+  private canStrike(dwarf: Dwarf, foe: Creature, weapon: Weapon): boolean {
+    const dx = Math.abs(foe.x - dwarf.x);
+    const dy = Math.abs(foe.y - dwarf.y);
+    if (weapon.range > 1 && weapon.projectile) {
+      return dx * dx + dy * dy <= weapon.range * weapon.range && this.ctx.lineOfSight(dwarf.x, dwarf.y, foe.x, foe.y);
+    }
+    if (dx > 1 || dy > 1) return false;
+    if (dx === 1 && dy === 1) {
+      // Not round a corner: one of the two cells between them must be open.
+      const { nav } = this.ctx;
+      return nav.passable(dwarf.x, foe.y) || nav.passable(foe.x, dwarf.y);
+    }
+    return true;
   }
 
   // ---- Working --------------------------------------------------------------------------------
@@ -623,9 +906,24 @@ export class DwarfAI {
       case 'harvest':
         this.pick(dwarf, job);
         break;
+      case 'revive':
+        this.pourDraught(dwarf, job);
+        break;
       default:
         this.giveUp(dwarf);
     }
+  }
+
+  /** Pour a revival draught on a fallen dwarf. */
+  private pourDraught(dwarf: Dwarf, job: Job): void {
+    if (!this.ctx.siteValid(job)) {
+      this.ctx.jobs.remove(job.id);
+      this.toIdle(dwarf);
+      return;
+    }
+    if (!this.labour(dwarf, job)) return;
+    this.toIdle(dwarf);
+    if (!this.ctx.completeRevive(job, dwarf)) this.ctx.jobs.remove(job.id);
   }
 
   /** Eat the meal in hand: at its table (walking back to it if need be), or right here without one. */

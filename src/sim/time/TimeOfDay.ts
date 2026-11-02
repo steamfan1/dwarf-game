@@ -133,6 +133,12 @@ export class TimeOfDay {
     return t < dayTicks ? dayTicks - t : this.cycleTicks - t + dayTicks;
   }
 
+  /** Move the clock forward so that `tick` falls `before` ticks ahead of the next nightfall (debug). */
+  skipToBeforeNight(tick: number, before: number): void {
+    if (this.isNight(tick)) return;
+    this.offset += Math.max(0, this.ticksUntilNight(tick) - before);
+  }
+
   /** Move the clock forward so that `tick` falls at the start of the next night (debug). */
   skipToNight(tick: number): void {
     if (this.isNight(tick)) return;

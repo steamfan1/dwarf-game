@@ -31,15 +31,49 @@ import type { CellRect, World } from '../world/World';
  *   build      put a block in a cell              wall      put up a background wall
  *   place      set down a piece of furniture      dismantle take a piece of furniture apart
  *   craft      make a recipe (one craft)
+ *   hunt       go after an animal the player marked, and kill it
+ *   revive     pour a revival draught on a fallen dwarf
  * A dwarf's own needs are jobs too, taken by that dwarf alone:
  *   equip      fetch better gear                  eat       fetch a meal and eat it
  *   sleep      go to bed (or to the Hearth's floor) and sleep
+ *   fight      take on a monster that came near
  */
-export type JobType = 'dig' | 'chop' | 'harvest' | 'haul' | 'build' | 'wall' | 'place' | 'dismantle' | 'craft' | 'equip' | 'eat' | 'sleep';
-export const JOB_TYPES: readonly JobType[] = ['dig', 'chop', 'harvest', 'haul', 'build', 'wall', 'place', 'dismantle', 'craft', 'equip', 'eat', 'sleep'];
+export type JobType =
+  | 'dig'
+  | 'chop'
+  | 'harvest'
+  | 'haul'
+  | 'build'
+  | 'wall'
+  | 'place'
+  | 'dismantle'
+  | 'craft'
+  | 'hunt'
+  | 'revive'
+  | 'equip'
+  | 'eat'
+  | 'sleep'
+  | 'fight';
+export const JOB_TYPES: readonly JobType[] = [
+  'dig',
+  'chop',
+  'harvest',
+  'haul',
+  'build',
+  'wall',
+  'place',
+  'dismantle',
+  'craft',
+  'hunt',
+  'revive',
+  'equip',
+  'eat',
+  'sleep',
+  'fight',
+];
 
 /** Jobs a dwarf makes for itself and keeps to itself. */
-export const PERSONAL_JOBS: ReadonlySet<JobType> = new Set<JobType>(['equip', 'eat', 'sleep']);
+export const PERSONAL_JOBS: ReadonlySet<JobType> = new Set<JobType>(['equip', 'eat', 'sleep', 'fight']);
 
 export type MarkLayer = 'front' | 'back';
 
@@ -59,6 +93,7 @@ export interface Job {
   /**
    * Dig, build, wall: the cell. Chop: the bottom of the trunk. Haul: where the stack lies.
    * Place, dismantle: the furniture's bottom-left cell. Craft: the station (or the Hearth).
+   * Hunt, fight: where the creature is (kept up to date). Revive: where the body lies.
    */
   x: number;
   y: number;
@@ -82,7 +117,11 @@ export interface Job {
   readonly layer: MarkLayer;
   /** What the job uses up, fetched from storage before the work starts. */
   readonly inputs: readonly ItemCount[];
-  /** Build: the tile. Wall: the wall. Place: the furniture kind. Craft: the recipe. Equip, eat: the item. Harvest: the plant's tile. -1 otherwise. */
+  /**
+   * Build: the tile. Wall: the wall. Place: the furniture kind. Craft: the recipe. Equip,
+   * eat: the item. Harvest: the plant's tile. Hunt, fight: the creature's id. Revive: the
+   * fallen dwarf's id. -1 otherwise.
+   */
   readonly target: number;
   /** Craft: the order it belongs to. */
   readonly orderId: number;
