@@ -1,0 +1,6 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[info] World "smoke-test" (temperate) generated in 129 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}
+[info] A Gloomling appears at 236, 48.
+[info] An invasion is coming tonight.

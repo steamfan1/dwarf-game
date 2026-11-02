@@ -1,0 +1,4 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[info] World "smoke-test" (temperate) generated in 128 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}

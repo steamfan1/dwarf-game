@@ -1,0 +1,1249 @@
+{
+  "config": {
+    "argv": [
+      "/opt/hostedtoolcache/node/26.13.0/x64/bin/node",
+      "/home/runner/work/dwarf-game/dwarf-game/node_modules/.bin/playwright",
+      "test"
+    ],
+    "configFile": "/home/runner/work/dwarf-game/dwarf-game/playwright.config.ts",
+    "rootDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/steamfan1/dwarf-game/commit/1d44c4917798cc88ca2d38899d587c01f1fa1360",
+        "commitHash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+        "buildHref": "https://github.com/steamfan1/dwarf-game/actions/runs/41529616266"
+      },
+      "gitCommit": {
+        "shortHash": "1d44c49",
+        "hash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+        "subject": "Fighters square up from neighbouring cells instead of sharing one",
+        "body": "Fighters square up from neighbouring cells instead of sharing one\n\nA dwarf and a monster stepping toward each other at the same time both\nmoved into the cell between them and fought there, the dwarf hiding the\nmonster. Now a melee fighter whose foe is part-way through a step into\nits reach waits for it, and a monster that ends up in its prey's own cell\nbacks off a step before it strikes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_0172Bktxac5eUT4t3gCW9ZoH\n",
+        "author": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1793655281000
+        },
+        "committer": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1793655281000
+        },
+        "branch": "main"
+      },
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/dwarf-game/dwarf-game/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/steamfan1/dwarf-game/commit/1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "commitHash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "buildHref": "https://github.com/steamfan1/dwarf-game/actions/runs/41529616266"
+          },
+          "gitCommit": {
+            "shortHash": "1d44c49",
+            "hash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "subject": "Fighters square up from neighbouring cells instead of sharing one",
+            "body": "Fighters square up from neighbouring cells instead of sharing one\n\nA dwarf and a monster stepping toward each other at the same time both\nmoved into the cell between them and fought there, the dwarf hiding the\nmonster. Now a melee fighter whose foe is part-way through a step into\nits reach waits for it, and a monster that ends up in its prey's own cell\nbacks off a step before it strikes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_0172Bktxac5eUT4t3gCW9ZoH\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 1
+        },
+        "id": "build",
+        "name": "build",
+        "testDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/home/runner/work/dwarf-game/dwarf-game/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/steamfan1/dwarf-game/commit/1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "commitHash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "buildHref": "https://github.com/steamfan1/dwarf-game/actions/runs/41529616266"
+          },
+          "gitCommit": {
+            "shortHash": "1d44c49",
+            "hash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "subject": "Fighters square up from neighbouring cells instead of sharing one",
+            "body": "Fighters square up from neighbouring cells instead of sharing one\n\nA dwarf and a monster stepping toward each other at the same time both\nmoved into the cell between them and fought there, the dwarf hiding the\nmonster. Now a melee fighter whose foe is part-way through a step into\nits reach waits for it, and a monster that ends up in its prey's own cell\nbacks off a step before it strikes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_0172Bktxac5eUT4t3gCW9ZoH\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 1
+        },
+        "id": "dev",
+        "name": "dev",
+        "testDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/runner/work/dwarf-game/dwarf-game/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/steamfan1/dwarf-game/commit/1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "commitHash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "buildHref": "https://github.com/steamfan1/dwarf-game/actions/runs/41529616266"
+          },
+          "gitCommit": {
+            "shortHash": "1d44c49",
+            "hash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "subject": "Fighters square up from neighbouring cells instead of sharing one",
+            "body": "Fighters square up from neighbouring cells instead of sharing one\n\nA dwarf and a monster stepping toward each other at the same time both\nmoved into the cell between them and fought there, the dwarf hiding the\nmonster. Now a melee fighter whose foe is part-way through a step into\nits reach waits for it, and a monster that ends up in its prey's own cell\nbacks off a step before it strikes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_0172Bktxac5eUT4t3gCW9ZoH\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 1
+        },
+        "name": "build",
+        "testDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "snapshotDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "screenshot": "only-on-failure",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "screen": {
+            "width": 1920,
+            "height": 1080
+          },
+          "deviceScaleFactor": 1,
+          "isMobile": false,
+          "hasTouch": false,
+          "defaultBrowserType": "chromium",
+          "launchOptions": {
+            "args": [
+              "--enable-unsafe-swiftshader"
+            ]
+          },
+          "baseURL": "http://localhost:4173/"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "build"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/runner/work/dwarf-game/dwarf-game/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/steamfan1/dwarf-game/commit/1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "commitHash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "buildHref": "https://github.com/steamfan1/dwarf-game/actions/runs/41529616266"
+          },
+          "gitCommit": {
+            "shortHash": "1d44c49",
+            "hash": "1d44c4917798cc88ca2d38899d587c01f1fa1360",
+            "subject": "Fighters square up from neighbouring cells instead of sharing one",
+            "body": "Fighters square up from neighbouring cells instead of sharing one\n\nA dwarf and a monster stepping toward each other at the same time both\nmoved into the cell between them and fought there, the dwarf hiding the\nmonster. Now a melee fighter whose foe is part-way through a step into\nits reach waits for it, and a monster that ends up in its prey's own cell\nbacks off a step before it strikes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_0172Bktxac5eUT4t3gCW9ZoH\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1793655281000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 1
+        },
+        "name": "dev",
+        "testDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "snapshotDir": "/home/runner/work/dwarf-game/dwarf-game/e2e",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "screenshot": "only-on-failure",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "screen": {
+            "width": 1920,
+            "height": 1080
+          },
+          "deviceScaleFactor": 1,
+          "isMobile": false,
+          "hasTouch": false,
+          "defaultBrowserType": "chromium",
+          "launchOptions": {
+            "args": [
+              "--enable-unsafe-swiftshader"
+            ]
+          },
+          "baseURL": "http://localhost:5173/"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "dev"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "github",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "perf.spec.ts",
+      "file": "perf.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "performance probe",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [
+                {
+                  "type": "renderer",
+                  "description": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+                },
+                {
+                  "type": "perf",
+                  "description": "title screen: 22.9 fps (p50 50 ms, p90 50 ms, max 50.1 ms); main thread 2139.6 ms, script 31.6 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still: 15.7 fps (p50 66.7 ms, p90 66.7 ms, max 83.3 ms); main thread 2147.1 ms, script 60.2 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, panning: 14.4 fps (p50 66.7 ms, p90 83.4 ms, max 100 ms); main thread 2221.6 ms, script 60.8 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, minimap closed: 13 fps (p50 83.3 ms, p90 83.4 ms, max 83.4 ms); main thread 2228.4 ms, script 41.6 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 1, still: 11.9 fps (p50 83.3 ms, p90 83.4 ms, max 100 ms); main thread 2199.6 ms, script 88.1 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, panning (profiled): 12 fps (p50 83.3 ms, p90 83.5 ms, max 100 ms); main thread 2357.4 ms, script 52.4 ms"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 19057,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:35:28.861Z",
+                  "annotations": [
+                    {
+                      "type": "renderer",
+                      "description": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "title screen: 22.9 fps (p50 50 ms, p90 50 ms, max 50.1 ms); main thread 2139.6 ms, script 31.6 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still: 15.7 fps (p50 66.7 ms, p90 66.7 ms, max 83.3 ms); main thread 2147.1 ms, script 60.2 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, panning: 14.4 fps (p50 66.7 ms, p90 83.4 ms, max 100 ms); main thread 2221.6 ms, script 60.8 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, minimap closed: 13 fps (p50 83.3 ms, p90 83.4 ms, max 83.4 ms); main thread 2228.4 ms, script 41.6 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 1, still: 11.9 fps (p50 83.3 ms, p90 83.4 ms, max 100 ms); main thread 2199.6 ms, script 88.1 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, panning (profiled): 12 fps (p50 83.3 ms, p90 83.5 ms, max 100 ms); main thread 2357.4 ms, script 52.4 ms"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "73ed389be8d3d6a89cdb-512f9b8ae40dfe7a9286",
+          "file": "perf.spec.ts",
+          "line": 114,
+          "column": 1
+        },
+        {
+          "title": "performance probe",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [
+                {
+                  "type": "tick cost",
+                  "description": "0.225 ms per tick with 40 monsters"
+                },
+                {
+                  "type": "renderer",
+                  "description": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+                },
+                {
+                  "type": "perf",
+                  "description": "title screen: 22.6 fps (p50 50 ms, p90 50 ms, max 50.1 ms); main thread 2113.5 ms, script 30.8 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still: 15.2 fps (p50 66.7 ms, p90 66.7 ms, max 83.3 ms); main thread 2152.2 ms, script 59.3 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, panning: 15.9 fps (p50 66.6 ms, p90 66.7 ms, max 66.8 ms); main thread 2210.1 ms, script 59.6 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, without fog: 23.9 fps (p50 49.9 ms, p90 50 ms, max 50.1 ms); main thread 2167.5 ms, script 63.5 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, without blocks: 19.8 fps (p50 50 ms, p90 50.1 ms, max 66.8 ms); main thread 2116.7 ms, script 36.6 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, without walls: 18.8 fps (p50 50 ms, p90 66.6 ms, max 66.7 ms); main thread 2117.8 ms, script 41.5 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, without sky: 24.1 fps (p50 33.4 ms, p90 50.1 ms, max 50.1 ms); main thread 2118.7 ms, script 45.8 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, without overlay: 17.4 fps (p50 50.1 ms, p90 66.7 ms, max 66.7 ms); main thread 2135.1 ms, script 35.2 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, still, minimap closed: 17.1 fps (p50 66.6 ms, p90 66.7 ms, max 66.8 ms); main thread 2161.5 ms, script 46.4 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 1, still: 14.8 fps (p50 66.7 ms, p90 66.7 ms, max 99.9 ms); main thread 2167.9 ms, script 74.3 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, 40 monsters: 16.6 fps (p50 66.5 ms, p90 66.7 ms, max 100.1 ms); main thread 2220.3 ms, script 75.4 ms"
+                },
+                {
+                  "type": "perf",
+                  "description": "game, zoom 2, panning (profiled): 15.7 fps (p50 66.7 ms, p90 66.7 ms, max 66.8 ms); main thread 2221.8 ms, script 60.8 ms"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 32847,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:37:03.027Z",
+                  "annotations": [
+                    {
+                      "type": "tick cost",
+                      "description": "0.225 ms per tick with 40 monsters"
+                    },
+                    {
+                      "type": "renderer",
+                      "description": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "title screen: 22.6 fps (p50 50 ms, p90 50 ms, max 50.1 ms); main thread 2113.5 ms, script 30.8 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still: 15.2 fps (p50 66.7 ms, p90 66.7 ms, max 83.3 ms); main thread 2152.2 ms, script 59.3 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, panning: 15.9 fps (p50 66.6 ms, p90 66.7 ms, max 66.8 ms); main thread 2210.1 ms, script 59.6 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, without fog: 23.9 fps (p50 49.9 ms, p90 50 ms, max 50.1 ms); main thread 2167.5 ms, script 63.5 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, without blocks: 19.8 fps (p50 50 ms, p90 50.1 ms, max 66.8 ms); main thread 2116.7 ms, script 36.6 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, without walls: 18.8 fps (p50 50 ms, p90 66.6 ms, max 66.7 ms); main thread 2117.8 ms, script 41.5 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, without sky: 24.1 fps (p50 33.4 ms, p90 50.1 ms, max 50.1 ms); main thread 2118.7 ms, script 45.8 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, without overlay: 17.4 fps (p50 50.1 ms, p90 66.7 ms, max 66.7 ms); main thread 2135.1 ms, script 35.2 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, still, minimap closed: 17.1 fps (p50 66.6 ms, p90 66.7 ms, max 66.8 ms); main thread 2161.5 ms, script 46.4 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 1, still: 14.8 fps (p50 66.7 ms, p90 66.7 ms, max 99.9 ms); main thread 2167.9 ms, script 74.3 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, 40 monsters: 16.6 fps (p50 66.5 ms, p90 66.7 ms, max 100.1 ms); main thread 2220.3 ms, script 75.4 ms"
+                    },
+                    {
+                      "type": "perf",
+                      "description": "game, zoom 2, panning (profiled): 15.7 fps (p50 66.7 ms, p90 66.7 ms, max 66.8 ms); main thread 2221.8 ms, script 60.8 ms"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "73ed389be8d3d6a89cdb-0e1032dbe367a4e6efa0",
+          "file": "perf.spec.ts",
+          "line": 114,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "smoke.spec.ts",
+      "file": "smoke.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a new world: dwarves dig and fell what the player marks; camera, minimap, pause and menus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "ticks in 1.5 s",
+                  "description": "32"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26383,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:35:48.464Z",
+                  "annotations": [
+                    {
+                      "type": "ticks in 1.5 s",
+                      "description": "32"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-e0c0ab3ef32f3bc555c0",
+          "file": "smoke.spec.ts",
+          "line": 8,
+          "column": 1
+        },
+        {
+          "title": "crafting and building: planks and a chest from a felled tree, then the Furniture, Build and Walls tools",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26048,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:14.879Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-a803f2fa3075f64f2733",
+          "file": "smoke.spec.ts",
+          "line": 199,
+          "column": 1
+        },
+        {
+          "title": "night: a world started at 22:00 is dark but for the Hearth, and the clock shows the moon",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "brightness",
+                  "description": "far sky 68, above the Hearth 206"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5110,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:40.952Z",
+                  "annotations": [
+                    {
+                      "type": "brightness",
+                      "description": "far sky 68, above the Hearth 206"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-503d536661803f1b7965",
+          "file": "smoke.spec.ts",
+          "line": 307,
+          "column": 1
+        },
+        {
+          "title": "night, dev build: tired dwarves lie down by the Hearth and sleep",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "window.debug exists only in dev builds",
+                  "location": {
+                    "file": "/home/runner/work/dwarf-game/dwarf-game/e2e/smoke.spec.ts",
+                    "line": 343,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 82,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:46.083Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "window.debug exists only in dev builds",
+                      "location": {
+                        "file": "/home/runner/work/dwarf-game/dwarf-game/e2e/smoke.spec.ts",
+                        "line": 343,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-123fe1e849d06c37b305",
+          "file": "smoke.spec.ts",
+          "line": 342,
+          "column": 1
+        },
+        {
+          "title": "monsters, dev build: dwarves fight off a gloomling, and an invasion portal opens at dusk",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "window.debug exists only in dev builds",
+                  "location": {
+                    "file": "/home/runner/work/dwarf-game/dwarf-game/e2e/smoke.spec.ts",
+                    "line": 373,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 91,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:46.176Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "window.debug exists only in dev builds",
+                      "location": {
+                        "file": "/home/runner/work/dwarf-game/dwarf-game/e2e/smoke.spec.ts",
+                        "line": 373,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-ab8343cef28ab73c1761",
+          "file": "smoke.spec.ts",
+          "line": 372,
+          "column": 1
+        },
+        {
+          "title": "a snowy world can be chosen in the New world dialog",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4857,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:46.277Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-45e6b1c89c7ce357a7bd",
+          "file": "smoke.spec.ts",
+          "line": 406,
+          "column": 1
+        },
+        {
+          "title": "?reveal=1 lifts the fog of war over the whole map",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5030,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:51.146Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-f5350898d3b9027fa94d",
+          "file": "smoke.spec.ts",
+          "line": 416,
+          "column": 1
+        },
+        {
+          "title": "right-click and the mouse wheel are kept away from the browser",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "build",
+              "projectName": "build",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1156,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:36:56.196Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-0bb20f1faf162e3c0f38",
+          "file": "smoke.spec.ts",
+          "line": 427,
+          "column": 1
+        },
+        {
+          "title": "a new world: dwarves dig and fell what the player marks; camera, minimap, pause and menus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "ticks in 1.5 s",
+                  "description": "32"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26622,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:37:36.013Z",
+                  "annotations": [
+                    {
+                      "type": "ticks in 1.5 s",
+                      "description": "32"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-04b116a165d575eaad85",
+          "file": "smoke.spec.ts",
+          "line": 8,
+          "column": 1
+        },
+        {
+          "title": "crafting and building: planks and a chest from a felled tree, then the Furniture, Build and Walls tools",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26265,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:02.652Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-815971d403b6b25863dc",
+          "file": "smoke.spec.ts",
+          "line": 199,
+          "column": 1
+        },
+        {
+          "title": "night: a world started at 22:00 is dark but for the Hearth, and the clock shows the moon",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "brightness",
+                  "description": "far sky 68, above the Hearth 206"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5521,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:28.934Z",
+                  "annotations": [
+                    {
+                      "type": "brightness",
+                      "description": "far sky 68, above the Hearth 206"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-f1cc6b17690248e6271c",
+          "file": "smoke.spec.ts",
+          "line": 307,
+          "column": 1
+        },
+        {
+          "title": "night, dev build: tired dwarves lie down by the Hearth and sleep",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5993,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:34.483Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-827cde7c57de90472dc2",
+          "file": "smoke.spec.ts",
+          "line": 342,
+          "column": 1
+        },
+        {
+          "title": "monsters, dev build: dwarves fight off a gloomling, and an invasion portal opens at dusk",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12267,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:40.502Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-1d0b4ff78b97f281821c",
+          "file": "smoke.spec.ts",
+          "line": 372,
+          "column": 1
+        },
+        {
+          "title": "a snowy world can be chosen in the New world dialog",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5379,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:52.794Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-503651b24c923e3ecd1c",
+          "file": "smoke.spec.ts",
+          "line": 406,
+          "column": 1
+        },
+        {
+          "title": "?reveal=1 lifts the fog of war over the whole map",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5333,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:38:58.195Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-16905a661494ab821158",
+          "file": "smoke.spec.ts",
+          "line": 416,
+          "column": 1
+        },
+        {
+          "title": "right-click and the mouse wheel are kept away from the browser",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "dev",
+              "projectName": "dev",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1560,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T21:39:03.543Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-f8715ee6d7d7c3084b6d",
+          "file": "smoke.spec.ts",
+          "line": 427,
+          "column": 1
+        }
+      ],
+      "suites": [
+        {
+          "title": "on a high-DPI screen",
+          "file": "smoke.spec.ts",
+          "line": 443,
+          "column": 6,
+          "specs": [
+            {
+              "title": "the canvas renders at full resolution and follows window resizes",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "build",
+                  "projectName": "build",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5173,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-02T21:36:57.377Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-8d187533f38233bdc792",
+              "file": "smoke.spec.ts",
+              "line": 446,
+              "column": 3
+            },
+            {
+              "title": "the canvas renders at full resolution and follows window resizes",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "dev",
+                  "projectName": "dev",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5549,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-02T21:39:05.119Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-61497bc24576045b4c2f",
+              "file": "smoke.spec.ts",
+              "line": 446,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-02T21:35:27.350Z",
+    "duration": 223478.899,
+    "expected": 18,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
