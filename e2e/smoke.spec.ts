@@ -378,8 +378,11 @@ test('monsters, dev build: dwarves fight off a gloomling, and an invasion portal
   await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.spawnCreature('gloomling', 7));
   await expect(page.getByTestId('debug-creatures')).toContainText(/^1 hostile/);
   await expect(page.getByTestId('roster-dwarf').filter({ hasText: 'Fighting a Gloomling' }).first()).toBeVisible({ timeout: 15_000 });
+  // The fight is east of the Hearth, where the overlay would hide it.
+  await page.keyboard.press('Backquote');
   await page.waitForTimeout(300);
   await page.screenshot({ path: testInfo.outputPath('m5-1-fight.png') });
+  await page.keyboard.press('Backquote');
   await page.keyboard.press('Digit3');
   await expect(page.getByTestId('debug-creatures')).toContainText(/^0 hostile/, { timeout: 30_000 });
 
