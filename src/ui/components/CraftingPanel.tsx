@@ -94,7 +94,7 @@ function RecipeRow({ recipe, stock }: { recipe: RecipeView; stock: ReadonlyMap<s
   const enough = recipe.inputs.every((input) => (stock.get(input.id) ?? 0) >= input.count);
   return (
     <li class={`recipe${enough ? '' : ' short'}`} data-testid={`recipe-${recipe.id}`}>
-      <img src={recipe.output.icon} alt="" width={20} height={20} />
+      <img class="item-icon" src={recipe.output.icon} alt="" width={30} height={30} />
       <span class="recipe-name">
         <strong>{recipe.output.name}</strong>
         {recipe.output.count > 1 && <span class="makes">{t('crafting.makes', { count: recipe.output.count })}</span>}
@@ -104,7 +104,7 @@ function RecipeRow({ recipe, stock }: { recipe: RecipeView; stock: ReadonlyMap<s
           const have = stock.get(input.id) ?? 0;
           return (
             <span key={input.id} class={`input${have < input.count ? ' short' : ''}`} title={t('crafting.have', { have, need: input.count, item: input.name })}>
-              <img src={input.icon} alt={input.name} width={16} height={16} />
+              <img class="item-icon small" src={input.icon} alt={input.name} width={20} height={20} />
               {input.count}
             </span>
           );
@@ -139,7 +139,7 @@ function OrderRow({ order }: { order: CraftOrderView }) {
     order.status === 'no-station' ? t('crafting.status.no-station', { station: order.station ?? '' }) : t(`crafting.status.${order.status}`);
   return (
     <li class={`order status-${order.status}`} data-testid="craft-order">
-      <img src={order.icon} alt="" width={20} height={20} />
+      <img class="item-icon" src={order.icon} alt="" width={30} height={30} />
       <span class="order-text">
         <strong>
           {order.name}

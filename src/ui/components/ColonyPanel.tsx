@@ -127,7 +127,7 @@ function DwarfDetails({ dwarf }: { dwarf: DwarfSummary }) {
           <li key={slot}>
             <span>{t(`slot.${slot}`)}</span>
             <span class={item ? 'equipped' : 'empty'}>
-              {icon && <img src={icon} alt="" width={16} height={16} />}
+              {icon && <img class="item-icon small" src={icon} alt="" width={20} height={20} />}
               {item ?? t('dwarf.emptySlot')}
             </span>
           </li>
@@ -137,7 +137,7 @@ function DwarfDetails({ dwarf }: { dwarf: DwarfSummary }) {
       {dwarf.carrying.length > 0 && (
         <p class="carrying">
           {dwarf.carrying.map((load) => (
-            <img key={load.name} src={load.icon} alt="" width={20} height={20} />
+            <img class="item-icon small" key={load.name} src={load.icon} alt="" width={20} height={20} />
           ))}
           {dwarf.carrying.length === 1
             ? t('dwarf.carrying', { count: dwarf.carrying[0]!.count, item: dwarf.carrying[0]!.name })
@@ -188,7 +188,7 @@ function Storage({ colony }: { colony: ColonyView }) {
           <ul class="storage-grid">
             {colony.resources.map((entry) => (
               <li key={entry.id} title={`${entry.name}: ${entry.count}`} data-testid={`stored-${entry.id}`}>
-                <img src={entry.icon} alt={entry.name} width={20} height={20} />
+                <img class="item-icon" src={entry.icon} alt={entry.name} width={30} height={30} />
                 <span class="count">{entry.count}</span>
               </li>
             ))}

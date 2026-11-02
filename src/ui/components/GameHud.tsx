@@ -138,7 +138,7 @@ function ResourceBar() {
     <ul class="resource-bar" aria-label={t('colony.storage')} data-testid="resource-bar">
       {shown.map((entry) => (
         <li key={entry.id} title={entry.name}>
-          <img src={entry.icon} alt={entry.name} width={20} height={20} />
+          <img class="item-icon" src={entry.icon} alt={entry.name} width={24} height={24} />
           <span>{entry.count}</span>
         </li>
       ))}

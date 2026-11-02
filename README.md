@@ -77,6 +77,9 @@ it can, red where it can't, and the readout in the top-left corner says why. Rig
 | Esc | Close a dialog or the crafting panel, put the tool down, deselect the dwarf, or open the in-game menu |
 | ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
 
+The interface is sized for easy reading at 100%; **Settings → Interface size** makes it
+smaller or larger (75% to 200%), and everything on screen scales together.
+
 Every key can be changed in **Settings → Key bindings**. Keys are matched by physical
 position, so the defaults stay put on AZERTY or Dvorak keyboards. Keys the browser
 reserves (F3, F5, F11, F12, Tab, and any Ctrl/Alt/Cmd combination) can't be bound.

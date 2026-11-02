@@ -21,7 +21,7 @@ export interface Settings {
 }
 
 export const UI_SCALE_MIN = 0.75;
-export const UI_SCALE_MAX = 1.5;
+export const UI_SCALE_MAX = 2;
 /** The interface-size slider moves in steps of 1/20 (5%). */
 const UI_SCALE_STEPS_PER_UNIT = 20;
 export const UI_SCALE_STEP = 1 / UI_SCALE_STEPS_PER_UNIT;

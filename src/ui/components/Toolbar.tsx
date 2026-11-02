@@ -139,7 +139,7 @@ function Palette({ tool }: { tool: BuildTool }) {
               commands.setBuildChoice(tool, entry.id);
             }}
           >
-            <img src={entry.icon} alt="" width={20} height={20} />
+            <img class="item-icon" src={entry.icon} alt="" width={30} height={30} />
             <span class="name">{entry.name}</span>
             <span class="count">{count}</span>
           </button>
