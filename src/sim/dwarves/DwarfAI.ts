@@ -247,10 +247,14 @@ export class DwarfAI {
     }
 
     this.watchForDanger(dwarf);
-    // A fighter stops as soon as its foe is within reach, and plans again if the foe has moved on.
+    // A fighter stops as soon as its foe is within reach (or about to be), and plans again
+    // if the foe has moved on.
     if (dwarf.phase === 'fighting' && dwarf.path) {
       const foe = this.foe(dwarf);
-      if (!foe || this.canStrike(dwarf, foe, this.ctx.weaponOf(dwarf)) || (dwarf.chaseTicks === 0 && this.foeMoved(dwarf, foe))) dwarf.path = null;
+      const weapon = this.ctx.weaponOf(dwarf);
+      if (!foe || this.canStrike(dwarf, foe, weapon) || this.closingIn(dwarf, foe, weapon) || (dwarf.chaseTicks === 0 && this.foeMoved(dwarf, foe))) {
+        dwarf.path = null;
+      }
     }
     if (dwarf.path && this.followPath(dwarf)) return;
 
@@ -818,7 +822,21 @@ export class DwarfAI {
       }
       return;
     }
+    // It's stepping into reach: wait for it rather than walk into the cell it's taking.
+    if (this.closingIn(dwarf, foe, weapon)) return;
     if (!dwarf.path) this.chase(dwarf, job, foe);
+  }
+
+  /**
+   * Whether the foe is part-way through a step that ends where the dwarf could strike it
+   * from where it stands (melee only). Fighters who both stepped toward each other would
+   * otherwise meet in the same cell and fight there, one hiding the other.
+   */
+  private closingIn(dwarf: Dwarf, foe: Creature, weapon: Weapon): boolean {
+    if (!foe.movement || (weapon.range > 1 && weapon.projectile)) return false;
+    const width = this.ctx.world.width;
+    const x = foe.movement.to % width;
+    return this.withinMeleeReach(dwarf.x, dwarf.y, x, (foe.movement.to - x) / width);
   }
 
   /** Whether the foe has moved away from where the dwarf's path leads. */
@@ -862,16 +880,23 @@ export class DwarfAI {
 
   /** Whether the dwarf could strike (or shoot) the creature from where it stands. */
   private canStrike(dwarf: Dwarf, foe: Creature, weapon: Weapon): boolean {
-    const dx = Math.abs(foe.x - dwarf.x);
-    const dy = Math.abs(foe.y - dwarf.y);
     if (weapon.range > 1 && weapon.projectile) {
+      const dx = foe.x - dwarf.x;
+      const dy = foe.y - dwarf.y;
       return dx * dx + dy * dy <= weapon.range * weapon.range && this.ctx.lineOfSight(dwarf.x, dwarf.y, foe.x, foe.y);
     }
+    return this.withinMeleeReach(dwarf.x, dwarf.y, foe.x, foe.y);
+  }
+
+  /** Whether a blow can be struck between two cells: next to each other (or the same), but not round a corner. */
+  private withinMeleeReach(x0: number, y0: number, x1: number, y1: number): boolean {
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
     if (dx > 1 || dy > 1) return false;
     if (dx === 1 && dy === 1) {
       // Not round a corner: one of the two cells between them must be open.
       const { nav } = this.ctx;
-      return nav.passable(dwarf.x, foe.y) || nav.passable(foe.x, dwarf.y);
+      return nav.passable(x0, y1) || nav.passable(x1, y0);
     }
     return true;
   }

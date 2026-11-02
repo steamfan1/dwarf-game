@@ -103,19 +103,36 @@ export class CreatureAI {
 
   /** Whether a creature could strike (or shoot) a dwarf from where it stands now. */
   inReach(c: Creature, def: CreatureDef, prey: Dwarf): boolean {
-    const dx = Math.abs(prey.x - c.x);
-    const dy = Math.abs(prey.y - c.y);
-    if (def.attack === 'melee') {
-      if (dx > 1 || dy > 1) return false;
-      if (dx === 1 && dy === 1) {
-        // Not round a corner: one of the two cells between them must be open.
-        const nav = this.ctx.navFor(c.kind);
-        return nav.open(c.x, prey.y) || nav.open(prey.x, c.y);
-      }
-      return true;
-    }
+    if (def.attack === 'melee') return this.withinMeleeReach(c, prey.x, prey.y);
     if (def.attack !== 'ranged') return false;
+    const dx = prey.x - c.x;
+    const dy = prey.y - c.y;
     return dx * dx + dy * dy <= def.range * def.range && this.ctx.lineOfSight(c.x, c.y, prey.x, prey.y);
+  }
+
+  /**
+   * Whether its prey is part-way through a step that ends within the creature's reach
+   * (melee only). Better to wait for it there than to walk into the cell it's taking and
+   * fight on top of each other.
+   */
+  private closingIn(c: Creature, def: CreatureDef, prey: Dwarf): boolean {
+    if (def.attack !== 'melee' || !prey.movement) return false;
+    const width = this.ctx.world.width;
+    const x = prey.movement.to % width;
+    return this.withinMeleeReach(c, x, (prey.movement.to - x) / width);
+  }
+
+  /** Whether the creature could strike a cell: next to it (or its own), but not round a corner. */
+  private withinMeleeReach(c: Creature, x: number, y: number): boolean {
+    const dx = Math.abs(x - c.x);
+    const dy = Math.abs(y - c.y);
+    if (dx > 1 || dy > 1) return false;
+    if (dx === 1 && dy === 1) {
+      // Not round a corner: one of the two cells between them must be open.
+      const nav = this.ctx.navFor(c.kind);
+      return nav.open(c.x, y) || nav.open(x, c.y);
+    }
+    return true;
   }
 
   // ---- Monsters ------------------------------------------------------------------------------
@@ -134,11 +151,14 @@ export class CreatureAI {
     }
     if (prey && this.inReach(c, def, prey)) {
       c.path = null;
+      // Standing in its prey's own cell (it dropped onto it, say), it backs off a step first.
+      if (prey.x === c.x && prey.y === c.y && !prey.movement && def.attack === 'melee' && this.stepBack(c, def, nav)) return;
       c.phase = 'attacking';
       this.strike(c, def, prey);
       return;
     }
     if (c.phase === 'attacking') c.phase = 'idle';
+    if (prey && this.closingIn(c, def, prey)) return;
 
     const width = ctx.world.width;
     if (prey) {
@@ -279,6 +299,21 @@ export class CreatureAI {
     c.pathIndex = 0;
     c.pathGoal = goalCell;
     c.phase = 'moving';
+  }
+
+  /** One plain step sideways, back the way it faces from if it can; false if neither side is open. */
+  private stepBack(c: Creature, def: CreatureDef, nav: CreatureNav): boolean {
+    const from = c.y * this.ctx.world.width + c.x;
+    const ahead = c.facing;
+    const behind = ahead === 1 ? -1 : 1;
+    for (const side of [behind, ahead]) {
+      if (!nav.open(c.x + side, c.y) || nav.stepKind(from, from + side) !== 'walk') continue;
+      this.startMove(c, def, from, from + side, 'walk');
+      c.facing = side === 1 ? -1 : 1; // backing off, still facing its prey
+      c.phase = 'moving';
+      return true;
+    }
+    return false;
   }
 
   /** Take the next step, breaking through what's in the way first. */

@@ -29,6 +29,37 @@ describe('Fighting', () => {
     expect(sim.dwarves.every((d) => d.phase !== 'dead')).toBe(true);
   });
 
+  it('fighters square up from neighbouring cells, never on top of each other', () => {
+    // Coming at the dwarves from either side, the gloomling and the dwarves never stand in
+    // (or step into) the same cell, where one would hide the other.
+    const shared: Record<number, number> = {};
+    for (const dx of [-9, -6, 6, 7, 8, 11]) {
+      const { sim, world, runUntil } = newSim();
+      const gloomling = sim.spawnCreatureNear('gloomling', dx)!;
+      const cellOf = (body: { x: number; y: number; movement: { to: number } | null }) => body.movement?.to ?? world.index(body.x, body.y);
+      shared[dx] = 0;
+      runUntil(() => {
+        shared[dx]! += sim.dwarves.filter((dwarf) => cellOf(dwarf) === cellOf(gloomling)).length;
+        return gloomling.gone;
+      }, 2000);
+    }
+    expect(shared).toEqual({ [-9]: 0, [-6]: 0, 6: 0, 7: 0, 8: 0, 11: 0 });
+
+    // Put down right on top of a dwarf, it backs off a step before it strikes.
+    const { sim, run, runUntil } = newSim(undefined, { colony: STAY_PUT });
+    sim.dwarves.splice(1);
+    const dwarf = sim.dwarves[0]!;
+    dwarf.x = 26;
+    const gloomling = sim.spawnCreatureNear('gloomling', 6)!;
+    expect(gloomling).toMatchObject({ x: 26, y: dwarf.y });
+    runUntil(() => gloomling.x !== dwarf.x, 30);
+    expect(Math.abs(gloomling.x - dwarf.x)).toBe(1);
+    run(60);
+    expect(dwarf.health).toBeLessThan(100);
+    expect(gloomling.health).toBeLessThan(gloomling.maxHealth);
+    expect(Math.abs(gloomling.x - dwarf.x)).toBe(1);
+  });
+
   it('armour softens every blow', () => {
     const { sim } = newSim();
     const dwarf = sim.dwarves[0]!;
