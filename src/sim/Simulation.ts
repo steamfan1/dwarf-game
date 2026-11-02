@@ -17,6 +17,11 @@
  * needs, fetches it from whichever of those is nearest, and uses it up at the site or
  * station. Jobs whose materials aren't in storage wait, flagged as missing them.
  *
+ * Time and needs: the clock (TimeOfDay) turns day into night and back; dwarves get hungry
+ * and tired, eat from storage (better at a table) and sleep at night (better in a bed in
+ * a lit room). Rooms are found by flood fill (RoomMap) whenever blocks, walls, doors or
+ * furniture change.
+ *
  * Pure TypeScript: no Phaser and no DOM, so it runs in unit tests and could move into a
  * worker. All randomness comes from `rng`, never Math.random(), so a world can be
  * replayed exactly from its seed and the player's orders.
@@ -26,19 +31,21 @@ import { Rng } from '../core/Rng';
 import { CraftQueue, type CraftOrder } from './crafting/CraftQueue';
 import { HAND_CRAFTED, type Recipe, type RecipeBook } from './crafting/Recipes';
 import { createDwarf, skillSpeed, type Dwarf, type Skill } from './dwarves/Dwarf';
-import { DwarfAI, type ColonyContext } from './dwarves/DwarfAI';
+import { DwarfAI, type ColonyContext, type NeedRates } from './dwarves/DwarfAI';
 import type { ColonySettings } from './dwarves/settings';
-import type { GameEvents } from './events';
+import type { DeathCause, GameEvents } from './events';
 import { FurnitureSet, type PlacedFurniture } from './furniture/Furniture';
 import type { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ColonyStorage, GroundItems } from './items/Items';
 import { EQUIP_SLOTS, type ItemCount, type ItemRegistry } from './items/ItemRegistry';
-import { DEFAULT_PRIORITY, HAUL_PRIORITY, JobBoard, type Job, type Priority } from './jobs/JobBoard';
+import { DEFAULT_PRIORITY, HAUL_PRIORITY, JobBoard, PERSONAL_JOBS, type Job, type Priority } from './jobs/JobBoard';
 import { HEARTH_LIGHT, Lighting } from './light/Lighting';
 import { HomeMaps } from './nav/HomeMaps';
 import { NavGrid } from './nav/NavGrid';
 import { Pathfinder, type PathGoal } from './nav/Pathfinder';
 import { PathService } from './nav/PathService';
+import { RoomMap } from './rooms/RoomMap';
+import { TimeOfDay, type TimeSettings } from './time/TimeOfDay';
 import { AIR, NO_LIQUID, type TileRegistry } from './world/TileRegistry';
 import { TreeFinder, type Tree } from './world/trees';
 import type { CellRect, World } from './world/World';
@@ -78,7 +85,7 @@ export type BuildStatus =
 /** Where a crafting order stands, for the crafting panel. */
 export type CraftStatus = 'working' | 'queued' | 'missing-materials' | 'no-station';
 
-/** The tools that mark work. 'auto' fells trees and digs everything else that can be dug. */
+/** The tools that mark work. 'auto' fells trees, picks plants and digs everything else that can be dug. */
 export type DesignationTool = 'dig' | 'chop' | 'auto';
 
 /** Most A* searches per tick, so a burst of new jobs never drops a frame. */
@@ -91,6 +98,10 @@ const MAP_REBUILD_TICKS = 5;
 const SUPPLY_CHECK_TICKS = 10;
 /** "Storage is full" is announced at most this often (ticks). */
 const STORAGE_FULL_NOTICE_TICKS = 400;
+/** Rooms are found again at most this often after something changes (ticks). */
+const ROOM_REBUILD_TICKS = 10;
+/** Picked plants are checked for regrowth this often (ticks). */
+const REGROWTH_CHECK_TICKS = 20;
 
 const NEIGHBOURS = [
   [1, 0],
@@ -106,7 +117,10 @@ export interface SimulationOptions {
   furniture: FurnitureRegistry;
   recipes: RecipeBook;
   colony: ColonySettings;
+  time: TimeSettings;
   bus: EventBus<GameEvents>;
+  /** The hour the world starts at, instead of time.json's (from the page address, for testing). */
+  startHour?: number;
 }
 
 export class Simulation implements ColonyContext {
@@ -134,6 +148,9 @@ export class Simulation implements ColonyContext {
   readonly furniture: FurnitureSet;
   readonly crafting: CraftQueue;
   readonly trees: TreeFinder;
+  readonly time: TimeOfDay;
+  readonly rooms: RoomMap;
+  readonly needRates: NeedRates;
   readonly dwarves: Dwarf[] = [];
   /** Number of ticks simulated since the world began. */
   tick = 0;
@@ -153,8 +170,17 @@ export class Simulation implements ColonyContext {
   private storesVersion = 0;
   private lastStorageNotice = -STORAGE_FULL_NOTICE_TICKS;
   private readonly lavaType: number;
+  /** Food items, most filling first. */
+  private readonly foods: number[];
+  private wasNight: boolean;
+  private roomsDirty = true;
+  private roomsTick = -ROOM_REBUILD_TICKS;
+  /** Picked plants waiting to grow back: the cell, the tile it is now, what it becomes, and when. */
+  private readonly regrowth: Array<{ cell: number; from: number; to: number; at: number }> = [];
+  /** When each starving dwarf was last announced. */
+  private readonly starvingNotices = new Map<number, number>();
 
-  constructor({ world, tiles, items, furniture, recipes, colony, bus }: SimulationOptions) {
+  constructor({ world, tiles, items, furniture, recipes, colony, time, bus, startHour }: SimulationOptions) {
     this.world = world;
     this.tiles = tiles;
     this.items = items;
@@ -173,6 +199,12 @@ export class Simulation implements ColonyContext {
       if (item.builds && 'furniture' in item.builds) this.furnitureItems.set(furniture.id(item.builds.furniture), i);
     });
     this.gear = items.items.flatMap((item, i) => (item.equip ? [i] : []));
+    this.foods = items.items
+      .flatMap((item, i) => (item.food ? [i] : []))
+      .sort((a, b) => items.get(b).food!.hunger - items.get(a).food!.hunger || a - b);
+    this.time = new TimeOfDay(time, startHour);
+    this.wasNight = this.time.isNight(0);
+    this.needRates = needRates(colony, this.time);
 
     this.nav = new NavGrid(world, tiles, { safeDrop: colony.movement.safeDrop });
     this.paths = new PathService(world, new Pathfinder(this.nav, { maxExpanded: PATH_SEARCH_LIMIT }), {
@@ -189,6 +221,8 @@ export class Simulation implements ColonyContext {
     this.furniture = new FurnitureSet(world, furniture);
     this.crafting = new CraftQueue();
     this.trees = new TreeFinder(world, tiles);
+    this.rooms = new RoomMap(world, tiles);
+    for (const { item, count } of colony.startingItems) if (items.has(item)) this.storage.add(items.item(item), count);
 
     // Light the world. Whatever sunlight reaches (the whole surface and a few blocks
     // into the ground) counts as explored from the start.
@@ -199,6 +233,7 @@ export class Simulation implements ColonyContext {
     this.spawnDwarves();
     this.ai = new DwarfAI(this);
     this.rebuildMaps();
+    this.rebuildRooms();
   }
 
   /** Advance the world by exactly one tick (1/20 s of game time at 1x). */
@@ -218,7 +253,34 @@ export class Simulation implements ColonyContext {
       }
     }
     if (this.tick % SUPPLY_CHECK_TICKS === 0) this.checkSupplies();
+    if (this.roomsDirty && this.tick - this.roomsTick >= ROOM_REBUILD_TICKS) this.rebuildRooms();
+    if (this.tick % REGROWTH_CHECK_TICKS === 0) this.regrow();
+    const night = this.time.isNight(this.tick);
+    if (night !== this.wasNight) {
+      this.wasNight = night;
+      this.bus.emit(night ? 'NightStarted' : 'DayStarted', { day: this.time.day(this.tick) });
+    }
     for (const dwarf of this.dwarves) this.ai.update(dwarf);
+  }
+
+  /** Whether it is night now. */
+  isNight(): boolean {
+    return this.time.isNight(this.tick);
+  }
+
+  /** How strong sunlight is now, from the night's moonlight up to 1 in full day. */
+  get daylight(): number {
+    return this.time.daylight(this.tick);
+  }
+
+  /** The light a cell gets right now: sunlight (dimmed at night) or glow, whichever is brighter. */
+  lightNow(x: number, y: number): number {
+    return Math.max(this.lighting.sunAt(x, y) * this.daylight, this.lighting.glow[this.world.index(x, y)] ?? 0);
+  }
+
+  /** Debug: bring nightfall forward to now. */
+  skipToNight(): void {
+    this.time.skipToNight(this.tick);
   }
 
   get livingDwarves(): Dwarf[] {
@@ -251,16 +313,18 @@ export class Simulation implements ColonyContext {
     for (let y = r.y0; y <= r.y1; y++) {
       for (let x = r.x0; x <= r.x1; x++) {
         if ((tool === 'chop' || tool === 'auto') && this.markTree(x, y, priority)) added++;
+        else if (tool === 'auto' && this.markHarvest(x, y, priority)) added++;
         else if ((tool === 'dig' || tool === 'auto') && this.markDig(x, y, priority)) added++;
       }
     }
     return added;
   }
 
-  /** What a click with the Auto tool would mark here: a tree to fell, a block to dig, furniture to take apart, or nothing. */
-  autoTarget(x: number, y: number): 'chop' | 'dig' | 'dismantle' | null {
+  /** What a click with the Auto tool would mark here: a tree to fell, a plant to pick, a block to dig, furniture to take apart, or nothing. */
+  autoTarget(x: number, y: number): 'chop' | 'harvest' | 'dig' | 'dismantle' | null {
     if (!this.world.inBounds(x, y) || !this.world.isVisible(x, y)) return null;
     if (this.trees.treeAt(x, y)) return 'chop';
+    if (this.harvestable(x, y)) return 'harvest';
     if (this.furniture.at(x, y)) return 'dismantle';
     return this.digStatus(x, y) === 'ok' ? 'dig' : null;
   }
@@ -406,11 +470,15 @@ export class Simulation implements ColonyContext {
     return required > 0 ? Math.min(1, job.progress / required) : 1;
   }
 
-  /** Ticks of work a job takes from a dwarf (or from a beginner with bare hands). */
+  /**
+   * Ticks of work a job takes from a dwarf (or from a beginner with bare hands, rested and
+   * fed). Skill and tools make work quicker; hunger and tiredness make it slower.
+   */
   workRequired(job: Job, dwarf?: Dwarf): number {
     const { colony, tiles, world } = this;
     const work = colony.work;
-    const speed = (skill: Skill): number => (dwarf ? skillSpeed(dwarf, skill, colony.skills.speedPerLevel) : 1);
+    const needs = dwarf ? this.needsSpeed(dwarf) : 1;
+    const speed = (skill: Skill): number => needs * (dwarf ? skillSpeed(dwarf, skill, colony.skills.speedPerLevel) : 1);
     switch (job.type) {
       case 'dig': {
         const tile = world.fg[world.index(job.x, job.y)]!;
@@ -430,9 +498,19 @@ export class Simulation implements ColonyContext {
         return work.dismantleTicks / speed('building');
       case 'craft':
         return this.recipes.recipes[job.target]!.time / speed('crafting');
+      case 'harvest':
+        return work.harvestTicks / speed('farming');
+      case 'eat':
+        return colony.needs.eatTicks;
       default:
         return 0;
     }
+  }
+
+  /** How fast a dwarf works for its hunger and tiredness: 1 when fed and rested. */
+  needsSpeed(dwarf: Dwarf): number {
+    const n = this.colony.needs;
+    return (dwarf.hunger < n.hungryBelow ? n.slowWork : 1) * (dwarf.energy < n.tiredBelow ? n.slowWork : 1);
   }
 
   /** How many times faster than bare hands a dwarf digs with the tool it holds. */
@@ -461,7 +539,7 @@ export class Simulation implements ColonyContext {
   jobWorkable(job: Job): boolean {
     const { world, homeMaps } = this;
     if (job.type === 'haul') return world.inBounds(job.x, job.y) && homeMaps.workable(world.index(job.x, job.y));
-    if (job.type === 'craft' || job.type === 'equip') return true;
+    if (job.type === 'craft' || PERSONAL_JOBS.has(job.type)) return true;
     const area = this.jobArea(job);
     for (let y = area.y0 - 1; y <= area.y1 + 1; y++) {
       for (let x = area.x0 - 1; x <= area.x1 + 1; x++) {
@@ -473,14 +551,17 @@ export class Simulation implements ColonyContext {
     return false;
   }
 
-  /** The cells a dwarf works beside: the block or tree, a furniture footprint, the station. */
+  /**
+   * The cells a dwarf works beside: the block or tree, a furniture footprint, the station,
+   * the table it eats at, the bed it sleeps in (or the Hearth, without one).
+   */
   jobArea(job: Job): CellRect {
     if (job.type === 'place') return this.furniture.footprint(job.target, job.x, job.y);
-    if (job.type === 'dismantle' || (job.type === 'craft' && job.furnitureId !== 0)) {
+    if (job.furnitureId !== 0 && job.type !== 'equip') {
       const piece = this.furniture.get(job.furnitureId);
       if (piece) return piece.rect;
     }
-    if (job.type === 'craft') return this.storeArea;
+    if (job.type === 'craft' || job.type === 'eat' || job.type === 'sleep') return this.storeArea;
     return { x0: job.x, y0: job.y, x1: job.x, y1: job.y };
   }
 
@@ -501,6 +582,8 @@ export class Simulation implements ColonyContext {
       }
       case 'dismantle':
         return this.furniture.get(job.furnitureId) !== undefined;
+      case 'harvest':
+        return this.world.fg[this.world.index(job.x, job.y)] === job.target;
       case 'craft': {
         if (this.isHandCraft(job)) return true;
         const station = this.furniture.get(job.furnitureId);
@@ -522,7 +605,11 @@ export class Simulation implements ColonyContext {
         return false;
       }
       case 'equip':
+      case 'eat':
+      case 'sleep':
         return false;
+      case 'harvest':
+        return this.siteValid(job);
       case 'craft': {
         if (!this.storage.hasAll(job.inputs)) return false;
         return this.isHandCraft(job) || this.freeStation(this.recipes.recipes[job.target]!.station, dwarf) !== null;
@@ -600,6 +687,54 @@ export class Simulation implements ColonyContext {
     return null;
   }
 
+  /**
+   * A hungry dwarf's meal: the most filling food in storage, reserved for it, eaten at the
+   * nearest table within reach if there is one (a table gives a better meal). Null if
+   * there's nothing to eat.
+   */
+  startMeal(dwarf: Dwarf): Job | null {
+    const food = this.foods.find((item) => this.storage.available(item) > 0);
+    if (food === undefined) return null;
+    const job = this.jobs.add({ type: 'eat', x: this.hearth.x, y: this.hearth.y, priority: 4, tick: this.tick, inputs: [{ item: food, count: 1 }], target: food });
+    if (!this.takeJob(job, dwarf)) {
+      this.jobs.remove(job.id);
+      return null;
+    }
+    const table = this.nearestFurniture('table', dwarf, this.colony.needs.tableReach, false);
+    if (table) {
+      job.furnitureId = table.id;
+      job.x = table.x;
+      job.y = table.y;
+    }
+    return job;
+  }
+
+  /** A tired dwarf goes to bed: the nearest free bed it can reach, or else the floor by the Hearth. */
+  startSleep(dwarf: Dwarf): Job {
+    const bed = this.nearestFurniture('bed', dwarf, Infinity, true);
+    const job = this.jobs.add({ type: 'sleep', x: bed?.x ?? this.hearth.x, y: bed?.y ?? this.hearth.y, priority: 4, tick: this.tick, furnitureId: bed?.id ?? 0 });
+    this.jobs.claim(job.id, dwarf.id);
+    if (bed) bed.user = dwarf.id;
+    return job;
+  }
+
+  /**
+   * How fast a sleeping dwarf recovers, as a multiple of a night in bed: slower on the
+   * floor, faster in a bed in a room with a light.
+   */
+  sleepRate(dwarf: Dwarf): number {
+    const job = dwarf.jobId !== 0 ? this.jobs.get(dwarf.jobId) : undefined;
+    const bed = job?.type === 'sleep' && job.furnitureId !== 0 ? this.furniture.get(job.furnitureId) : undefined;
+    if (!bed) return this.colony.needs.floorSleep;
+    const room = this.rooms.roomAt(bed.x, bed.y);
+    return room && room.lights > 0 ? this.colony.needs.roomSleepBonus : 1;
+  }
+
+  /** Whether there's any food in storage that nobody has claimed. */
+  foodAvailable(): boolean {
+    return this.foods.some((item) => this.storage.available(item) > 0);
+  }
+
   /** Where goods are put away and fetched from: the Hearth or any chest, whichever is nearest. */
   storageGoal(): PathGoal {
     const chests = this.furniture.storagePieces().map((piece) => piece.rect);
@@ -636,6 +771,49 @@ export class Simulation implements ColonyContext {
   }
 
   // ---- Changes made by dwarves (and, later, spells) --------------------------------------------
+
+  /** A dwarf ate the meal it carried; a table makes it go further, a table in a room more so. */
+  completeMeal(job: Job, by: Dwarf): boolean {
+    const food = this.items.get(job.target).food;
+    if (!food || !takeFrom(by.carrying, [{ item: job.target, count: 1 }])) return false;
+    this.jobs.remove(job.id);
+    const table = job.furnitureId !== 0 ? this.furniture.get(job.furnitureId) : undefined;
+    const n = this.colony.needs;
+    const bonus = !table ? 1 : this.rooms.roomAt(table.x, table.y) ? n.roomTableBonus : n.tableBonus;
+    by.hunger = Math.min(100, by.hunger + food.hunger * bonus);
+    return true;
+  }
+
+  /** A dwarf picked a plant: it leaves its crop where it grew, and may grow back. */
+  harvestPlant(job: Job, by: Dwarf): void {
+    const { world, tiles } = this;
+    const i = world.index(job.x, job.y);
+    const plant = tiles.tiles[world.fg[i]!]!.harvest;
+    this.jobs.remove(job.id);
+    if (!plant) return;
+    const becomes = plant.becomes ? tiles.tile(plant.becomes) : AIR;
+    const was = world.fg[i]!;
+    world.fg[i] = becomes;
+    this.bus.emit('TileChanged', { x: job.x, y: job.y });
+    this.dropItems(this.items.item(plant.item), plant.count, job.x, job.y);
+    if (plant.regrowDays > 0) {
+      this.regrowth.push({ cell: i, from: becomes, to: was, at: this.tick + Math.round(plant.regrowDays * this.time.cycleTicks) });
+    }
+    this.bus.emit('Harvested', { x: job.x, y: job.y, dwarf: by.id });
+  }
+
+  /** A dwarf has run out of food: say so now and then. */
+  starving(dwarf: Dwarf): void {
+    const last = this.starvingNotices.get(dwarf.id);
+    if (last !== undefined && this.tick - last < this.time.cycleTicks / 3) return;
+    this.starvingNotices.set(dwarf.id, this.tick);
+    this.bus.emit('DwarfStarving', { dwarf: dwarf.id, name: dwarf.name });
+  }
+
+  /** A dwarf ran out of energy and fell asleep where it stood. */
+  collapsed(dwarf: Dwarf): void {
+    this.bus.emit('DwarfCollapsed', { dwarf: dwarf.id, name: dwarf.name });
+  }
 
   removeBlock(x: number, y: number, by: Dwarf): void {
     const { world, tiles } = this;
@@ -759,8 +937,9 @@ export class Simulation implements ColonyContext {
     }
     if (piece.def.light > 0) {
       const at = this.furniture.lightCell(piece);
-      this.lighting.setPointLight(at.x, at.y, piece.def.light);
+      this.bus.emit('LightChanged', this.lighting.setPointLight(at.x, at.y, piece.def.light));
     }
+    this.roomsDirty = true;
     this.bus.emit('FurnitureChanged', { id: piece.id, placed: true });
     return piece;
   }
@@ -774,11 +953,15 @@ export class Simulation implements ColonyContext {
     }
     if (piece.def.light > 0) {
       const at = this.furniture.lightCell(piece);
-      this.lighting.setPointLight(at.x, at.y, 0);
+      this.bus.emit('LightChanged', this.lighting.setPointLight(at.x, at.y, 0));
     }
-    // A crafter using it as a station stops; the materials go back to storage.
+    this.roomsDirty = true;
+    // A crafter using it as a station stops (the materials go back to storage); a dwarf
+    // sleeping in it wakes up; one about to eat at it eats where it is.
     for (const job of [...this.jobs.all()]) {
-      if (job.type === 'craft' && job.furnitureId === piece.id && job.claimedBy !== 0) this.jobs.release(job.id, job.claimedBy);
+      if (job.furnitureId !== piece.id || job.claimedBy === 0) continue;
+      if (job.type === 'craft' || job.type === 'sleep') this.jobs.release(job.id, job.claimedBy);
+      if (job.type === 'eat') job.furnitureId = 0;
     }
     const item = this.furnitureItems.get(piece.kind);
     if (item !== undefined) this.dropItems(item, 1, piece.x, piece.y);
@@ -800,7 +983,7 @@ export class Simulation implements ColonyContext {
     if (revealed) this.bus.emit('ExploredChanged', revealed);
   }
 
-  dwarfDied(dwarf: Dwarf, cause: 'fall' | 'lava'): void {
+  dwarfDied(dwarf: Dwarf, cause: DeathCause): void {
     this.bus.emit('DwarfDied', { dwarf: dwarf.id, name: dwarf.name, cause });
   }
 
@@ -814,6 +997,59 @@ export class Simulation implements ColonyContext {
   }
 
   // ---- Internals --------------------------------------------------------------------------------
+
+  /** A plant that can be picked, seen by the player. */
+  harvestable(x: number, y: number): boolean {
+    const { world, tiles } = this;
+    return world.inBounds(x, y) && world.isVisible(x, y) && tiles.tiles[world.fg[world.index(x, y)]!]!.harvest !== null;
+  }
+
+  private markHarvest(x: number, y: number, priority: Priority): boolean {
+    if (!this.harvestable(x, y) || this.jobs.at(x, y)) return false;
+    const cell = this.world.index(x, y);
+    this.flagIfBlocked(this.jobs.add({ type: 'harvest', x, y, priority, tick: this.tick, cells: [cell], target: this.world.fg[cell]! }));
+    return true;
+  }
+
+  /** Picked plants whose time has come grow back, if nothing else took their place. */
+  private regrow(): void {
+    const { world } = this;
+    for (let k = this.regrowth.length - 1; k >= 0; k--) {
+      const entry = this.regrowth[k]!;
+      if (entry.at > this.tick) continue;
+      this.regrowth.splice(k, 1);
+      if (world.fg[entry.cell] !== entry.from) continue;
+      world.fg[entry.cell] = entry.to;
+      const x = entry.cell % world.width;
+      this.bus.emit('TileChanged', { x, y: (entry.cell - x) / world.width });
+    }
+  }
+
+  /**
+   * The nearest piece of furniture with a use (a bed, a table) within `reach` tiles of a
+   * dwarf, that it can get to; with `free`, only one nobody is using.
+   */
+  private nearestFurniture(use: 'bed' | 'table', dwarf: Dwarf, reach: number, free: boolean): PlacedFurniture | null {
+    let best: PlacedFurniture | null = null;
+    let bestDistance = Infinity;
+    for (const piece of this.furniture.all()) {
+      if (piece.def.use !== use || (free && piece.user !== 0 && piece.user !== dwarf.id)) continue;
+      if (this.jobs.at(piece.x, piece.y)?.type === 'dismantle') continue;
+      const distance = Math.max(Math.abs(piece.x - dwarf.x), Math.abs(piece.y - dwarf.y));
+      if (distance > reach || distance >= bestDistance || !this.stationWorkable(piece)) continue;
+      best = piece;
+      bestDistance = distance;
+    }
+    return best;
+  }
+
+  /** Find the rooms again (the Hearth's fire counts as a light inside one). */
+  private rebuildRooms(): void {
+    this.rooms.rebuild(this.furniture, [this.world.index(this.hearth.x, this.hearth.y)]);
+    this.roomsDirty = false;
+    this.roomsTick = this.tick;
+    this.bus.emit('RoomsChanged');
+  }
 
   private markDig(x: number, y: number, priority: Priority): boolean {
     if (this.digStatus(x, y) !== 'ok' || this.jobs.at(x, y)) return false;
@@ -1048,9 +1284,9 @@ export class Simulation implements ColonyContext {
       this.storage.unreserveAll(job.inputs);
       job.reserved = false;
     }
-    if (job.type === 'craft' && job.furnitureId !== 0) {
-      const station = this.furniture.get(job.furnitureId);
-      if (station && station.user === job.claimedBy) station.user = 0;
+    if ((job.type === 'craft' || job.type === 'sleep') && job.furnitureId !== 0) {
+      const piece = this.furniture.get(job.furnitureId);
+      if (piece && piece.user === job.claimedBy) piece.user = 0;
       job.furnitureId = 0;
     }
   }
@@ -1062,13 +1298,13 @@ export class Simulation implements ColonyContext {
     // ones left without are flagged as missing materials.
     const waiting: Job[] = [];
     for (const job of this.jobs.all()) {
-      if (job.type === 'equip') {
-        // A trip for gear that was interrupted isn't anyone's any more.
+      if (PERSONAL_JOBS.has(job.type)) {
+        // A trip for gear, a meal or a nap that was interrupted isn't anyone's any more.
         if (job.claimedBy === 0) this.jobs.remove(job.id);
         continue;
       }
       // Plans overtaken by events (something else filled the spot, the furniture is gone) go.
-      const planned = job.type === 'build' || job.type === 'wall' || job.type === 'place' || job.type === 'dismantle';
+      const planned = job.type === 'build' || job.type === 'wall' || job.type === 'place' || job.type === 'dismantle' || job.type === 'harvest';
       if (planned && job.claimedBy === 0 && !this.siteValid(job)) {
         this.jobs.remove(job.id);
         continue;
@@ -1133,19 +1369,21 @@ export class Simulation implements ColonyContext {
     this.bus.emit('StorageFull');
   }
 
-  /** Keep lighting, exploration, cached paths and blocked jobs in step with a changed cell. */
+  /** Keep lighting, exploration, cached paths, rooms and blocked jobs in step with a changed cell. */
   private terrainChanged(x: number, y: number): void {
     const relit = this.lighting.cellChanged(x, y);
+    this.bus.emit('LightChanged', relit);
     const discovered = this.lighting.discover(relit);
     if (discovered) this.bus.emit('ExploredChanged', discovered);
     this.navChanged(x, y);
   }
 
-  /** The ways dwarves can move near (x, y) changed (a block, ladder or wall came or went). */
+  /** The ways dwarves can move near (x, y) changed (a block, ladder or wall came or went), and maybe the rooms. */
   private navChanged(x: number, y: number): void {
     this.paths.terrainChanged(x, y);
     this.jobs.terrainChanged(x, y);
     this.terrainVersion++;
+    this.roomsDirty = true;
   }
 
   /** Show a new job as blocked straight away if nobody can do it. */
@@ -1204,6 +1442,20 @@ export class Simulation implements ColonyContext {
     const landing = this.nav.landingRow(cx, Math.max(0, y));
     return { x: cx, y: landing >= 0 ? landing : Math.max(0, y) };
   }
+}
+
+/** The needs' per-day settings as per-tick rates for this length of day and night. */
+function needRates(colony: ColonySettings, time: TimeOfDay): NeedRates {
+  const n = colony.needs;
+  const { dayTicks, nightTicks } = time.settings;
+  const cycle = dayTicks + nightTicks;
+  return {
+    hunger: n.hungerPerDay / cycle,
+    energy: n.energyPerDay / dayTicks,
+    sleep: n.sleepPerNight / nightTicks,
+    heal: n.healPerNight / nightTicks,
+    starve: n.starvingDamagePerDay / cycle,
+  };
 }
 
 /** Add items to a carried list, joining counts of the same item. */

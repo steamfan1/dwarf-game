@@ -68,6 +68,8 @@ export function GameHud() {
           })}
         </div>
 
+        <Clock />
+
         <ResourceBar />
 
         <div class="panel-buttons" role="group">
@@ -125,6 +127,21 @@ export function GameHud() {
       <HoverReadout />
       {minimapOpen && <Minimap />}
       <p class="hud-hint">{t('hud.hint', { keys: moveKeys })}</p>
+    </div>
+  );
+}
+
+/** The day number and the time: a sun by day, a moon at night. */
+function Clock() {
+  const clock = useStore(uiState, (s) => s.clock);
+  if (!clock) return null;
+  const time = `${String(clock.hour).padStart(2, '0')}:${String(clock.minute).padStart(2, '0')}`;
+  const phase = t(clock.night ? 'hud.phase.night' : 'hud.phase.day');
+  return (
+    <div class={`clock${clock.night ? ' night' : ''}`} title={t('hud.clock', { day: clock.day, time, phase })} data-testid="clock">
+      <Icon name={clock.night ? 'moon' : 'sun'} />
+      <span class="clock-day">{t('hud.day', { day: clock.day })}</span>
+      <span class="clock-time">{time}</span>
     </div>
   );
 }

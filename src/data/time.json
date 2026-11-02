@@ -1,0 +1,9 @@
+{
+  "dayMinutes": 6,
+  "nightMinutes": 3,
+  "transitionSeconds": 30,
+  "nightLight": 0.22,
+  "dayStartHour": 5,
+  "nightStartHour": 21,
+  "startHour": 8
+}

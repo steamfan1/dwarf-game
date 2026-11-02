@@ -48,6 +48,7 @@ import {
   type DebugStats,
   type DwarfSummary,
   type HoverInfo,
+  type NeedWarning,
   type Tool,
 } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
@@ -150,11 +151,16 @@ export class App implements UiCommands, GameContext {
     uiState.set({ debug: stats });
   }
 
-  /** Refresh the HUD's dwarf roster, storage and crafting queue from the simulation. */
+  /** Refresh the HUD's dwarf roster, storage, crafting queue and clock from the simulation. */
   reportColony(): void {
     const sim = this.session?.sim;
     if (!sim) return;
-    uiState.set({ colony: summarizeColony(sim) });
+    const { hour, minute } = sim.time.clock(sim.tick);
+    // The clock moves in ten-minute steps, so it ticks over calmly even at triple speed.
+    const clock = { day: sim.time.day(sim.tick), hour, minute: minute - (minute % 10), night: sim.isNight() };
+    const previous = uiState.get().clock;
+    const same = previous && previous.day === clock.day && previous.hour === clock.hour && previous.minute === clock.minute && previous.night === clock.night;
+    uiState.set({ colony: summarizeColony(sim), ...(same ? {} : { clock }) });
   }
 
   get tool(): Tool {
@@ -398,7 +404,7 @@ export class App implements UiCommands, GameContext {
       if (generation !== this.generation) return;
       console.info(`World "${options.seed}" (${options.biome}) generated in ${result.stats.milliseconds} ms`, result.stats);
 
-      const session = new GameSession(World.fromSnapshot(result.snapshot), CONTENT);
+      const session = new GameSession(World.fromSnapshot(result.snapshot), CONTENT, undefined, options.hour ?? undefined);
       this.session = session;
       this.pendingReveal = options.reveal;
       this.minimap = new MinimapRenderer(session.world, TILES, BIOMES.get(session.world.biome).sky);
@@ -424,6 +430,10 @@ export class App implements UiCommands, GameContext {
           pushToast(t('toast.equipped', { name, item: session.sim.items.get(item).name.toLowerCase() }), 'info', 5000);
         }),
         session.bus.on('StorageFull', () => pushToast(t('toast.storageFull'), 'warning', 7000)),
+        session.bus.on('NightStarted', ({ day }) => pushToast(t('toast.night', { day }), 'info', 5000)),
+        session.bus.on('DayStarted', ({ day }) => pushToast(t('toast.day', { day }), 'info', 4000)),
+        session.bus.on('DwarfStarving', ({ name }) => pushToast(t('toast.starving', { name }), 'error', 8000)),
+        session.bus.on('DwarfCollapsed', ({ name }) => pushToast(t('toast.collapsed', { name }), 'warning', 6000)),
         session.bus.on('CraftOrderDone', ({ item, count }) => {
           pushToast(t('toast.orderDone', { count, item: session.sim.items.get(item).name }), 'info', 4000);
         }),
@@ -653,10 +663,22 @@ function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {
       return { slot, item: item === null ? null : sim.items.get(item).name, icon: item === null ? null : itemIconUrl(sim.items, item) };
     }),
     carrying: dwarf.carrying.map(({ item, count }) => ({ name: sim.items.get(item).name, count, icon: itemIconUrl(sim.items, item) })),
+    needs: dead ? [] : needWarnings(sim, dwarf),
     dead,
     stranded,
     tunic: sim.colony.looks.tunic[dwarf.looks.tunic] ?? '#888888',
   };
+}
+
+/** The needs a dwarf is short of, worst first. */
+function needWarnings(sim: Simulation, dwarf: Dwarf): NeedWarning[] {
+  const n = sim.colony.needs;
+  const warnings: NeedWarning[] = [];
+  if (dwarf.hunger <= 0) warnings.push('starving');
+  else if (dwarf.hunger < n.hungryBelow) warnings.push('hungry');
+  if (dwarf.energy <= 0) warnings.push('exhausted');
+  else if (dwarf.energy < n.tiredBelow) warnings.push('tired');
+  return warnings;
 }
 
 function applyUiScale(scale: number): void {

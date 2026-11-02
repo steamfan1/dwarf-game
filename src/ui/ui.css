@@ -271,6 +271,29 @@ body {
   height: 1.15em;
 }
 
+/* Day number and time, with a sun or a moon. */
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock .icon {
+  width: 1.2em;
+  height: 1.2em;
+  color: #ffd25e;
+}
+
+.clock.night .icon {
+  color: #b9c8ff;
+}
+
+.clock-time {
+  color: var(--c-text-dim);
+}
+
 .btn-speed {
   font-weight: 700;
   min-width: 2.6em;
@@ -639,6 +662,36 @@ body {
 
 .activity.warn {
   color: var(--c-warning);
+}
+
+/* Hungry, tired...: a small tag before the activity. */
+.need-tag {
+  display: inline-block;
+  margin-right: 0.4em;
+  padding: 0 0.35em;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: #1d1406;
+  background: var(--c-warning);
+  border-radius: 2px;
+}
+
+.need-tag.severe {
+  color: #fff;
+  background: var(--c-danger);
+}
+
+.needs-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2em;
+  margin: 0.4em 0 0;
+}
+
+.needs-warning .note {
+  flex-basis: 100%;
+  margin: 0.15em 0 0;
 }
 
 .dwarf-details header {

@@ -10,11 +10,21 @@ import type { Skill } from './dwarves/Dwarf';
 import type { JobType } from './jobs/JobBoard';
 import type { CellRect } from './world/World';
 
+export type DeathCause = 'fall' | 'lava' | 'starvation';
+
 export type GameEvents = {
   /** Speed or pause state changed (player input, menu, tab visibility, debug console). */
   TimeChanged: TimeState;
   /** Something in one cell changed (block, wall or liquid). Renderers redraw it and its neighbours. */
   TileChanged: { x: number; y: number };
+  /** Light levels changed inside this rectangle (a block dug or built, a torch set down). */
+  LightChanged: CellRect;
+  /** The sun came up: day `day` begins. */
+  DayStarted: { day: number };
+  /** Night fell on day `day`. */
+  NightStarted: { day: number };
+  /** Rooms were found again after the blocks, walls, doors or furniture changed. */
+  RoomsChanged: void;
   /** Cells in this rectangle were newly explored (fog of war lifted). */
   ExploredChanged: CellRect;
   /** A dig or chop mark appeared, changed (priority, blocked) or went away in this cell. */
@@ -25,6 +35,8 @@ export type GameEvents = {
   BlockDug: { x: number; y: number; dwarf: number };
   /** A dwarf felled a tree. */
   TreeFelled: { x: number; y: number; dwarf: number };
+  /** A dwarf picked a plant (berries, mushrooms). */
+  Harvested: { x: number; y: number; dwarf: number };
   /** A dwarf finished building a block, a wall or a piece of furniture. */
   BlockBuilt: { x: number; y: number; dwarf: number };
   /** A piece of furniture was set down (placed) or taken away. */
@@ -41,5 +53,9 @@ export type GameEvents = {
   StorageFull: void;
   /** A dwarf's skill went up a level. */
   SkillUp: { dwarf: number; name: string; skill: Skill; level: number };
-  DwarfDied: { dwarf: number; name: string; cause: 'fall' | 'lava' };
+  DwarfDied: { dwarf: number; name: string; cause: DeathCause };
+  /** A dwarf has nothing left to eat and is losing health. */
+  DwarfStarving: { dwarf: number; name: string };
+  /** A dwarf ran out of energy and fell asleep where it stood. */
+  DwarfCollapsed: { dwarf: number; name: string };
 };

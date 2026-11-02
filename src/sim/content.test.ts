@@ -17,10 +17,13 @@ function problems(run: () => unknown): string {
 }
 
 describe('shipped content', () => {
-  it('has around forty starter items, every one reachable by digging, felling or crafting', () => {
+  it('has around forty starter items, every one reachable by digging, felling, picking or crafting', () => {
     expect(ITEMS.items.length).toBeGreaterThanOrEqual(40);
     const obtainable = new Set<string>();
-    for (const tile of TILES.tiles) if (tile.drops) obtainable.add(tile.drops);
+    for (const tile of TILES.tiles) {
+      if (tile.drops) obtainable.add(tile.drops);
+      if (tile.harvest) obtainable.add(tile.harvest.item);
+    }
     for (const recipe of RECIPES.recipes) obtainable.add(ITEMS.get(recipe.output.item).id);
     // Meat and wheat come from hunting and farming (Milestones 4 and 5).
     const later = new Set(['raw_meat', 'wheat']);

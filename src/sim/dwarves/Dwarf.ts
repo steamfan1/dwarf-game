@@ -27,6 +27,9 @@ export interface SkillState {
  *   idle -> to-supply -> fetching -> to-job -> working            build, wall, place
  *   idle -> to-supply -> fetching -> to-job -> working -> to-storage -> dropping-off   craft
  *   idle -> to-supply -> fetching                                 equip
+ *   idle -> to-supply -> fetching (-> to-job) -> working          eat (at a table, if one is near)
+ *   idle -> to-job -> sleeping                                    sleep (in a bed, or by the Hearth)
+ *   idle -> to-job -> working                                     harvest
  *   idle -> wandering                                          nothing to do
  * "Supply" and "storage" are the same places (the Hearth and the chests): whichever is
  * nearest. A hand-made craft is worked right where its materials were fetched. Falling
@@ -42,6 +45,7 @@ export type Phase =
   | 'dropping-off'
   | 'to-supply'
   | 'fetching'
+  | 'sleeping'
   | 'wandering'
   | 'falling'
   | 'dead';
@@ -66,9 +70,9 @@ export interface Dwarf {
   facing: -1 | 1;
   health: number;
   maxHealth: number;
-  /** 100 is full. Hunger starts to matter in Milestone 4. */
+  /** 100 is full, 0 is starving. Dwarves eat from storage when it runs low. */
   hunger: number;
-  /** 100 is rested. Sleep arrives in Milestone 4. */
+  /** 100 is rested, 0 is exhausted. Dwarves sleep at night, in a bed if they have one. */
   energy: number;
   skills: Record<Skill, SkillState>;
   /** What it wears and wields, by item number. Dwarves equip better gear from storage by themselves. */

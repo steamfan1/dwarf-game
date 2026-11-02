@@ -134,7 +134,7 @@ export class GameScene extends Phaser.Scene {
     this.itemSprites = new ItemSprites(this);
     this.dwarfSprites = new DwarfSprites(this, world, sim.colony);
     this.cracks = new WorkCracks(this);
-    this.fog = new FogOverlay(this, world);
+    this.fog = new FogOverlay(this, world, sim.lighting, sim.daylight);
     this.selection = new SelectionBox(this);
     this.cursor = new TileCursor(this);
     this.chunkGrid = this.add.graphics().setDepth(DEPTH.debug).setVisible(false);
@@ -166,6 +166,11 @@ export class GameScene extends Phaser.Scene {
         // A newly explored cell under the pointer has something new to describe.
         this.hoverDirty = true;
       }),
+      session.bus.on('LightChanged', (rect) => this.fog.update(rect)),
+      session.bus.on('RoomsChanged', () => {
+        this.hoverDirty = true;
+      }),
+      session.bus.on('Harvested', ({ x, y }) => this.workSound('build', x, y)),
       session.bus.on('BlockDug', ({ x, y }) => this.workSound('dig', x, y)),
       session.bus.on('TreeFelled', ({ x, y }) => this.workSound('dig', x, y)),
       session.bus.on('BlockBuilt', ({ x, y }) => this.workSound('build', x, y)),
@@ -197,6 +202,9 @@ export class GameScene extends Phaser.Scene {
     const view = this.cameraControl.view;
     this.worldView.cull(view);
     this.sky.fit(this.scale.width, this.scale.height, this.cameraControl.scale);
+    // Day and night: the sky dims, and the darkness over the world deepens.
+    this.sky.setDaylight(sim.daylight, sim.time.settings.nightLight);
+    this.fog.setDaylight(sim.daylight);
 
     const alpha = this.session.alpha;
     this.plans.update();
@@ -467,6 +475,8 @@ export class GameScene extends Phaser.Scene {
       jobs: { ...sim.jobs.counts(), blocked },
       paths: { searches, cacheHits, busy, cached: sim.paths.cachedPaths },
       homeCells: { ...sim.homeMaps.sizes },
+      rooms: sim.rooms.size,
+      daylight: sim.daylight,
     });
   }
 

@@ -35,9 +35,10 @@ export function makeWorld(): World {
   return world;
 }
 
-export function newSim(world = makeWorld()) {
+/** A simulation on `world` (the test world by default); `startHour` sets the clock (8:00 otherwise). */
+export function newSim(world = makeWorld(), options: { startHour?: number } = {}) {
   const bus = new EventBus<GameEvents>();
-  const sim = new Simulation({ world, ...CONTENT, bus });
+  const sim = new Simulation({ world, ...CONTENT, bus, startHour: options.startHour });
   const run = (ticks: number): void => {
     for (let i = 0; i < ticks; i++) sim.step();
   };

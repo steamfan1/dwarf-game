@@ -309,6 +309,15 @@
       ],
       "station": "kitchen",
       "time": 80
+    },
+    {
+      "id": "mushroom_stew",
+      "output": { "item": "mushroom_stew", "count": 1 },
+      "inputs": [
+        { "item": "mushroom", "count": 2 }
+      ],
+      "station": "kitchen",
+      "time": 70
     }
   ]
 }

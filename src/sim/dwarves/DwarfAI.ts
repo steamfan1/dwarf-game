@@ -19,6 +19,12 @@
  * was taken apart) goes back to storage before it takes on anything else, so materials
  * are never lost.
  *
+ * Needs come before work: a hungry dwarf fetches something to eat (and eats it at a
+ * table, if there's one near), a tired one goes to bed (at night, or whenever it's worn
+ * out), and only then does it look at the job board. Hunger and tiredness slow work down;
+ * an empty stomach costs health, and a dwarf that runs out of energy falls asleep where it
+ * stands.
+ *
  * Paths come from the PathService, which may say 'busy' when this tick's pathfinding
  * budget is used up; the dwarf then asks again next tick. Work progress is kept on the
  * job, so an interrupted dig or craft isn't lost.
@@ -37,8 +43,23 @@ import type { PathService } from '../nav/PathService';
 import type { TileRegistry } from '../world/TileRegistry';
 import type { Tree, TreeFinder } from '../world/trees';
 import type { CellRect, World } from '../world/World';
+import type { DeathCause } from '../events';
 import { gainXp, type Dwarf, type Movement, type Skill } from './Dwarf';
 import type { ColonySettings } from './settings';
+
+/** How needs change each tick (worked out from dwarves.json and the length of day and night). */
+export interface NeedRates {
+  /** Hunger lost per tick. */
+  hunger: number;
+  /** Energy lost per tick awake. */
+  energy: number;
+  /** Energy regained per tick asleep in a bed (before floor or room adjustments). */
+  sleep: number;
+  /** Health regained per tick asleep in a bed. */
+  heal: number;
+  /** Health lost per tick while starving. */
+  starve: number;
+}
 
 /** Everything the dwarves need from the simulation. */
 export interface ColonyContext {
@@ -59,6 +80,8 @@ export interface ColonyContext {
   readonly storeArea: CellRect;
   readonly dwarves: readonly Dwarf[];
   readonly tick: number;
+  readonly needRates: NeedRates;
+  isNight(): boolean;
   /** Whether a block can still be dug (it's there, diggable, and holds up nothing important). */
   canDigNow(x: number, y: number): boolean;
   /** Whether a dwarf standing in `cell` could do `job` from there. */
@@ -71,6 +94,14 @@ export interface ColonyContext {
   takeJob(job: Job, dwarf: Dwarf): boolean;
   /** A trip to fetch better gear from storage, already claimed by the dwarf, or null if there's none. */
   startEquip(dwarf: Dwarf): Job | null;
+  /** A meal from storage, claimed by the dwarf (at a table if one is near), or null if there's no food. */
+  startMeal(dwarf: Dwarf): Job | null;
+  /** Going to bed: the nearest free bed, or the floor by the Hearth. Claimed by the dwarf. */
+  startSleep(dwarf: Dwarf): Job;
+  /** How fast a sleeping dwarf recovers, as a multiple of a night in bed. */
+  sleepRate(dwarf: Dwarf): number;
+  /** Whether there's food in storage nobody has claimed. */
+  foodAvailable(): boolean;
   /** The places goods are stored and fetched: the Hearth and every chest, whichever is nearest. */
   storageGoal(): PathGoal;
   /** The cells a job is done beside (the block, a furniture footprint, the station). */
@@ -95,6 +126,14 @@ export interface ColonyContext {
   completeCraft(job: Job, by: Dwarf): boolean;
   /** A dwarf took a piece of furniture apart. */
   completeDismantle(job: Job): void;
+  /** A dwarf ate the meal it carried. */
+  completeMeal(job: Job, by: Dwarf): boolean;
+  /** A dwarf picked a plant. */
+  harvestPlant(job: Job, by: Dwarf): void;
+  /** A dwarf is starving (announced now and then). */
+  starving(dwarf: Dwarf): void;
+  /** A dwarf ran out of energy and fell asleep where it stood. */
+  collapsed(dwarf: Dwarf): void;
   /** A dwarf finished digging a block. */
   removeBlock(x: number, y: number, by: Dwarf): void;
   /** A dwarf finished chopping a tree. */
@@ -103,7 +142,7 @@ export interface ColonyContext {
   dropItems(item: number, count: number, x: number, y: number, skipDwarf?: number): void;
   /** Uncover the cells around a dwarf. */
   reveal(x: number, y: number, radius: number): void;
-  dwarfDied(dwarf: Dwarf, cause: 'fall' | 'lava'): void;
+  dwarfDied(dwarf: Dwarf, cause: DeathCause): void;
   skillUp(dwarf: Dwarf, skill: Skill): void;
 }
 
@@ -136,7 +175,11 @@ export class DwarfAI {
     if (isDead(dwarf)) return;
     const { nav, world } = this.ctx;
 
+    this.tickNeeds(dwarf);
+    if (isDead(dwarf)) return;
     if (!dwarf.movement && isActive(dwarf) && !nav.standable(dwarf.x, dwarf.y)) this.startFalling(dwarf);
+    // Out of energy: it drops whatever it was doing and falls asleep on the spot.
+    if (!dwarf.movement && isActive(dwarf) && dwarf.phase !== 'sleeping' && dwarf.energy <= 0) this.collapse(dwarf);
 
     if (dwarf.movement) {
       dwarf.movement.elapsed++;
@@ -173,10 +216,58 @@ export class DwarfAI {
       case 'fetching':
         this.fetch(dwarf);
         break;
+      case 'sleeping':
+        this.sleep(dwarf);
+        break;
       case 'falling':
       case 'dead':
         break;
     }
+  }
+
+  // ---- Needs ---------------------------------------------------------------------------------
+
+  /** Hunger and energy run down (energy comes back while asleep); starving costs health. */
+  private tickNeeds(dwarf: Dwarf): void {
+    const rates = this.ctx.needRates;
+    dwarf.hunger = Math.max(0, dwarf.hunger - rates.hunger);
+    if (dwarf.phase === 'sleeping') {
+      const rate = this.ctx.sleepRate(dwarf);
+      dwarf.energy = Math.min(100, dwarf.energy + rates.sleep * rate);
+      dwarf.health = Math.min(dwarf.maxHealth, dwarf.health + rates.heal * rate);
+    } else if (dwarf.phase !== 'falling') {
+      dwarf.energy = Math.max(0, dwarf.energy - rates.energy);
+    }
+    if (dwarf.hunger > 0) return;
+    dwarf.health -= rates.starve;
+    if (dwarf.health <= 0) this.die(dwarf, 'starvation');
+    else this.ctx.starving(dwarf);
+  }
+
+  private collapse(dwarf: Dwarf): void {
+    if (dwarf.jobId !== 0) this.ctx.jobs.release(dwarf.jobId, dwarf.id);
+    this.toIdle(dwarf);
+    dwarf.phase = 'sleeping';
+    this.ctx.collapsed(dwarf);
+  }
+
+  /** Asleep: wake once rested and the night is over, or if hunger can't wait (and there's food). */
+  private sleep(dwarf: Dwarf): void {
+    const job = dwarf.jobId !== 0 ? this.myJob(dwarf) : undefined;
+    const n = this.ctx.colony.needs;
+    // The bed went (taken apart), or someone else has it now.
+    const lostBed = dwarf.jobId !== 0 && !job;
+    const rested = dwarf.energy >= 100 && !this.ctx.isNight();
+    const famished = dwarf.hunger < n.hungryBelow && this.ctx.foodAvailable();
+    if (!lostBed && !rested && !famished) return;
+    if (job) this.ctx.jobs.remove(job.id);
+    this.toIdle(dwarf);
+  }
+
+  /** Whether a dwarf should go to bed now: tired at night, or worn out at any time. */
+  private sleepy(dwarf: Dwarf): boolean {
+    const n = this.ctx.colony.needs;
+    return dwarf.energy < n.sleepBelow || (this.ctx.isNight() && dwarf.energy < n.sleepAtNightBelow);
   }
 
   /** A dwarf that can't get home from where it stands (it fell into a hole, say). */
@@ -196,7 +287,24 @@ export class DwarfAI {
       return;
     }
     const stranded = this.isStranded(dwarf);
-    // Better gear in storage comes first: it makes the rest of the work go faster.
+    // Needs first: a meal, then bed.
+    if (!stranded && dwarf.hunger < this.ctx.colony.needs.eatBelow) {
+      const meal = this.ctx.startMeal(dwarf);
+      if (meal) {
+        this.begin(dwarf, meal, 'to-supply');
+        return;
+      }
+    }
+    if (this.sleepy(dwarf)) {
+      if (stranded) {
+        // No way home: sleep right here.
+        dwarf.phase = 'sleeping';
+        return;
+      }
+      this.begin(dwarf, this.ctx.startSleep(dwarf), 'to-job');
+      return;
+    }
+    // Better gear in storage comes next: it makes the rest of the work go faster.
     const equip = stranded ? null : this.ctx.startEquip(dwarf);
     if (equip) {
       this.begin(dwarf, equip, 'to-supply');
@@ -281,7 +389,9 @@ export class DwarfAI {
     const stranded = this.isStranded(dwarf);
     // Stand somewhere the job can be done from, and (unless already stranded) that leads back home.
     const accept = (cell: number): boolean => this.ctx.workCellOk(job, cell) && (stranded || homeMaps.workable(cell));
-    return { area: this.ctx.jobArea(job), reach: job.type === 'haul' ? 0 : 1, accept };
+    // Hauls are picked up where they lie; a dwarf lies down in its bed itself.
+    const inside = job.type === 'haul' || (job.type === 'sleep' && job.furnitureId !== 0);
+    return { area: this.ctx.jobArea(job), reach: inside ? 0 : 1, accept };
   }
 
   private travel(dwarf: Dwarf): void {
@@ -328,7 +438,7 @@ export class DwarfAI {
     dwarf.workTicks = 0;
     switch (dwarf.phase) {
       case 'to-job':
-        dwarf.phase = 'working';
+        dwarf.phase = this.myJob(dwarf)?.type === 'sleep' ? 'sleeping' : 'working';
         break;
       case 'to-item':
         dwarf.phase = 'picking-up';
@@ -358,6 +468,12 @@ export class DwarfAI {
       const job = this.myJob(dwarf);
       if (job?.type === 'haul') jobs.remove(job.id);
       this.dropAll(dwarf, dwarf.id);
+    } else if (this.myJob(dwarf)?.type === 'sleep') {
+      // Can't get to bed: sleep where it stands instead.
+      jobs.remove(dwarf.jobId);
+      this.toIdle(dwarf);
+      dwarf.phase = 'sleeping';
+      return;
     } else if (dwarf.jobId !== 0) {
       jobs.markUnreachable(dwarf.jobId, dwarf.id);
       jobs.release(dwarf.jobId, dwarf.id);
@@ -466,7 +582,7 @@ export class DwarfAI {
     dwarf.movement = { from, to: from + world.width, kind: 'fall', elapsed: 0, duration: colony.movement.fallTicksPerRow };
   }
 
-  private die(dwarf: Dwarf, cause: 'fall' | 'lava'): void {
+  private die(dwarf: Dwarf, cause: DeathCause): void {
     if (dwarf.jobId !== 0) this.ctx.jobs.release(dwarf.jobId, dwarf.id);
     this.dropAll(dwarf);
     dwarf.health = 0;
@@ -501,9 +617,36 @@ export class DwarfAI {
       case 'craft':
         this.craft(dwarf, job);
         break;
+      case 'eat':
+        this.eat(dwarf, job);
+        break;
+      case 'harvest':
+        this.pick(dwarf, job);
+        break;
       default:
         this.giveUp(dwarf);
     }
+  }
+
+  /** Eat the meal in hand: at its table (walking back to it if need be), or right here without one. */
+  private eat(dwarf: Dwarf, job: Job): void {
+    if (job.furnitureId !== 0 && !this.labour(dwarf, job)) return;
+    if (job.furnitureId === 0 && job.progress++ < this.ctx.workRequired(job, dwarf)) return;
+    this.toIdle(dwarf);
+    if (!this.ctx.completeMeal(job, dwarf)) this.ctx.jobs.remove(job.id);
+  }
+
+  /** Pick a plant: it leaves berries or mushrooms where it grew, for hauling. */
+  private pick(dwarf: Dwarf, job: Job): void {
+    if (!this.ctx.siteValid(job)) {
+      this.ctx.jobs.remove(job.id);
+      this.toIdle(dwarf);
+      return;
+    }
+    if (!this.labour(dwarf, job)) return;
+    this.toIdle(dwarf);
+    this.ctx.harvestPlant(job, dwarf);
+    this.learn(dwarf, 'farming', this.ctx.colony.skills.xp.harvest);
   }
 
   /**
@@ -731,7 +874,8 @@ export class DwarfAI {
       this.toIdle(dwarf);
       return;
     }
-    if (this.ctx.isHandCraft(job)) {
+    // A hand-made craft, or a meal with no table to go to, happens right here at the store.
+    if (this.ctx.isHandCraft(job) || (job.type === 'eat' && job.furnitureId === 0)) {
       dwarf.phase = 'working';
       return;
     }

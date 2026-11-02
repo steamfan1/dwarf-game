@@ -64,14 +64,16 @@
       "name": "Bed",
       "size": [2, 1],
       "mapColor": "#b84a4a",
-      "art": { "style": "bed", "base": "#a87a4b", "dark": "#6b4628", "light": "#d8cfb8", "accent": "#b84a4a" }
+      "art": { "style": "bed", "base": "#a87a4b", "dark": "#6b4628", "light": "#d8cfb8", "accent": "#b84a4a" },
+      "use": "bed"
     },
     {
       "id": "table",
       "name": "Table",
       "size": [2, 1],
       "mapColor": "#a87a4b",
-      "art": { "style": "table", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" }
+      "art": { "style": "table", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" },
+      "use": "table"
     },
     {
       "id": "chair",

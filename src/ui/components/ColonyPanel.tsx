@@ -10,7 +10,7 @@ import { keyLabel } from '../../core/actions';
 import { t } from '../../core/strings';
 import { useCommands, useSettingsStore } from '../commands';
 import { useStore } from '../hooks';
-import { uiState, type ColonyView, type DwarfSummary } from '../state';
+import { uiState, type ColonyView, type DwarfSummary, type NeedWarning } from '../state';
 import { Icon } from './Icon';
 
 export function ColonyPanel() {
@@ -52,6 +52,7 @@ function Roster({ dwarves, selected }: { dwarves: DwarfSummary[]; selected: numb
               <span class="roster-text">
                 <strong>{dwarf.name}</strong>
                 <span class={`activity${dwarf.stranded ? ' warn' : ''}`} data-testid="roster-activity">
+                  {dwarf.needs[0] && <NeedTag need={dwarf.needs[0]} />}
                   {dwarf.activity}
                 </span>
               </span>
@@ -108,7 +109,14 @@ function DwarfDetails({ dwarf }: { dwarf: DwarfSummary }) {
           <Meter value={dwarf.energy} max={100} kind="energy" label={t('dwarf.energy')} showValue />
         </dd>
       </dl>
-      <p class="note">{t('dwarf.needsLater')}</p>
+      {dwarf.needs.length > 0 && (
+        <p class="needs-warning" data-testid="dwarf-needs">
+          {dwarf.needs.map((need) => (
+            <NeedTag key={need} need={need} />
+          ))}
+          <span class="note">{t('need.slow')}</span>
+        </p>
+      )}
 
       <h4>{t('dwarf.skills')}</h4>
       <ul class="skills">
@@ -196,6 +204,12 @@ function Storage({ colony }: { colony: ColonyView }) {
         ))}
     </section>
   );
+}
+
+/** A short warning for a need running low: amber when hungry or tired, red when it hurts. */
+function NeedTag({ need }: { need: NeedWarning }) {
+  const severe = need === 'starving' || need === 'exhausted';
+  return <span class={`need-tag${severe ? ' severe' : ''}`}>{t(`need.${need}`)}</span>;
 }
 
 function Meter({

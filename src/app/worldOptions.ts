@@ -5,11 +5,14 @@
  *   ?seed=mossy-cavern      a specific world (the same seed always gives the same world)
  *   ?biome=snow             start in another biome (the campaign unlocks biomes later)
  *   ?reveal=1               lift the fog of war over the whole map
+ *   ?hour=22                start at that hour (0-23) instead of the morning: 22 is night
  */
 export interface NewWorldOptions {
   seed: string;
   biome: string;
   reveal: boolean;
+  /** The hour to start at, or null for the usual morning. */
+  hour: number | null;
 }
 
 export const DEFAULT_BIOME = 'temperate';
@@ -20,10 +23,12 @@ export function worldOptionsFromQuery(query: string, knownBiomes: readonly strin
   const seed = params.get('seed')?.trim().slice(0, 64);
   const biome = params.get('biome')?.trim().toLowerCase();
   const reveal = params.get('reveal');
+  const hour = Number.parseFloat(params.get('hour') ?? '');
   return {
     seed: seed || randomSeed(),
     biome: biome && knownBiomes.includes(biome) ? biome : DEFAULT_BIOME,
     reveal: reveal === '1' || reveal === 'true' || reveal === '',
+    hour: Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : null,
   };
 }
 

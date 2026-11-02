@@ -26,8 +26,9 @@ export class GameSession {
   private readonly now: () => number;
   private readonly unsubscribeTime: () => void;
 
-  constructor(world: World, content: GameContent, now: () => number = () => performance.now()) {
-    this.sim = new Simulation({ world, ...content, bus: this.bus });
+  /** `startHour` sets the clock for a new world (the morning, from time.json, by default). */
+  constructor(world: World, content: GameContent, now: () => number = () => performance.now(), startHour?: number) {
+    this.sim = new Simulation({ world, ...content, bus: this.bus, startHour });
     this.now = now;
     this.unsubscribeTime = this.time.onChange((state) => this.bus.emit('TimeChanged', state));
   }

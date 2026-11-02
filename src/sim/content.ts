@@ -13,11 +13,13 @@ import furnitureJson from '../data/furniture.json';
 import itemsJson from '../data/items.json';
 import recipesJson from '../data/recipes.json';
 import tilesJson from '../data/tiles.json';
+import timeJson from '../data/time.json';
 import worldgenJson from '../data/worldgen.json';
 import { RecipeBook } from './crafting/Recipes';
 import { parseColonySettings, type ColonySettings } from './dwarves/settings';
 import { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ItemRegistry } from './items/ItemRegistry';
+import { parseTimeSettings, type TimeSettings } from './time/TimeOfDay';
 import { TileRegistry } from './world/TileRegistry';
 import { parseBiomes, parseWorldgenSettings } from './worldgen/settings';
 
@@ -28,8 +30,9 @@ export const RECIPES = RecipeBook.fromJson(recipesJson, ITEMS, FURNITURE.station
 export const BIOMES = parseBiomes(biomesJson, TILES);
 export const WORLDGEN = parseWorldgenSettings(worldgenJson, TILES);
 export const COLONY = parseColonySettings(dwarvesJson);
+export const TIME = parseTimeSettings(timeJson);
 
-checkLinks(TILES, ITEMS, FURNITURE);
+checkLinks(TILES, ITEMS, FURNITURE, COLONY);
 
 /** The content a running world uses (tests can swap in their own). */
 export interface GameContent {
@@ -38,18 +41,25 @@ export interface GameContent {
   furniture: FurnitureRegistry;
   recipes: RecipeBook;
   colony: ColonySettings;
+  time: TimeSettings;
 }
 
-export const CONTENT: GameContent = { tiles: TILES, items: ITEMS, furniture: FURNITURE, recipes: RECIPES, colony: COLONY };
+export const CONTENT: GameContent = { tiles: TILES, items: ITEMS, furniture: FURNITURE, recipes: RECIPES, colony: COLONY, time: TIME };
 
 /**
  * Check the ids the content files use to refer to each other, so a typo fails at start-up
  * instead of when a dwarf first digs that block or builds that chair.
  */
-export function checkLinks(tiles: TileRegistry, items: ItemRegistry, furniture: FurnitureRegistry): void {
+export function checkLinks(tiles: TileRegistry, items: ItemRegistry, furniture: FurnitureRegistry, colony?: ColonySettings): void {
   const problems: string[] = [];
   for (const tile of tiles.tiles) {
     if (tile.drops !== null && !items.has(tile.drops)) problems.push(`tile "${tile.id}" drops "${tile.drops}", which is not in items.json`);
+    const harvest = tile.harvest;
+    if (harvest && !items.has(harvest.item)) problems.push(`tile "${tile.id}" is picked for "${harvest.item}", which is not in items.json`);
+    if (harvest?.becomes && !tiles.hasTile(harvest.becomes)) problems.push(`tile "${tile.id}" becomes "${harvest.becomes}" when picked, which is not in tiles.json`);
+  }
+  for (const start of colony?.startingItems ?? []) {
+    if (!items.has(start.item)) problems.push(`dwarves.json startingItems names "${start.item}", which is not in items.json`);
   }
   for (const wall of tiles.walls) {
     if (wall.material !== null && !items.has(wall.material)) problems.push(`wall "${wall.id}" is built from "${wall.material}", which is not in items.json`);

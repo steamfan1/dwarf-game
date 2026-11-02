@@ -155,6 +155,17 @@ export function paintCracks(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+// ---- Sleep -----------------------------------------------------------------------------
+
+/** "Zz" floating over a sleeping dwarf: a big Z and a small one, light with a dark shadow. */
+const SLEEP_Z = ['.....wwwww', '........w.', '.......w..', '......w...', '.....wwwww', 'www.......', '.w........', 'www.......'];
+export const SLEEP_SIZE = { width: 11, height: 9 } as const;
+
+export function paintSleepZ(ctx: CanvasRenderingContext2D): void {
+  drawPixelRows(ctx, SLEEP_Z, { w: '#1b1d29' }, 1, 1);
+  drawPixelRows(ctx, SLEEP_Z, { w: '#eef3ff' }, 0, 0);
+}
+
 // ---- Designation marks --------------------------------------------------------------
 
 export const PRIORITY_COLOURS: Record<Priority, string> = {

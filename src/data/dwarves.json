@@ -1,6 +1,10 @@
 {
   "startingDwarves": 3,
   "maxDwarves": 12,
+  "startingItems": [
+    { "item": "bread", "count": 12 },
+    { "item": "berries", "count": 10 }
+  ],
   "names": {
     "first": [
       "Arnor", "Brakka", "Dagny", "Dunmir", "Eskil", "Feldra", "Gorrik", "Gunvor", "Hadra", "Halvar",
@@ -43,12 +47,32 @@
     "wallTicks": 20,
     "furnitureTicks": 40,
     "dismantleTicks": 30,
+    "harvestTicks": 30,
     "leavesPerFiber": 5,
     "wanderRadius": 6
+  },
+  "needs": {
+    "hungerPerDay": 70,
+    "eatBelow": 45,
+    "hungryBelow": 20,
+    "starvingDamagePerDay": 60,
+    "energyPerDay": 80,
+    "sleepAtNightBelow": 75,
+    "sleepBelow": 12,
+    "tiredBelow": 12,
+    "sleepPerNight": 120,
+    "floorSleep": 0.6,
+    "roomSleepBonus": 1.5,
+    "healPerNight": 30,
+    "slowWork": 0.7,
+    "eatTicks": 40,
+    "tableBonus": 1.25,
+    "roomTableBonus": 1.5,
+    "tableReach": 30
   },
   "skills": {
     "levels": [0, 60, 150, 280, 450, 680, 960, 1300, 1700, 2200],
     "speedPerLevel": 0.12,
-    "xp": { "digPerHardness": 10, "chop": 15, "build": 6, "craftPerSecond": 4 }
+    "xp": { "digPerHardness": 10, "chop": 15, "build": 6, "craftPerSecond": 4, "harvest": 6 }
   }
 }

@@ -19,7 +19,7 @@ export function NewWorldDialog() {
   return preset ? <NewWorldForm key={preset.seed} preset={preset} /> : null;
 }
 
-function NewWorldForm({ preset }: { preset: { seed: string; biome: string; reveal: boolean } }) {
+function NewWorldForm({ preset }: { preset: { seed: string; biome: string; reveal: boolean; hour: number | null } }) {
   const commands = useCommands();
   const [seed, setSeed] = useState(preset.seed);
   const [biome, setBiome] = useState(preset.biome);
@@ -30,7 +30,7 @@ function NewWorldForm({ preset }: { preset: { seed: string; biome: string; revea
   };
   const create = (): void => {
     commands.playSound('uiClick');
-    commands.createWorld({ seed: seed.trim() || randomSeed(), biome, reveal: preset.reveal });
+    commands.createWorld({ seed: seed.trim() || randomSeed(), biome, reveal: preset.reveal, hour: preset.hour });
   };
 
   return (

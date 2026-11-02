@@ -6,10 +6,8 @@
  *   debug.spawnItem('stone', 20)   drop items at the Hearth (the dwarves store them)
  *   debug.give('plank', 20)    put items straight into storage
  *   debug.stockUp()            a bit of every raw material, plus one of each crafting station
- *   debug.skipToNight()
+ *   debug.skipToNight()        bring nightfall forward to now
  *   debug.revealMap()
- *
- * Helpers whose systems don't exist yet say which milestone brings them.
  */
 import type { App } from '../app/App';
 
@@ -30,9 +28,6 @@ declare global {
   }
 }
 
-function notYet(name: string, milestone: number): void {
-  console.info(`debug.${name}() becomes available in Milestone ${milestone}.`);
-}
 
 /** What debug.stockUp() puts in storage. */
 const STARTER_KIT: ReadonlyArray<[string, number]> = [
@@ -97,7 +92,15 @@ export function installDebugApi(app: App): void {
       for (const [id, count] of STARTER_KIT) if (sim.items.has(id)) sim.storage.add(sim.items.item(id), count);
       console.info(`Stocked up: ${STARTER_KIT.map(([id, count]) => `${count} ${id}`).join(', ')}.`);
     },
-    skipToNight: () => notYet('skipToNight', 4),
+    skipToNight: () => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.skipToNight() needs a running game: start a new game first.');
+        return;
+      }
+      sim.skipToNight();
+      console.info(`Night falls on day ${sim.time.day(sim.tick)}.`);
+    },
     revealMap: () => {
       if (app.revealMap()) console.info('Fog of war lifted over the whole map.');
       else console.info('debug.revealMap() needs a running game: start a new world first.');

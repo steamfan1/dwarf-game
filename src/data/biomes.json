@@ -17,6 +17,7 @@
         "height": [4, 7]
       },
       "decorations": [
+        { "tile": "berry_bush", "chance": 0.06 },
         { "tile": "tall_grass", "chance": 0.28 },
         { "tile": "flowers", "chance": 0.07 }
       ],
@@ -45,6 +46,7 @@
         "height": [3, 5]
       },
       "decorations": [
+        { "tile": "berry_bush", "chance": 0.04 },
         { "tile": "snow_shrub", "chance": 0.12 }
       ],
       "pools": {

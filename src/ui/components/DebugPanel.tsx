@@ -70,6 +70,10 @@ export function DebugPanel() {
         <dd>{stats ? t('debug.pathsValue', { searches: stats.paths.searches, hits: stats.paths.cacheHits, busy: stats.paths.busy }) : '—'}</dd>
         <dt>{t('debug.home')}</dt>
         <dd>{stats ? t('debug.homeValue', { from: stats.homeCells.fromHome, to: stats.homeCells.toHome }) : '—'}</dd>
+        <dt>{t('debug.rooms')}</dt>
+        <dd data-testid="debug-rooms">{stats ? stats.rooms : '—'}</dd>
+        <dt>{t('debug.daylight')}</dt>
+        <dd data-testid="debug-daylight">{stats ? `${Math.round(stats.daylight * 100)}%` : '—'}</dd>
         <dt>{t('debug.seed')}</dt>
         <dd>{world?.seed ?? '—'}</dd>
       </dl>

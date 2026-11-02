@@ -24,6 +24,8 @@ import {
   DWARF_SHEET_FRAMES,
   MARK_FRAMES,
   paintCracks,
+  paintSleepZ,
+  SLEEP_SIZE,
   paintDwarfLookSheet,
   paintMarks,
   type DwarfColours,
@@ -152,6 +154,8 @@ export const TEXTURES = {
   },
   /** Dig and chop marks by priority, and blocked marks (see colonyArt.ts markFrame). */
   marks: { kind: 'generated', width: 16 * MARK_FRAMES, height: 16, paint: paintMarks },
+  /** "Zz" over a sleeping dwarf. */
+  sleep: { kind: 'generated', width: SLEEP_SIZE.width, height: SLEEP_SIZE.height, paint: paintSleepZ },
   /** Cracks in a block being dug, in four stages. */
   cracks: {
     kind: 'generated',

@@ -242,8 +242,9 @@ describe('Gear', () => {
 describe('Storage', () => {
   it('leaves goods on the ground while storage is full, and says so', () => {
     const { sim, world, bus, run, runUntil } = newSim();
-    sim.storage.capacity = 1;
+    // Fill every slot: a full stack of stone on top of the food the colony starts with.
     sim.storage.add(item('stone'), ITEMS.get(item('stone')).stack);
+    sim.storage.capacity = sim.storage.slotsUsed();
     let notices = 0;
     bus.on('StorageFull', () => notices++);
     sim.designate('dig', at(26, 10), 2);
@@ -251,7 +252,7 @@ describe('Storage', () => {
     run(200);
     expect(sim.ground.size).toBe(1);
     expect(notices).toBeGreaterThan(0);
-    sim.storage.capacity = 2;
+    sim.storage.capacity++;
     runUntil(() => sim.storage.count(item('dirt')) === 1);
   });
 

@@ -160,6 +160,36 @@ const PIXELS = {
     '............',
     '............',
   ],
+  // The sun, for daytime in the top bar.
+  sun: [
+    '.....XX.....',
+    '.X...XX...X.',
+    '..X......X..',
+    '....XXXX....',
+    '...XXXXXX...',
+    'XX.XXXXXX.XX',
+    'XX.XXXXXX.XX',
+    '...XXXXXX...',
+    '....XXXX....',
+    '..X......X..',
+    '.X...XX...X.',
+    '.....XX.....',
+  ],
+  // A crescent moon, for the night.
+  moon: [
+    '....XXXX....',
+    '..XXXX......',
+    '.XXXX.......',
+    '.XXX........',
+    'XXXX........',
+    'XXXX........',
+    'XXXX........',
+    'XXXX........',
+    '.XXXX.......',
+    '.XXXXX....X.',
+    '..XXXXXXXX..',
+    '....XXXX....',
+  ],
   // A chest.
   chest: [
     '............',

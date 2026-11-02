@@ -207,6 +207,42 @@
       "icon": { "style": "bread", "base": "#c98f4a", "dark": "#8d5a26", "light": "#ecc387" }
     },
     {
+      "id": "berries",
+      "name": "Berries",
+      "category": "food",
+      "description": "Picked from wild bushes, which grow more in a couple of days.",
+      "food": { "hunger": 14 },
+      "icon": {
+        "style": "berries",
+        "base": "#b8344f",
+        "dark": "#6e1d33",
+        "light": "#ec7d91",
+        "accent": "#4f8a2c"
+      }
+    },
+    {
+      "id": "mushroom",
+      "name": "Cave mushroom",
+      "category": "food",
+      "description": "Edible, if not exciting. Better in a stew.",
+      "food": { "hunger": 10 },
+      "icon": { "style": "mushroom", "base": "#c8503c", "dark": "#7d2a20", "light": "#f6eadf" }
+    },
+    {
+      "id": "mushroom_stew",
+      "name": "Mushroom stew",
+      "category": "food",
+      "description": "Hot and hearty: cooked at a kitchen stove.",
+      "food": { "hunger": 50 },
+      "icon": {
+        "style": "bowl",
+        "base": "#a8683a",
+        "dark": "#5e3a1f",
+        "light": "#e0b27a",
+        "accent": "#c8503c"
+      }
+    },
+    {
       "id": "ladder",
       "name": "Ladder",
       "category": "furniture",

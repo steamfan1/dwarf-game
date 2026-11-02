@@ -19,6 +19,8 @@ export interface NewWorldChoice {
   biome: string;
   /** Lift the fog of war over the whole map (from ?reveal=1, for testing). */
   reveal: boolean;
+  /** Start at this hour instead of the morning (from ?hour=22, for testing), or null. */
+  hour: number | null;
 }
 
 export interface UiCommands {

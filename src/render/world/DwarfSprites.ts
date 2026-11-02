@@ -4,7 +4,8 @@
  * jump follows a small arc; stepping off an edge walks first, then falls.
  *
  * The frame shows what the dwarf is doing: walking, swinging a pick, airborne, or lying
- * still. What it carries floats above its head. A small arrow marks the selected dwarf.
+ * down (asleep, with a "Zz" over it, or dead and greyed). What it carries floats above
+ * its head. A small arrow marks the selected dwarf.
  */
 import * as Phaser from 'phaser';
 import { TILE_SIZE } from '../../config';
@@ -19,7 +20,10 @@ import { DEPTH } from '../depths';
 interface DwarfView {
   body: Phaser.GameObjects.Sprite;
   load: Phaser.GameObjects.Image;
+  sleep: Phaser.GameObjects.Image;
 }
+
+const DEAD_TINT = 0x8c8c94;
 
 /** Where a dwarf is drawn, in tiles (x of its centre column, y of the row it stands in). */
 export interface DwarfPlace {
@@ -62,6 +66,14 @@ export class DwarfSprites {
       const py = (place.y + 1) * TILE_SIZE;
       view.body.setPosition(Math.round(px), Math.round(py)).setFlipX(dwarf.facing < 0);
       view.body.setFrame(this.frameFor(dwarf, place, tick, timeMs));
+      view.body.setTint(dwarf.phase === 'dead' ? DEAD_TINT : 0xffffff);
+      if (dwarf.phase === 'sleeping') {
+        // The Zz drifts up and down a little.
+        const bob = Math.round(Math.sin(timeMs / 450 + dwarf.id) * 1.5);
+        view.sleep.setPosition(Math.round(px) + 4, Math.round(py) - 14 + bob).setVisible(true);
+      } else {
+        view.sleep.setVisible(false);
+      }
 
       // A load of several things (a job's materials) shows the first of them.
       const load = dwarf.carrying[0];
@@ -119,6 +131,7 @@ export class DwarfSprites {
     for (const view of this.views.values()) {
       view.body.destroy();
       view.load.destroy();
+      view.sleep.destroy();
     }
     this.views.clear();
     this.marker.destroy();
@@ -133,13 +146,14 @@ export class DwarfSprites {
     view = {
       body: this.scene.add.sprite(0, 0, key, DWARF_FRAMES.stand).setOrigin(0.5, 1).setDepth(DEPTH.dwarves),
       load: this.scene.add.image(0, 0, 'items', 0).setOrigin(0.5, 1).setDepth(DEPTH.carried).setVisible(false),
+      sleep: this.scene.add.image(0, 0, 'sleep').setOrigin(0, 1).setDepth(DEPTH.carried).setVisible(false),
     };
     this.views.set(dwarf.id, view);
     return view;
   }
 
   private frameFor(dwarf: Dwarf, place: DwarfPlace, tick: number, timeMs: number): number {
-    if (dwarf.phase === 'dead') return DWARF_FRAMES.fallen;
+    if (dwarf.phase === 'dead' || dwarf.phase === 'sleeping') return DWARF_FRAMES.fallen;
     if (place.airborne) return DWARF_FRAMES.airborne;
     if (dwarf.movement) return DWARF_FRAMES.walk[Math.floor(timeMs / 110) % DWARF_FRAMES.walk.length]!;
     if (dwarf.phase === 'working') return (tick + dwarf.id * 3) % 12 < 6 ? DWARF_FRAMES.windUp : DWARF_FRAMES.strike;

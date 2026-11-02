@@ -6,13 +6,17 @@
  *   - `storage`: stacks of goods it holds; dwarves drop off and pick up the colony's goods
  *     there as at the Hearth;
  *   - `station`: a crafting station, named by recipes (workbench, furnace, anvil...);
- *   - `light`: it glows (torches, furnaces).
+ *   - `light`: it glows (torches, furnaces);
+ *   - `use`: "bed" (dwarves sleep in it) or "table" (dwarves eat at it).
  * `mount` says what it needs: "floor" (solid ground under its whole width, the default)
  * or "wall" (a background wall behind it, or a block beside or below it).
  */
 import { Validator } from '../../core/validate';
 
 export type FurnitureMount = 'floor' | 'wall';
+
+/** What dwarves use a piece for, besides crafting: sleeping in it, or eating at it. */
+export type FurnitureUse = 'bed' | 'table';
 
 /** How the placeholder sprite is painted (see render/assets/furnitureArt.ts). */
 export const FURNITURE_STYLES = [
@@ -50,6 +54,7 @@ export interface FurnitureDef {
   /** Crafting station kind, or null. */
   station: string | null;
   light: number;
+  use: FurnitureUse | null;
   mapColor: string;
   art: FurnitureArt;
 }
@@ -112,6 +117,7 @@ function parseFurniture(v: Validator, raw: unknown, path: string): FurnitureDef 
     storage: o?.storage === undefined ? 0 : Math.round(v.number(o.storage, `${path}.storage`, 0, 1000)),
     station: o?.station === undefined ? null : v.identifier(o.station, `${path}.station`),
     light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
+    use: o?.use === undefined ? null : (v.oneOf(o.use, ['bed', 'table'] as const, `${path}.use`) ?? null),
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: {
       style: v.oneOf(art?.style, FURNITURE_STYLES, `${path}.art.style`) ?? 'chest',

@@ -45,6 +45,17 @@ export interface TileArt {
   palette?: Record<string, string>;
 }
 
+/** A plant dwarves can pick (berries, mushrooms): what it gives, and what it leaves behind. */
+export interface HarvestDef {
+  /** Item id it gives. */
+  item: string;
+  count: number;
+  /** Tile id it turns into once picked (a bare bush), or null to disappear. */
+  becomes: string | null;
+  /** In-game days until a picked plant grows back (0: never). */
+  regrowDays: number;
+}
+
 /** What a tile visually joins up with: other solid blocks, only its own kind, or nothing. */
 export type ConnectRule = 'solid' | 'self' | 'none';
 
@@ -69,6 +80,8 @@ export interface TileDef {
   transparent: boolean;
   /** Light it gives off, 0 (none) to 15 (as bright as daylight). */
   light: number;
+  /** A plant that can be picked, or null. */
+  harvest: HarvestDef | null;
   connect: ConnectRule;
   mapColor: string;
   art: TileArt;
@@ -263,6 +276,7 @@ function parseTile(v: Validator, raw: unknown, path: string): TileDef {
   const o = v.object(raw, path);
   const solid = v.boolean(o?.solid, `${path}.solid`);
   const connect = o?.connect === undefined ? (solid ? 'solid' : 'none') : v.oneOf(o.connect, ['solid', 'self', 'none'] as const, `${path}.connect`) ?? 'none';
+  const harvest = o?.harvest === undefined ? null : v.object(o.harvest, `${path}.harvest`);
   return {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
@@ -275,6 +289,14 @@ function parseTile(v: Validator, raw: unknown, path: string): TileDef {
     door: o?.door === undefined ? false : v.boolean(o.door, `${path}.door`),
     transparent: o?.transparent === undefined ? false : v.boolean(o.transparent, `${path}.transparent`),
     light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
+    harvest: harvest
+      ? {
+          item: v.identifier(harvest.item, `${path}.harvest.item`),
+          count: Math.round(v.number(harvest.count, `${path}.harvest.count`, 1, 999)),
+          becomes: harvest.becomes === undefined ? null : v.identifier(harvest.becomes, `${path}.harvest.becomes`),
+          regrowDays: harvest.regrowDays === undefined ? 0 : v.number(harvest.regrowDays, `${path}.harvest.regrowDays`, 0, 100),
+        }
+      : null,
     connect,
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: parseArt(v, o?.art, `${path}.art`),

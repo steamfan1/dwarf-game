@@ -7,12 +7,15 @@ home from monsters at night, and finally build a gate to the next world.
 All names, art, sound and text are original to this project. Art and sound are generated
 at runtime as placeholders, so the game currently needs no image or audio files.
 
-**Status: Milestone 3 (building and crafting).** Worlds are generated from a seed in a
+**Status: Milestone 4 (needs, day and night).** Worlds are generated from a seed in a
 background worker (hills, caves, lakes, lava, ores, trees, two biomes) and drawn with
-chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to dig and trees
-to fell, plan blocks, walls, ladders, doors and furniture, and queue crafts; the dwarves
-do all of it, fetching materials from storage (the Hearth and any chests) and walking to
-the right crafting station. See [Roadmap](#roadmap) for what each milestone adds.
+chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to dig, trees to
+fell and wild plants to pick, plan blocks, walls, ladders, doors and furniture, and queue
+crafts; the dwarves do all of it, fetching materials from storage (the Hearth and any
+chests) and walking to the right crafting station. They get hungry and tired: they eat
+from storage and sleep through the night, better in a bed, at a table, or in a lit room.
+Days and nights pass, and at night only what something lights up is bright. See
+[Roadmap](#roadmap) for what each milestone adds.
 
 ## Requirements
 
@@ -38,7 +41,7 @@ Then open http://localhost:5173.
 | `npm run smoke` | Browser smoke tests against the build (run `npx playwright install chromium` once first) |
 | `npm run check` | Build, unit tests and smoke tests in one go |
 
-## Controls (Milestone 3)
+## Controls (Milestone 4)
 
 You never move dwarves or change the world yourself: you plan work, and idle dwarves
 take it on. Pick a tool from the toolbar on the left (or press its key), then click or
@@ -46,7 +49,7 @@ drag over the world.
 
 | Tool | Key | What a click or drag does |
 | --- | --- | --- |
-| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling, furniture to take apart. A click on a mark removes it; a click on a dwarf selects it |
+| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling, berry bushes and mushrooms for picking, furniture to take apart. A click on a mark removes it; a click on a dwarf selects it |
 | Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
 | Dig | F | Mark blocks (and, with a click, ladders, doors and furniture) to dig out or take apart |
 | Fell trees | C | Mark a tree for felling (click any part of it) |
@@ -76,6 +79,9 @@ it can, red where it can't, and the readout in the top-left corner says why. Rig
 | 1, 2, 3 | Normal, double, triple speed |
 | Esc | Close a dialog or the crafting panel, put the tool down, deselect the dwarf, or open the in-game menu |
 | ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
+
+The top bar shows the day, the time and a sun or a moon. The readout in the top-left
+corner describes whatever is under the pointer, including the room it's in.
 
 The interface is sized for easy reading at 100%; **Settings → Interface size** makes it
 smaller or larger (75% to 200%), and everything on screen scales together.
@@ -124,6 +130,29 @@ mark work while paused too.
 - **Dwarves equip themselves.** A dwarf with nothing better to do takes better gear from
   storage (a pickaxe, armour...) and puts back what it used before. Pickaxes make digging
   faster; weapons and armour matter once monsters arrive (Milestone 5).
+- **Dwarves eat.** Hunger goes down all the time (a full dwarf lasts more than a day). Below
+  about half, a dwarf fetches the most filling food in storage and eats it, at a table if
+  one stands within 30 tiles: a meal there goes a quarter further, half again in a room.
+  The colony starts with 12 bread and 10 berries. A hungry dwarf works slower; one with
+  nothing left to eat starves: the game warns you, and it loses health until it eats, or
+  dies of it.
+- **Dwarves sleep.** Energy goes down while a dwarf is awake. At nightfall the dwarves
+  that need it go to bed, in the nearest free bed or else on the floor by the Hearth
+  (which rests them less), and sleep until morning; sleep heals them too. A hungry dwarf
+  gets up to eat if there's food. A tired dwarf works slower, and one that runs out of
+  energy altogether falls asleep where it stands. The roster shows who is hungry or tired.
+- **Rooms.** A space closed in by blocks and doors, with a background wall behind every
+  cell of it, is a room (up to 400 cells; a big cave isn't one). A bed in a room with a
+  light (a torch, a furnace or stove, the Hearth) gives half as much sleep again, and a table in a
+  room the better meal. The readout shows the room under the pointer and what's in it, and
+  the debug overlay tints every room. From Milestone 5, monsters can't appear in rooms.
+- **Day and night.** A day is 6 minutes of daylight and 3 of night at normal speed
+  (`src/data/time.json`). The light fades out over the last half minute of the day and
+  comes back at dawn, and the sky turns deep blue. At night the sun gives a fifth of its
+  light (moonlight), so the Hearth, torches, lava and crystals stand out in the dark.
+- **Wild food.** Berry bushes grow on the surface and mushrooms on cave floors; Auto marks
+  them for picking. A bush gives 3 berries and grows more two days later; a picked
+  mushroom is gone. A kitchen stove cooks 2 mushrooms into a filling stew.
 - **Walls are for climbing.** Every block in the ground has a background wall behind it,
   and a dug-out block leaves its wall behind, so dwarves can climb straight up and down
   the shafts and caves they open (as they climb ladders).
@@ -131,10 +160,11 @@ mark work while paused too.
   they won't dig out a block if that would leave someone in a hole they can't climb out
   of. Such work shows a red mark until a way opens up.
 - **What sunlight reaches, you can see.** Sunlight lights the sky and a few blocks into
-  the ground, so the whole surface is visible from the start, and it shines further in
-  down every shaft the dwarves open. Lava and glow crystals give off light too, but don't
-  give away what's down there: everything sunlight doesn't reach stays dark until a dwarf
-  comes close. (Day and night arrive in Milestone 4.)
+  the ground, so the whole surface is visible from the start (night included), and it
+  shines further in down every shaft the dwarves open. Lava and glow crystals give off
+  light too, but don't give away what's down there: everything sunlight doesn't reach
+  stays hidden until a dwarf comes close. Explored places are drawn darker the less light
+  reaches them; a tunnel no light reaches stays dimly visible.
 
 ### Choosing a world
 
@@ -147,6 +177,7 @@ can preset the dialog, which is handy for testing and sharing:
 | `?seed=mossy-cavern-17` | Preset the seed |
 | `?biome=snow` | Preset the biome (`temperate` or `snow`) |
 | `?reveal=1` | Start with the fog of war lifted over the whole map |
+| `?hour=22` | Start at that hour (0 to 23) instead of 8 in the morning: 22 is night |
 
 ## Project structure
 
@@ -161,9 +192,11 @@ src/
     world/         the tile grid (typed arrays), the tile registry built from tiles.json, trees
     worldgen/      seeded world generation: terrain, caves, liquids, ores, vegetation
     light/         per-tile light (sunlight, lava, the Hearth) that also decides what's explored
+    time/          day and night: the clock, the day count, how strong the sun is
+    rooms/         room detection: enclosed spaces, found by flood fill
     nav/           how dwarves move, A* pathfinding with a per-tick budget and a path cache
-    jobs/          the job board: dig, fell, haul, build, craft... jobs, claims and priorities
-    dwarves/       dwarves (data), their behaviour (DwarfAI) and colony settings
+    jobs/          the job board: dig, fell, haul, build, craft, pick... jobs, claims and priorities
+    dwarves/       dwarves (data), their behaviour and needs (DwarfAI) and colony settings
     items/         the item registry, items lying in the world, and the colony's storage
     furniture/     the furniture registry and the furniture standing in the world
     crafting/      recipes and the queue of crafting orders
@@ -176,7 +209,7 @@ src/
   ui/              HTML/CSS overlay in Preact: menus, HUD, settings, debug panel
   debug/           window.debug helpers (dev builds only)
   data/            game content as JSON: tiles, biomes, world generation, items, furniture,
-                   recipes, dwarves, strings
+                   recipes, dwarves, time of day, strings
 e2e/               browser smoke tests (Playwright)
 .github/workflows/ CI and GitHub Pages deployment
 ```
@@ -212,9 +245,24 @@ e2e/               browser smoke tests (Playwright)
   water. Any sunlit cell counts as explored, as do cells near a dwarf; glow alone never
   uncovers anything. A dug block relights only the cells within reach of it (a few
   hundred), never the whole world.
-- **Fog of war** is a 400 x 200 texture (one pixel per tile) stretched over the world,
-  updated only where cells are revealed, at most once per frame. In Milestone 4 the same
-  texture also shows darkness from the light levels.
+- **Fog of war and darkness** share one 400 x 200 texture (one pixel per tile) stretched
+  over the world (`render/world/FogOverlay.ts`): unexplored cells are opaque, explored ones
+  are darkened by how little light reaches them. Cells are updated only where they're
+  revealed or relit, at most once per frame; the whole texture is redrawn only when the
+  daylight changes by a visible step, a few times a second at dawn and dusk.
+- **Day and night** (`sim/time/TimeOfDay.ts`) are worked out from the tick, so saving the
+  tick saves the time of day. The light map itself never changes at nightfall: the sun's
+  strength scales the sunlight channel only where it's used (the darkness texture, and
+  `Simulation.lightNow`), so night costs nothing to compute.
+- **Needs** (hunger, energy, health) are kept on each dwarf and change every tick, at
+  rates worked out from the per-day numbers in dwarves.json. Eating and sleeping are
+  personal jobs: a dwarf makes one for itself when it needs to (`sim/dwarves/DwarfAI.ts`),
+  so they never go on the board for others to take, and a meal reserves its food in
+  storage like any other job's materials.
+- **Rooms** (`sim/rooms/RoomMap.ts`) come from one flood fill over the open cells of the
+  whole world into a typed array of room ids, rebuilt at most every 10 ticks and only after
+  blocks, walls, doors or furniture change. Each room counts the beds, tables and lights
+  in it.
 - **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`): walking, jumping,
   dropping, swimming and climbing ladders or background walls. The moves are worked out
   from the tile grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
@@ -264,8 +312,9 @@ at runtime.
   with `t('key')`. Placeholders look like `{name}`. A translation would be another file
   with the same keys.
 - **Items** are in `src/data/items.json`, **furniture** in `src/data/furniture.json`,
-  **recipes** in `src/data/recipes.json` and **dwarves** (names, looks, speeds, skills)
-  in `src/data/dwarves.json`, all described below. **The tech tree, creatures and spells**
+  **recipes** in `src/data/recipes.json`, **dwarves** (names, looks, speeds, skills,
+  needs) in `src/data/dwarves.json` and **day and night** in `src/data/time.json`, all
+  described below. **The tech tree, creatures and spells**
   get their JSON files in Milestones 5 to 7, documented here as they arrive.
 
 Every file is checked when the game starts. A mistake (a misspelt tile id, a colour that
@@ -307,6 +356,7 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 | `door` | Dwarves walk through it, but it stops light (and, from Milestone 5, monsters). |
 | `transparent` | A solid block that lets light through (glass). |
 | `light` | Light it gives off, 0 to 15 (15 is daylight). Liquids can glow too (lava is 12). |
+| `harvest` | Optional. A plant the dwarves can pick: `{ "item": "berries", "count": 3, "becomes": "berry_bush_bare", "regrowDays": 2 }`. `becomes` is the tile left behind (nothing if left out), which turns back into this one `regrowDays` days later (never if left out). |
 | `connect` | What the tile visually joins with: `solid` (default for solid tiles), `self` or `none`. |
 | `mapColor` | Colour on the minimap. |
 | `art` | How the placeholder art is painted (below). |
@@ -367,7 +417,7 @@ in tiles.json and an ore rule here.
 | `icon` | The placeholder icon: a `style` (`lump`, `pile`, `ore`, `log`, `plank`, `bar`, `pickaxe`, `chest`, `torch`... see `ICON_STYLES` in `sim/items/ItemRegistry.ts`) with `base`, `dark` and `light` colours and an optional `accent`. |
 | `builds` | Optional. What building with it puts in the world: `{ "tile": "plank" }` (the Build tool's palette) or `{ "furniture": "chest" }` (the Furniture tool's). Items that are a wall's `material` appear in the Walls palette. |
 | `equip` | Optional. Gear: `slot` (`head`, `body`, `weapon`, `tool` or `accessory`), `tier` (dwarves swap up to higher tiers by themselves), and `digSpeed` (tools), `damage` (weapons) or `armor`. |
-| `food` | Optional. `{ "hunger": 40 }`: how much eating one restores (Milestone 4). |
+| `food` | Optional. `{ "hunger": 40 }`: how much hunger eating one restores (a full dwarf is at 100). Dwarves eat the most filling food first. |
 
 Every tile's `drops` must name an item here; the game checks this at start-up. So a new
 ore takes three entries: the tile, its ore rule in worldgen.json, and the item it drops.
@@ -392,6 +442,7 @@ ore takes three entries: the tile, its ore rule in worldgen.json, and the item i
 | `storage` | Stacks of goods it adds to the colony's storage (chests). |
 | `station` | The crafting station it provides, named by recipes (`workbench`, `furnace`, `anvil`, `loom`, `kitchen`...). |
 | `light` | Light it gives off, 0 to 15. |
+| `use` | `bed` (a dwarf sleeps in it) or `table` (dwarves eat at it). |
 | `art` | Placeholder sprite: a `style` (see `FURNITURE_STYLES` in `sim/furniture/FurnitureRegistry.ts`) and colours. |
 
 Each piece of furniture is built from exactly one item whose `builds` names it, and that
@@ -421,9 +472,37 @@ set the pace of the game: `movement` (ticks per step for each kind of move, the 
 and fall damage), `vision` (how near a dwarf must be to uncover a cell), `storage` (stack
 slots the Hearth holds), `work` (ticks to dig a block of hardness 1, to fell a tree, to
 pick up and put down, to build a block, a wall or furniture, to take furniture apart, and
-how many leaf tiles give one fibre) and `skills` (the experience each level needs, how
-much faster each level works, and the experience for digging, felling, building and each
-second of crafting). There are 20 ticks per second at normal speed.
+how many leaf tiles give one fibre, and to pick a plant), `skills` (the experience each
+level needs, how much faster each level works, and the experience for digging, felling,
+building, picking and each second of crafting), `startingItems` (what's in storage when a
+colony starts) and `needs`. There are 20 ticks per second at normal speed.
+
+`needs` sets how hunger and sleep work. Hunger and energy run from 0 to 100, and the
+rates are per in-game day:
+
+| Field | Meaning |
+| --- | --- |
+| `hungerPerDay` | Hunger lost over a whole day and night. |
+| `eatBelow`, `hungryBelow` | A dwarf goes to eat below the first; below the second it's hungry (slower, and it gets up from sleep to eat). |
+| `starvingDamagePerDay` | Health lost per day at zero hunger. |
+| `energyPerDay` | Energy lost over the daylight hours. |
+| `sleepAtNightBelow`, `sleepBelow` | At night a dwarf goes to bed below the first; at any time below the second. |
+| `tiredBelow` | Below this a dwarf is tired, and works slower. |
+| `sleepPerNight`, `healPerNight` | Energy and health a whole night in bed gives back. |
+| `floorSleep`, `roomSleepBonus` | How fast sleep works on the floor, and in a bed in a room with a light, compared with a bed. |
+| `slowWork` | How fast a hungry or tired dwarf works (0.7 is 70%). |
+| `eatTicks` | How long a meal takes, in ticks. |
+| `tableBonus`, `roomTableBonus`, `tableReach` | How much further a meal at a table goes, at a table in a room, and how near (in tiles) a table must be. |
+
+### Day and night: `src/data/time.json`
+
+| Field | Meaning |
+| --- | --- |
+| `dayMinutes`, `nightMinutes` | Real minutes of daylight and of night at normal speed. |
+| `transitionSeconds` | How long the light takes to fade at dusk, and to come back at dawn. |
+| `nightLight` | How bright the sun is at night, as a fraction of daylight (moonlight). |
+| `dayStartHour`, `nightStartHour` | The hours the clock shows at dawn and at nightfall. |
+| `startHour` | The hour a new world starts at. |
 
 ### Replacing placeholder art and sound
 
@@ -441,6 +520,7 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   picture and that the sunlit surface is visible, marking blocks and a tree and watching
   the dwarves dig, fell and haul, crafting planks and a chest from the felled tree and
   setting the chest down (storage grows), building a block and a wall, the dwarf panel,
+  a world started at night (dark sky, the Hearth's light, the clock's moon),
   zooming and panning, the minimap, the simulation ticking at the right rate, pause, menu,
   settings, right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
   each test's browser console log go to `test-results/`. `e2e/perf.spec.ts` also records
@@ -456,16 +536,17 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 - Press **`** (backtick) in game for the debug overlay: frame and tick timing, camera and
   cursor tiles, chunks drawn, jobs by type (and how many are blocked), pathfinding
   counts, and how far the dwarves can range from the Hearth. In the world it draws chunk
-  borders, each dwarf's remaining path (cyan) and the job it has reserved (gold), and the
-  "Show light levels" box swaps the fog of war for the light map. Room regions arrive in
-  Milestone 4.
+  borders, each dwarf's remaining path (cyan), the job it has reserved (gold) and every
+  room (each tinted its own colour), and the "Show light levels" box swaps the fog of war
+  for the light map. It also counts the rooms and shows how strong the daylight is.
 - In dev builds (`npm run dev`), the browser console has `window.debug`:
   `debug.setSpeed(5)` runs the simulation 5x faster on top of the chosen speed,
   `debug.revealMap()` lifts the fog of war, `debug.spawnItem('stone', 20)` drops items
   beside the Hearth for the dwarves to store, `debug.give('plank', 20)` puts items straight
   into storage, and `debug.stockUp()` stocks a bit of every raw material plus one of each
-  crafting station, for trying out building and crafting quickly. `skipToNight()` becomes
-  active with day and night in Milestone 4.
+  crafting station, for trying out building and crafting quickly, and
+  `debug.skipToNight()` brings nightfall forward to now. To start a world at night, add
+  `?hour=22` to the address.
 
 ## Deploying
 
@@ -509,8 +590,8 @@ static host works the same way: upload the contents of `dist/`.
 | 1 | World generation in a worker, chunked tile rendering, camera, digging by click | Done |
 | 2 | Dwarves, pathfinding, job queue (dig, chop, haul); light shows the surface | Done |
 | 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Done |
-| 4 | Hunger and sleep, day/night, lighting overlay, room detection | Next |
-| 5 | Monsters, combat, invasion waves, defences | |
+| 4 | Hunger and sleep, day/night, lighting overlay, room detection | Done |
+| 5 | Monsters, combat, invasion waves, defences | Next |
 | 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | |
 | 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | |
 | 8 | Release: bundle optimisation, cross-browser testing, publishing guides | |

@@ -1,13 +1,55 @@
 /**
- * Colony tuning from src/data/dwarves.json: how many dwarves there are, how they are
- * named and dressed, how fast they move and work, how much the Hearth stores, and how
- * their skills grow.
+ * Colony tuning from src/data/dwarves.json: how many dwarves there are and what they
+ * start with, how they are named and dressed, how fast they move and work, how much the
+ * Hearth stores, how quickly they get hungry and tired, and how their skills grow.
+ *
+ * Need rates are given per in-game day (a whole day and night, see time.json), so they
+ * keep the same rhythm if the day is made longer or shorter.
  */
 import { Validator } from '../../core/validate';
+
+export interface NeedSettings {
+  /** Hunger lost over a whole day and night (hunger runs from 100, full, to 0). */
+  hungerPerDay: number;
+  /** A dwarf goes to eat when its hunger falls below this. */
+  eatBelow: number;
+  /** Below this it works slower ("hungry"); at 0 it starves and loses health. */
+  hungryBelow: number;
+  /** Health lost per day while starving. */
+  starvingDamagePerDay: number;
+  /** Energy lost over the daytime while awake (energy runs from 100, rested, to 0). */
+  energyPerDay: number;
+  /** At night a dwarf goes to bed when its energy is below this. */
+  sleepAtNightBelow: number;
+  /** At any time, a dwarf goes to bed when its energy falls below this. */
+  sleepBelow: number;
+  /** Below this it works slower ("tired"); at 0 it falls asleep where it stands. */
+  tiredBelow: number;
+  /** Energy regained by sleeping through a whole night in a bed. */
+  sleepPerNight: number;
+  /** Sleeping without a bed (on the floor) restores this fraction as fast. */
+  floorSleep: number;
+  /** A bed in a room with a light restores this many times as fast. */
+  roomSleepBonus: number;
+  /** Health healed by sleeping through a whole night (in bed; scaled like energy). */
+  healPerNight: number;
+  /** Work speed while hungry or tired (multiplied when both). */
+  slowWork: number;
+  /** Ticks to eat a meal. */
+  eatTicks: number;
+  /** A meal eaten at a table fills this many times as much. */
+  tableBonus: number;
+  /** ...and this many times as much at a table in a room. */
+  roomTableBonus: number;
+  /** Dwarves walk to a table to eat if one is at most this many tiles away. */
+  tableReach: number;
+}
 
 export interface ColonySettings {
   startingDwarves: number;
   maxDwarves: number;
+  /** Goods in storage when a colony starts (item ids from items.json). */
+  startingItems: Array<{ item: string; count: number }>;
   names: { first: string[]; familyStart: string[]; familyEnd: string[] };
   looks: { skin: string[]; beard: string[]; tunic: string[] };
   health: { max: number };
@@ -46,6 +88,8 @@ export interface ColonySettings {
     dismantleTicks: number;
     /** A felled tree gives one fibre for every this many leaf tiles (at least one). */
     leavesPerFiber: number;
+    /** Ticks to pick a plant (berries, mushrooms) at farming level 1. */
+    harvestTicks: number;
     /** Idle dwarves wander up to this many tiles from the Hearth. */
     wanderRadius: number;
   };
@@ -54,8 +98,9 @@ export interface ColonySettings {
     levels: number[];
     /** Work speed gained per level above 1 (0.12 = 12% faster each level). */
     speedPerLevel: number;
-    xp: { digPerHardness: number; chop: number; build: number; craftPerSecond: number };
+    xp: { digPerHardness: number; chop: number; build: number; craftPerSecond: number; harvest: number };
   };
+  needs: NeedSettings;
 }
 
 export function parseColonySettings(data: unknown): ColonySettings {
@@ -77,6 +122,7 @@ export function parseColonySettings(data: unknown): ColonySettings {
   const movement = section('movement');
   const vision = section('vision');
   const work = section('work');
+  const needs = section('needs');
   const skills = section('skills');
   const xp = v.object(skills?.xp, 'skills.xp');
   const text = (value: unknown, path: string): string => v.string(value, path);
@@ -91,6 +137,10 @@ export function parseColonySettings(data: unknown): ColonySettings {
   const settings: ColonySettings = {
     startingDwarves: count(root, 'startingDwarves', 'root', 1, 12),
     maxDwarves: count(root, 'maxDwarves', 'root', 1, 64),
+    startingItems: v.array(root?.startingItems, 'startingItems').map((raw, i) => {
+      const o = v.object(raw, `startingItems[${i}]`);
+      return { item: v.identifier(o?.item, `startingItems[${i}].item`), count: count(o, 'count', `startingItems[${i}]`, 1, 999) };
+    }),
     names: {
       first: strings(names?.first, 'names.first', text),
       familyStart: strings(names?.familyStart, 'names.familyStart', text),
@@ -123,6 +173,7 @@ export function parseColonySettings(data: unknown): ColonySettings {
       furnitureTicks: count(work, 'furnitureTicks', 'work', 1, 1000),
       dismantleTicks: count(work, 'dismantleTicks', 'work', 1, 1000),
       leavesPerFiber: count(work, 'leavesPerFiber', 'work', 1, 100),
+      harvestTicks: count(work, 'harvestTicks', 'work', 1, 1000),
       wanderRadius: count(work, 'wanderRadius', 'work', 0, 50),
     },
     skills: {
@@ -133,10 +184,32 @@ export function parseColonySettings(data: unknown): ColonySettings {
         chop: v.number(xp?.chop, 'skills.xp.chop', 0, 1000),
         build: v.number(xp?.build, 'skills.xp.build', 0, 1000),
         craftPerSecond: v.number(xp?.craftPerSecond, 'skills.xp.craftPerSecond', 0, 1000),
+        harvest: v.number(xp?.harvest, 'skills.xp.harvest', 0, 1000),
       },
+    },
+    needs: {
+      hungerPerDay: v.number(needs?.hungerPerDay, 'needs.hungerPerDay', 0, 1000),
+      eatBelow: v.number(needs?.eatBelow, 'needs.eatBelow', 0, 100),
+      hungryBelow: v.number(needs?.hungryBelow, 'needs.hungryBelow', 0, 100),
+      starvingDamagePerDay: v.number(needs?.starvingDamagePerDay, 'needs.starvingDamagePerDay', 0, 10000),
+      energyPerDay: v.number(needs?.energyPerDay, 'needs.energyPerDay', 0, 1000),
+      sleepAtNightBelow: v.number(needs?.sleepAtNightBelow, 'needs.sleepAtNightBelow', 0, 100),
+      sleepBelow: v.number(needs?.sleepBelow, 'needs.sleepBelow', 0, 100),
+      tiredBelow: v.number(needs?.tiredBelow, 'needs.tiredBelow', 0, 100),
+      sleepPerNight: v.number(needs?.sleepPerNight, 'needs.sleepPerNight', 1, 10000),
+      floorSleep: v.number(needs?.floorSleep, 'needs.floorSleep', 0.05, 1),
+      roomSleepBonus: v.number(needs?.roomSleepBonus, 'needs.roomSleepBonus', 1, 10),
+      healPerNight: v.number(needs?.healPerNight, 'needs.healPerNight', 0, 10000),
+      slowWork: v.number(needs?.slowWork, 'needs.slowWork', 0.1, 1),
+      eatTicks: count(needs, 'eatTicks', 'needs', 1, 1000),
+      tableBonus: v.number(needs?.tableBonus, 'needs.tableBonus', 1, 10),
+      roomTableBonus: v.number(needs?.roomTableBonus, 'needs.roomTableBonus', 1, 10),
+      tableReach: count(needs, 'tableReach', 'needs', 0, 400),
     },
   };
   if (settings.maxDwarves < settings.startingDwarves) v.problem('maxDwarves must be at least startingDwarves');
+  if (settings.needs.hungryBelow > settings.needs.eatBelow) v.problem('needs.hungryBelow must not be above needs.eatBelow');
+  if (settings.needs.sleepBelow > settings.needs.sleepAtNightBelow) v.problem('needs.sleepBelow must not be above needs.sleepAtNightBelow');
   v.throwIfProblems();
   return settings;
 }

@@ -14,15 +14,16 @@ const random = (): string => 'random-seed';
 
 describe('worldOptionsFromQuery', () => {
   it('defaults to a random seed in the temperate biome, fog on', () => {
-    expect(worldOptionsFromQuery('', BIOMES, random)).toEqual({ seed: 'random-seed', biome: 'temperate', reveal: false });
+    expect(worldOptionsFromQuery('', BIOMES, random)).toEqual({ seed: 'random-seed', biome: 'temperate', reveal: false, hour: null });
   });
 
   it('reads seed, biome and reveal from the address', () => {
-    expect(worldOptionsFromQuery('?seed=mossy&biome=SNOW&reveal=1', BIOMES, random)).toEqual({ seed: 'mossy', biome: 'snow', reveal: true });
+    expect(worldOptionsFromQuery('?seed=mossy&biome=SNOW&reveal=1&hour=22', BIOMES, random)).toEqual({ seed: 'mossy', biome: 'snow', reveal: true, hour: 22 });
+    expect(worldOptionsFromQuery('?hour=25', BIOMES, random).hour).toBeNull();
     expect(worldOptionsFromQuery('?reveal', BIOMES, random).reveal).toBe(true);
   });
 
   it('ignores unknown biomes and blank seeds', () => {
-    expect(worldOptionsFromQuery('?seed=%20&biome=lava', BIOMES, random)).toEqual({ seed: 'random-seed', biome: 'temperate', reveal: false });
+    expect(worldOptionsFromQuery('?seed=%20&biome=lava', BIOMES, random)).toEqual({ seed: 'random-seed', biome: 'temperate', reveal: false, hour: null });
   });
 });

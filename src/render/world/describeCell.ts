@@ -62,6 +62,12 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
     details.push(t('hover.caveDetail', { wall: tiles.walls[wall]!.name }));
   } else title = tiles.tiles[AIR]!.name;
 
+  const room = sim.rooms.roomAt(x, y);
+  if (room) {
+    const has = [room.beds > 0 && t('hover.roomBed'), room.tables > 0 && t('hover.roomTable'), room.lights > 0 && t('hover.roomLight')].filter(Boolean);
+    details.push(`${t('hover.room', { size: room.size })}${has.length > 0 ? `: ${has.join(', ')}` : ''}`);
+  }
+
   const job = sim.jobs.at(x, y);
   const wallJob = sim.jobs.wallAt(x, y);
   if (job) details.push(describeMark(sim, job));
@@ -182,13 +188,27 @@ export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolea
     case 'to-supply':
     case 'fetching':
       if (job?.type === 'equip') return t('activity.toEquip', { item: lower(job.target) });
+      if (job?.type === 'eat') return t('activity.toEat', { item: lower(job.target) });
       return t('activity.toSupply', { item: job ? list(job.inputs) : '' });
+    case 'sleeping': {
+      const inBed = job?.type === 'sleep' && job.furnitureId !== 0;
+      return t(inBed ? 'activity.sleepingBed' : 'activity.sleepingFloor');
+    }
     case 'to-job':
     case 'working': {
       const working = dwarf.phase === 'working';
       switch (job?.type) {
         case 'chop':
           return t(working ? 'activity.chopping' : 'activity.toChop');
+        case 'eat':
+          return t(working ? 'activity.eating' : 'activity.toTable', { item: lower(job.target) });
+        case 'sleep':
+          return t(job.furnitureId !== 0 ? 'activity.toBed' : 'activity.toFloor');
+        case 'harvest': {
+          const crop = sim.tiles.tiles[job.target]?.harvest?.item;
+          const item = crop && sim.items.has(crop) ? sim.items.get(sim.items.item(crop)).name.toLowerCase() : '';
+          return t(working ? 'activity.picking' : 'activity.toPick', { item });
+        }
         case 'build':
         case 'wall':
         case 'place':

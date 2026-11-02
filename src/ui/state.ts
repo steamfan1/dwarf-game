@@ -36,7 +36,21 @@ export interface DebugStats {
   paths: { searches: number; cacheHits: number; busy: number; cached: number };
   /** Cells dwarves can reach from the Hearth, and walk home from. */
   homeCells: { fromHome: number; toHome: number };
+  /** Rooms found, and the sun's strength now (0..1). */
+  rooms: number;
+  daylight: number;
 }
+
+/** The time of day, for the top bar. */
+export interface ClockView {
+  day: number;
+  hour: number;
+  minute: number;
+  night: boolean;
+}
+
+/** A need a dwarf is short of, worst first: shown as a warning beside its name. */
+export type NeedWarning = 'starving' | 'hungry' | 'exhausted' | 'tired';
 
 /** What a click with the current tool would do to the cell under the pointer. */
 export type HoverAction = 'ok' | 'blocked' | 'none';
@@ -88,6 +102,8 @@ export interface DwarfSummary {
   equipment: Array<{ slot: EquipmentSlot; item: string | null; icon: string | null }>;
   /** What it has in its arms (nothing: empty). */
   carrying: Array<{ name: string; count: number; icon: string }>;
+  /** Needs running short. */
+  needs: NeedWarning[];
   dead: boolean;
   /** Can't walk back to the Hearth from where it is. */
   stranded: boolean;
@@ -177,7 +193,7 @@ export interface UiState {
   fatalMessage: string;
   loading: { stage: LoadingStage; progress: number } | null;
   /** Starting values for the New world dialog; the dialog is open while this is set. */
-  newWorld: { seed: string; biome: string; reveal: boolean } | null;
+  newWorld: { seed: string; biome: string; reveal: boolean; hour: number | null } | null;
   /** The running world, for the menu. */
   world: { seed: string; biomeName: string } | null;
   /** null until storage has been probed; false means settings and saves won't persist. */
@@ -203,6 +219,7 @@ export interface UiState {
   selectedDwarf: number | null;
   colony: ColonyView | null;
   catalogue: Catalogue | null;
+  clock: ClockView | null;
 }
 
 export const uiState = new Store<UiState>({
@@ -230,6 +247,7 @@ export const uiState = new Store<UiState>({
   selectedDwarf: null,
   colony: null,
   catalogue: null,
+  clock: null,
 });
 
 let nextToastId = 1;

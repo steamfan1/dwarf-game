@@ -287,6 +287,58 @@
           "......kssk......",
           "......kssk......"
         ]
+      },
+      "harvest": { "item": "mushroom", "count": 1 }
+    },
+    {
+      "id": "berry_bush",
+      "name": "Berry bush",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#4f9a36",
+      "harvest": { "item": "berries", "count": 3, "becomes": "berry_bush_bare", "regrowDays": 2 },
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#2f6b2a", "G": "#4f9a36", "r": "#b8344f", "R": "#f07a8c", "b": "#5a3a20" },
+        "rows": [
+          "................",
+          ".....gGGg.......",
+          "...gGGgGGg.gg...",
+          "..gGrGGgGrGGGg..",
+          ".gGrRrGgrRrgGGg.",
+          ".gGGrGGGGrGGrGg.",
+          "gGgGGgrGgGGrRrGg",
+          "gGGrGGrRrGgGrGGg",
+          ".gGrRrGrGGGGgGg.",
+          "..gGrGGgGrGGg...",
+          "...gggGbGGgg....",
+          ".......bb......."
+        ]
+      }
+    },
+    {
+      "id": "berry_bush_bare",
+      "name": "Picked berry bush",
+      "solid": false,
+      "replaceable": true,
+      "mapColor": "#4f9a36",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#2f6b2a", "G": "#4f9a36", "b": "#5a3a20" },
+        "rows": [
+          "................",
+          ".....gGGg.......",
+          "...gGGgGGg.gg...",
+          "..gGGGGgGGGGGg..",
+          ".gGGGGGgGGGgGGg.",
+          ".gGGGGGGGGGGGGg.",
+          "gGgGGgGGgGGGGGGg",
+          "gGGGGGGGGGgGGGGg",
+          ".gGGGGGGGGGGgGg.",
+          "..gGGGGgGGGGg...",
+          "...gggGbGGgg....",
+          ".......bb......."
+        ]
       }
     },
     {

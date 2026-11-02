@@ -293,6 +293,38 @@ test('crafting and building: planks and a chest from a felled tree, then the Fur
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
+test('night: a world started at 22:00 is dark but for the Hearth, and the clock shows the moon', async ({ page, browserErrors }, testInfo) => {
+  await page.goto('./?hour=22');
+  await createWorld(page, { seed: 'smoke-test' });
+  const clock = page.getByTestId('clock');
+  await expect(clock).toContainText('Day 1');
+  await expect(clock).toContainText(/22:\d0/);
+  await expect(clock).toHaveClass(/night/);
+  await page.keyboard.press('Backquote');
+  await expect(page.getByTestId('debug-daylight')).toHaveText(/^2\d%$/);
+  await page.keyboard.press('Backquote');
+  await page.waitForTimeout(800);
+  const shot = decodePng(await page.screenshot({ path: testInfo.outputPath('night.png') }));
+
+  // The camera starts centred two tiles above the Hearth (one tile is 32 CSS pixels).
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
+  const tile = 32;
+  const brightness = (x: number, y: number): number => {
+    const [red, green, blue] = pixelAt(shot, x, y);
+    return red + green + blue;
+  };
+  // Only moonlight on the open sky far from the colony (left of it, clear of the panels on
+  // the right); the Hearth's fire lights the air above it.
+  const farSky = brightness(centre.x - 9 * tile, centre.y - 5 * tile);
+  const nearHearth = brightness(centre.x, centre.y - tile);
+  testInfo.annotations.push({ type: 'brightness', description: `far sky ${farSky}, above the Hearth ${nearHearth}` });
+  expect(farSky, 'the night sky far from the Hearth').toBeLessThan(220);
+  expect(nearHearth, 'the sky lit by the Hearth').toBeGreaterThan(farSky + 60);
+
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
 test('a snowy world can be chosen in the New world dialog', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   await createWorld(page, { seed: 'frost-hollow', biome: 'snow' });
