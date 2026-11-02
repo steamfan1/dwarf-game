@@ -1,56 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { EventBus } from '../core/EventBus';
 import { CONTENT, ITEMS, TILES } from './content';
-import type { GameEvents } from './events';
-import { Simulation } from './Simulation';
+import { at, newSim } from './testKit';
 import { AIR } from './world/TileRegistry';
 import { World } from './world/World';
 import { generateWorld } from './worldgen/generateWorld';
-
-/**
- * A hand-built world, 48 x 24:
- *   rows 0-9 sky, row 10 grass, rows 11-14 dirt, rows 15-22 stone, row 23 bedrock,
- *   background walls behind every block, as in a generated world. The Hearth stands at
- *   (20, 9); an oak with a four-tile trunk stands on (34, 10).
- */
-function makeWorld(): World {
-  const width = 48;
-  const height = 24;
-  const world = World.empty(width, height, 'sim-test', 'temperate');
-  world.surface.fill(10);
-  for (let x = 0; x < width; x++) {
-    for (let y = 10; y < height; y++) {
-      const tile = y === 10 ? 'grass' : y === height - 1 ? 'bedrock' : y >= 15 ? 'stone' : 'dirt';
-      world.fg[world.index(x, y)] = TILES.tile(tile);
-      world.bg[world.index(x, y)] = TILES.wall('dirt_wall');
-    }
-  }
-  for (let y = 6; y <= 9; y++) world.fg[world.index(34, y)] = TILES.tile('log');
-  for (let y = 3; y <= 6; y++) {
-    for (let x = 32; x <= 36; x++) if (world.fg[world.index(x, y)] === AIR) world.fg[world.index(x, y)] = TILES.tile('leaves');
-  }
-  world.spawn = { x: 20, y: 9 };
-  return world;
-}
-
-function newSim(world = makeWorld()) {
-  const bus = new EventBus<GameEvents>();
-  const sim = new Simulation({ world, ...CONTENT, bus });
-  const run = (ticks: number): void => {
-    for (let i = 0; i < ticks; i++) sim.step();
-  };
-  /** Step until `done` is true or `limit` ticks pass; returns the ticks taken. */
-  const runUntil = (done: () => boolean, limit = 4000): number => {
-    for (let i = 0; i < limit; i++) {
-      if (done()) return i;
-      sim.step();
-    }
-    throw new Error(`Still waiting after ${limit} ticks`);
-  };
-  return { world, bus, sim, run, runUntil };
-}
-
-const at = (x: number, y: number) => ({ x0: x, y0: y, x1: x, y1: y });
 
 describe('Simulation: dwarves change the world, the player only gives orders', () => {
   it('starts with three named dwarves beside the Hearth, and the sunlit surface already explored', () => {
@@ -97,7 +50,7 @@ describe('Simulation: dwarves change the world, the player only gives orders', (
     world.revealEllipse(25, 12, 6, 6);
     expect(sim.designate('dig', { x0: 24, y0: 10, x1: 27, y1: 13 }, 2)).toBe(16);
     // Done when no work is left, nobody is busy and everything is stored.
-    runUntil(() => sim.jobs.size === 0 && sim.ground.size === 0 && sim.dwarves.every((d) => d.carrying === null), 10_000);
+    runUntil(() => sim.jobs.size === 0 && sim.ground.size === 0 && sim.dwarves.every((d) => d.carrying.length === 0), 10_000);
     for (let y = 10; y <= 13; y++) for (let x = 24; x <= 27; x++) expect(world.fg[world.index(x, y)]).toBe(AIR);
     expect(sim.storage.count(ITEMS.item('dirt'))).toBe(16);
     // Everyone can still walk home.

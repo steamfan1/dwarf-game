@@ -11,8 +11,69 @@ export type ItemCategory = 'block' | 'material' | 'ore' | 'tool' | 'weapon' | 'a
 const CATEGORIES: readonly ItemCategory[] = ['block', 'material', 'ore', 'tool', 'weapon', 'armor', 'food', 'furniture'];
 
 /** How the placeholder icon is painted (see render/assets/itemArt.ts). */
-export type IconStyle = 'lump' | 'pile' | 'ball' | 'gem' | 'ore' | 'log';
-const ICON_STYLES: readonly IconStyle[] = ['lump', 'pile', 'ball', 'gem', 'ore', 'log'];
+export const ICON_STYLES = [
+  'lump',
+  'pile',
+  'ball',
+  'gem',
+  'ore',
+  'log',
+  'plank',
+  'brick',
+  'pane',
+  'bar',
+  'fiber',
+  'cloth',
+  'meat',
+  'wheat',
+  'bread',
+  'ladder',
+  'door',
+  'chest',
+  'torch',
+  'bench',
+  'furnace',
+  'anvil',
+  'loom',
+  'stove',
+  'bed',
+  'table',
+  'chair',
+  'trap',
+  'pickaxe',
+  'sword',
+  'crossbow',
+  'tunic',
+  'helmet',
+  'chestplate',
+  'amulet',
+] as const;
+export type IconStyle = (typeof ICON_STYLES)[number];
+
+/** Equipment slots, as on a dwarf (see sim/dwarves/Dwarf.ts). */
+export const EQUIP_SLOTS = ['head', 'body', 'weapon', 'tool', 'accessory'] as const;
+export type EquipSlot = (typeof EQUIP_SLOTS)[number];
+
+/** What a dwarf can wear or wield. Higher tiers replace lower ones automatically. */
+export interface EquipStats {
+  slot: EquipSlot;
+  tier: number;
+  /** Tools: how many times faster than bare hands it digs (1 = no better). */
+  digSpeed: number;
+  /** Weapons: damage per hit (combat arrives in Milestone 5). */
+  damage: number;
+  /** Armour: damage taken off each hit (Milestone 5). */
+  armor: number;
+}
+
+/** Some number of one item: a recipe's input or output, what a dwarf carries, a stack. */
+export interface ItemCount {
+  item: number;
+  count: number;
+}
+
+/** What building with an item puts into the world: a tile in the grid, or a piece of furniture. */
+export type BuildTarget = { tile: string } | { furniture: string };
 
 export interface ItemIcon {
   style: IconStyle;
@@ -31,6 +92,11 @@ export interface ItemDef {
   /** Most of one item that fits in a single stack (on the ground or in a dwarf's arms). */
   stack: number;
   icon: ItemIcon;
+  /** Building with it places this, or null. */
+  builds: BuildTarget | null;
+  equip: EquipStats | null;
+  /** Food: hunger restored by eating one (needs arrive in Milestone 4). */
+  food: { hunger: number } | null;
 }
 
 export const DEFAULT_STACK = 50;
@@ -75,9 +141,33 @@ export class ItemRegistry {
   }
 }
 
+function parseBuilds(v: Validator, raw: unknown, path: string): BuildTarget | null {
+  if (raw === undefined) return null;
+  const o = v.object(raw, path);
+  if (o?.tile !== undefined) return { tile: v.identifier(o.tile, `${path}.tile`) };
+  if (o?.furniture !== undefined) return { furniture: v.identifier(o.furniture, `${path}.furniture`) };
+  v.problem(`${path} needs "tile" or "furniture"`);
+  return null;
+}
+
+function parseEquip(v: Validator, raw: unknown, path: string): EquipStats | null {
+  if (raw === undefined) return null;
+  const o = v.object(raw, path);
+  const optional = (key: string, fallback: number, max: number): number =>
+    o?.[key] === undefined ? fallback : v.number(o[key], `${path}.${key}`, 0, max);
+  return {
+    slot: v.oneOf(o?.slot, EQUIP_SLOTS, `${path}.slot`) ?? 'tool',
+    tier: Math.round(v.number(o?.tier, `${path}.tier`, 0, 10)),
+    digSpeed: optional('digSpeed', 1, 10),
+    damage: optional('damage', 0, 1000),
+    armor: optional('armor', 0, 1000),
+  };
+}
+
 function parseItem(v: Validator, raw: unknown, path: string): ItemDef {
   const o = v.object(raw, path);
   const icon = v.object(o?.icon, `${path}.icon`);
+  const food = o?.food === undefined ? null : v.object(o.food, `${path}.food`);
   return {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
@@ -91,5 +181,8 @@ function parseItem(v: Validator, raw: unknown, path: string): ItemDef {
       light: v.color(icon?.light, `${path}.icon.light`),
       ...(icon?.accent !== undefined ? { accent: v.color(icon.accent, `${path}.icon.accent`) } : {}),
     },
+    builds: parseBuilds(v, o?.builds, `${path}.builds`),
+    equip: parseEquip(v, o?.equip, `${path}.equip`),
+    food: food ? { hunger: v.number(food.hunger, `${path}.food.hunger`, 0, 100) } : null,
   };
 }

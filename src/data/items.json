@@ -5,21 +5,24 @@
       "name": "Dirt",
       "category": "block",
       "description": "Loose earth. Good for filling holes.",
-      "icon": { "style": "lump", "base": "#7a5236", "dark": "#5b3c26", "light": "#94694a" }
+      "icon": { "style": "lump", "base": "#7a5236", "dark": "#5b3c26", "light": "#94694a" },
+      "builds": { "tile": "dirt" }
     },
     {
       "id": "clay",
       "name": "Clay",
       "category": "material",
       "description": "Sticky red earth that fires into bricks.",
-      "icon": { "style": "lump", "base": "#9a5c43", "dark": "#7a4532", "light": "#b8765c" }
+      "icon": { "style": "lump", "base": "#9a5c43", "dark": "#7a4532", "light": "#b8765c" },
+      "builds": { "tile": "clay" }
     },
     {
       "id": "sand",
       "name": "Sand",
       "category": "material",
       "description": "Fine pale grit from the pond shores.",
-      "icon": { "style": "pile", "base": "#d7c28a", "dark": "#b49d63", "light": "#efe0ad" }
+      "icon": { "style": "pile", "base": "#d7c28a", "dark": "#b49d63", "light": "#efe0ad" },
+      "builds": { "tile": "sand" }
     },
     {
       "id": "snowball",
@@ -40,42 +43,63 @@
       "name": "Stone",
       "category": "block",
       "description": "Grey rock, the colony's basic building stone.",
-      "icon": { "style": "lump", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad" }
+      "icon": { "style": "lump", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad" },
+      "builds": { "tile": "stone" }
     },
     {
       "id": "deep_stone",
       "name": "Deep stone",
       "category": "block",
       "description": "Dense blue-grey rock from far below.",
-      "icon": { "style": "lump", "base": "#545a6e", "dark": "#3a3f50", "light": "#737a91" }
+      "icon": { "style": "lump", "base": "#545a6e", "dark": "#3a3f50", "light": "#737a91" },
+      "builds": { "tile": "deep_stone" }
     },
     {
       "id": "basalt",
       "name": "Basalt",
       "category": "block",
       "description": "Black rock formed where lava cooled.",
-      "icon": { "style": "lump", "base": "#3e3537", "dark": "#272022", "light": "#5c4f52" }
+      "icon": { "style": "lump", "base": "#3e3537", "dark": "#272022", "light": "#5c4f52" },
+      "builds": { "tile": "basalt" }
     },
     {
       "id": "copper_ore",
       "name": "Copper ore",
       "category": "ore",
       "description": "Rock threaded with soft orange metal.",
-      "icon": { "style": "ore", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad", "accent": "#e08a48" }
+      "icon": {
+        "style": "ore",
+        "base": "#7c7f87",
+        "dark": "#5a5d64",
+        "light": "#a2a5ad",
+        "accent": "#e08a48"
+      }
     },
     {
       "id": "iron_ore",
       "name": "Iron ore",
       "category": "ore",
       "description": "Heavy rock streaked with rust.",
-      "icon": { "style": "ore", "base": "#7c7f87", "dark": "#5a5d64", "light": "#a2a5ad", "accent": "#c89a80" }
+      "icon": {
+        "style": "ore",
+        "base": "#7c7f87",
+        "dark": "#5a5d64",
+        "light": "#a2a5ad",
+        "accent": "#c89a80"
+      }
     },
     {
       "id": "gold_ore",
       "name": "Gold ore",
       "category": "ore",
       "description": "Deep rock glinting with gold.",
-      "icon": { "style": "ore", "base": "#545a6e", "dark": "#3a3f50", "light": "#737a91", "accent": "#f6cc48" }
+      "icon": {
+        "style": "ore",
+        "base": "#545a6e",
+        "dark": "#3a3f50",
+        "light": "#737a91",
+        "accent": "#f6cc48"
+      }
     },
     {
       "id": "crystal",
@@ -88,8 +112,374 @@
       "id": "log",
       "name": "Wood",
       "category": "material",
-      "description": "A length of trunk, ready to be sawn into planks.",
+      "description": "A length of trunk. Saw it into planks.",
       "icon": { "style": "log", "base": "#7a5232", "dark": "#523621", "light": "#c49a64" }
+    },
+    {
+      "id": "plank",
+      "name": "Plank",
+      "category": "block",
+      "description": "Sawn wood: walls, floors and most furniture start here.",
+      "icon": { "style": "plank", "base": "#a87a4b", "dark": "#74512f", "light": "#c69866" },
+      "builds": { "tile": "plank" }
+    },
+    {
+      "id": "brick",
+      "name": "Brick",
+      "category": "block",
+      "description": "Fired clay. Sturdier than wood.",
+      "icon": { "style": "brick", "base": "#a5523e", "dark": "#6e3326", "light": "#cdbba6" },
+      "builds": { "tile": "brick" }
+    },
+    {
+      "id": "glass",
+      "name": "Glass",
+      "category": "block",
+      "description": "Melted sand. Lets the light through.",
+      "icon": { "style": "pane", "base": "#bfe6f2", "dark": "#5f8fa3", "light": "#ffffff" },
+      "builds": { "tile": "glass" }
+    },
+    {
+      "id": "copper_bar",
+      "name": "Copper bar",
+      "category": "material",
+      "description": "Smelted copper, ready for the anvil.",
+      "icon": { "style": "bar", "base": "#d07a3e", "dark": "#8f4a22", "light": "#f2b07a" }
+    },
+    {
+      "id": "iron_bar",
+      "name": "Iron bar",
+      "category": "material",
+      "description": "Smelted iron: tools, armour and traps.",
+      "icon": { "style": "bar", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de" }
+    },
+    {
+      "id": "gold_bar",
+      "name": "Gold bar",
+      "category": "material",
+      "description": "Soft and precious.",
+      "icon": { "style": "bar", "base": "#e8b83a", "dark": "#a07818", "light": "#fbe28a" }
+    },
+    {
+      "id": "fiber",
+      "name": "Plant fibre",
+      "category": "material",
+      "description": "Stripped from leaves when a tree comes down.",
+      "icon": { "style": "fiber", "base": "#8fb74e", "dark": "#5d7f2e", "light": "#c2dd84" }
+    },
+    {
+      "id": "cloth",
+      "name": "Cloth",
+      "category": "material",
+      "description": "Woven fibre, for beds and clothes.",
+      "icon": { "style": "cloth", "base": "#d8cfb8", "dark": "#9d927a", "light": "#f4eedd" }
+    },
+    {
+      "id": "raw_meat",
+      "name": "Raw meat",
+      "category": "food",
+      "description": "Better cooked.",
+      "food": { "hunger": 15 },
+      "icon": { "style": "meat", "base": "#c8504a", "dark": "#8a2f2c", "light": "#ef8f86" }
+    },
+    {
+      "id": "cooked_meat",
+      "name": "Cooked meat",
+      "category": "food",
+      "description": "A proper meal.",
+      "food": { "hunger": 45 },
+      "icon": { "style": "meat", "base": "#9a5a32", "dark": "#62351c", "light": "#c9874f" }
+    },
+    {
+      "id": "wheat",
+      "name": "Wheat",
+      "category": "food",
+      "description": "Grain for bread, or seeds for next year.",
+      "food": { "hunger": 5 },
+      "icon": { "style": "wheat", "base": "#e2c35c", "dark": "#a8872e", "light": "#f6e39c" }
+    },
+    {
+      "id": "bread",
+      "name": "Bread",
+      "category": "food",
+      "description": "Filling and keeps well.",
+      "food": { "hunger": 40 },
+      "icon": { "style": "bread", "base": "#c98f4a", "dark": "#8d5a26", "light": "#ecc387" }
+    },
+    {
+      "id": "ladder",
+      "name": "Ladder",
+      "category": "furniture",
+      "description": "Dwarves climb it; anything else climbs over it.",
+      "icon": { "style": "ladder", "base": "#a4774a", "dark": "#6b4628", "light": "#c99b6a" },
+      "builds": { "tile": "ladder" }
+    },
+    {
+      "id": "wooden_door",
+      "name": "Wooden door",
+      "category": "furniture",
+      "description": "Dwarves walk through it; monsters will have to break it.",
+      "icon": { "style": "door", "base": "#a06e40", "dark": "#5a3a20", "light": "#e2c070" },
+      "builds": { "tile": "wooden_door" }
+    },
+    {
+      "id": "chest",
+      "name": "Chest",
+      "category": "furniture",
+      "description": "Another place for dwarves to drop off and pick up the colony's goods.",
+      "icon": { "style": "chest", "base": "#9a6a3c", "dark": "#5e3d20", "light": "#e0b25a" },
+      "builds": { "furniture": "chest" }
+    },
+    {
+      "id": "torch",
+      "name": "Torch",
+      "category": "furniture",
+      "description": "Light for the dark. Fix it to a wall.",
+      "icon": {
+        "style": "torch",
+        "base": "#8a5a32",
+        "dark": "#5a3a20",
+        "light": "#ffc04a",
+        "accent": "#ff7a2a"
+      },
+      "builds": { "furniture": "torch" }
+    },
+    {
+      "id": "workbench",
+      "name": "Workbench",
+      "category": "furniture",
+      "description": "Where doors, tables, beds and looms are made.",
+      "icon": {
+        "style": "bench",
+        "base": "#a87a4b",
+        "dark": "#6b4628",
+        "light": "#c69866",
+        "accent": "#9aa1ab"
+      },
+      "builds": { "furniture": "workbench" }
+    },
+    {
+      "id": "furnace",
+      "name": "Furnace",
+      "category": "furniture",
+      "description": "Smelts ore into bars, clay into bricks and sand into glass.",
+      "icon": {
+        "style": "furnace",
+        "base": "#7c7f87",
+        "dark": "#4a4c52",
+        "light": "#a2a5ad",
+        "accent": "#ff8a2a"
+      },
+      "builds": { "furniture": "furnace" }
+    },
+    {
+      "id": "anvil",
+      "name": "Anvil",
+      "category": "furniture",
+      "description": "Hammers bars into tools, weapons and armour.",
+      "icon": { "style": "anvil", "base": "#5d636c", "dark": "#33373d", "light": "#9aa1ab" },
+      "builds": { "furniture": "anvil" }
+    },
+    {
+      "id": "loom",
+      "name": "Loom",
+      "category": "furniture",
+      "description": "Weaves fibre into cloth.",
+      "icon": { "style": "loom", "base": "#a87a4b", "dark": "#6b4628", "light": "#d8cfb8" },
+      "builds": { "furniture": "loom" }
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen stove",
+      "category": "furniture",
+      "description": "Turns raw food into meals.",
+      "icon": {
+        "style": "stove",
+        "base": "#7c7f87",
+        "dark": "#4a4c52",
+        "light": "#a2a5ad",
+        "accent": "#ff8a2a"
+      },
+      "builds": { "furniture": "kitchen" }
+    },
+    {
+      "id": "bed",
+      "name": "Bed",
+      "category": "furniture",
+      "description": "A good night's sleep (from Milestone 4).",
+      "icon": {
+        "style": "bed",
+        "base": "#a87a4b",
+        "dark": "#6b4628",
+        "light": "#d8cfb8",
+        "accent": "#b84a4a"
+      },
+      "builds": { "furniture": "bed" }
+    },
+    {
+      "id": "table",
+      "name": "Table",
+      "category": "furniture",
+      "description": "Meals taken at a table do more good (from Milestone 4).",
+      "icon": { "style": "table", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" },
+      "builds": { "furniture": "table" }
+    },
+    {
+      "id": "chair",
+      "name": "Chair",
+      "category": "furniture",
+      "description": "Somewhere to sit.",
+      "icon": { "style": "chair", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" },
+      "builds": { "furniture": "chair" }
+    },
+    {
+      "id": "spike_trap",
+      "name": "Spike trap",
+      "category": "furniture",
+      "description": "Hurts monsters that walk over it (from Milestone 5).",
+      "icon": {
+        "style": "trap",
+        "base": "#9aa1ab",
+        "dark": "#5d636c",
+        "light": "#d2d7de",
+        "accent": "#6b4628"
+      },
+      "builds": { "furniture": "spike_trap" }
+    },
+    {
+      "id": "copper_pickaxe",
+      "name": "Copper pickaxe",
+      "category": "tool",
+      "description": "Digs half as fast again as bare hands.",
+      "stack": 1,
+      "equip": { "slot": "tool", "tier": 1, "digSpeed": 1.5 },
+      "icon": {
+        "style": "pickaxe",
+        "base": "#d07a3e",
+        "dark": "#8f4a22",
+        "light": "#f2b07a",
+        "accent": "#8a5a32"
+      }
+    },
+    {
+      "id": "iron_pickaxe",
+      "name": "Iron pickaxe",
+      "category": "tool",
+      "description": "Digs twice as fast as bare hands.",
+      "stack": 1,
+      "equip": { "slot": "tool", "tier": 2, "digSpeed": 2 },
+      "icon": {
+        "style": "pickaxe",
+        "base": "#9aa1ab",
+        "dark": "#5d636c",
+        "light": "#d2d7de",
+        "accent": "#8a5a32"
+      }
+    },
+    {
+      "id": "crystal_pickaxe",
+      "name": "Crystal pickaxe",
+      "category": "tool",
+      "description": "Cuts through rock three times as fast as bare hands.",
+      "stack": 1,
+      "equip": { "slot": "tool", "tier": 3, "digSpeed": 3 },
+      "icon": {
+        "style": "pickaxe",
+        "base": "#55e0d4",
+        "dark": "#2a9f9a",
+        "light": "#c8fff8",
+        "accent": "#8a5a32"
+      }
+    },
+    {
+      "id": "copper_sword",
+      "name": "Copper sword",
+      "category": "weapon",
+      "description": "Better than a pick in a fight.",
+      "stack": 1,
+      "equip": { "slot": "weapon", "tier": 1, "damage": 8 },
+      "icon": {
+        "style": "sword",
+        "base": "#d07a3e",
+        "dark": "#8f4a22",
+        "light": "#f2b07a",
+        "accent": "#6b4628"
+      }
+    },
+    {
+      "id": "iron_sword",
+      "name": "Iron sword",
+      "category": "weapon",
+      "description": "A soldier's blade.",
+      "stack": 1,
+      "equip": { "slot": "weapon", "tier": 2, "damage": 12 },
+      "icon": {
+        "style": "sword",
+        "base": "#9aa1ab",
+        "dark": "#5d636c",
+        "light": "#d2d7de",
+        "accent": "#6b4628"
+      }
+    },
+    {
+      "id": "crossbow",
+      "name": "Crossbow",
+      "category": "weapon",
+      "description": "Hits from a distance.",
+      "stack": 1,
+      "equip": { "slot": "weapon", "tier": 2, "damage": 9 },
+      "icon": { "style": "crossbow", "base": "#a87a4b", "dark": "#6b4628", "light": "#9aa1ab" }
+    },
+    {
+      "id": "cloth_tunic",
+      "name": "Cloth tunic",
+      "category": "armor",
+      "description": "Better than nothing.",
+      "stack": 1,
+      "equip": { "slot": "body", "tier": 1, "armor": 1 },
+      "icon": { "style": "tunic", "base": "#6a8fb8", "dark": "#3f5f85", "light": "#a6c2e0" }
+    },
+    {
+      "id": "copper_helmet",
+      "name": "Copper helmet",
+      "category": "armor",
+      "description": "Keeps falling rocks off.",
+      "stack": 1,
+      "equip": { "slot": "head", "tier": 1, "armor": 1 },
+      "icon": { "style": "helmet", "base": "#d07a3e", "dark": "#8f4a22", "light": "#f2b07a" }
+    },
+    {
+      "id": "iron_helmet",
+      "name": "Iron helmet",
+      "category": "armor",
+      "description": "Keeps worse than rocks off.",
+      "stack": 1,
+      "equip": { "slot": "head", "tier": 2, "armor": 2 },
+      "icon": { "style": "helmet", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de" }
+    },
+    {
+      "id": "iron_armor",
+      "name": "Iron armour",
+      "category": "armor",
+      "description": "Heavy, and worth it.",
+      "stack": 1,
+      "equip": { "slot": "body", "tier": 2, "armor": 4 },
+      "icon": { "style": "chestplate", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de" }
+    },
+    {
+      "id": "gold_amulet",
+      "name": "Gold amulet",
+      "category": "armor",
+      "description": "A glowing charm (its magic awakens in Milestone 7).",
+      "stack": 1,
+      "equip": { "slot": "accessory", "tier": 1 },
+      "icon": {
+        "style": "amulet",
+        "base": "#e8b83a",
+        "dark": "#a07818",
+        "light": "#fbe28a",
+        "accent": "#55e0d4"
+      }
     }
   ]
 }

@@ -192,7 +192,8 @@
       "connect": "self",
       "replaceable": true,
       "mapColor": "#3f8a3a",
-      "art": { "style": "leaves", "base": "#3f8a3a", "dark": "#2c6a2c", "light": "#5fae4c" }
+      "art": { "style": "leaves", "base": "#3f8a3a", "dark": "#2c6a2c", "light": "#5fae4c" },
+      "drops": "fiber"
     },
     {
       "id": "pine_log",
@@ -216,7 +217,8 @@
         "dark": "#1f4f37",
         "light": "#3f8a60",
         "snow": "#e8f1f8"
-      }
+      },
+      "drops": "fiber"
     },
     {
       "id": "tall_grass",
@@ -334,6 +336,69 @@
           "...rRUUUUUUrR...",
           "...rR......rR..."
         ]
+      },
+      "hardness": 0.5,
+      "drops": "ladder"
+    },
+    {
+      "id": "plank",
+      "name": "Plank block",
+      "solid": true,
+      "hardness": 1,
+      "drops": "plank",
+      "mapColor": "#a87a4b",
+      "art": { "style": "planks", "base": "#a87a4b", "dark": "#74512f", "light": "#c69866" }
+    },
+    {
+      "id": "brick",
+      "name": "Brick block",
+      "solid": true,
+      "hardness": 2.5,
+      "drops": "brick",
+      "mapColor": "#a5523e",
+      "art": { "style": "bricks", "base": "#a5523e", "dark": "#6e3326", "light": "#cdbba6" }
+    },
+    {
+      "id": "glass",
+      "name": "Glass block",
+      "solid": true,
+      "transparent": true,
+      "hardness": 0.5,
+      "drops": "glass",
+      "connect": "self",
+      "mapColor": "#bfe6f2",
+      "art": { "style": "glass", "base": "#bfe6f2", "dark": "#5f8fa3", "light": "#ffffff" }
+    },
+    {
+      "id": "wooden_door",
+      "name": "Wooden door",
+      "solid": false,
+      "door": true,
+      "hardness": 1,
+      "drops": "wooden_door",
+      "connect": "none",
+      "mapColor": "#8a5a32",
+      "art": {
+        "style": "sprite",
+        "palette": { "f": "#5a3a20", "p": "#a06e40", "P": "#7e5430", "h": "#e2c070", "s": "#3a2414" },
+        "rows": [
+          "...ffffffffff...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...fssssssssf...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...fppPppPhhf...",
+          "...fppPppPhhf...",
+          "...fppPppPppf...",
+          "...fssssssssf...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...fppPppPppf...",
+          "...ffffffffff..."
+        ]
       }
     }
   ],
@@ -350,28 +415,48 @@
       "name": "Dirt wall",
       "natural": true,
       "mapColor": "#3e2a1c",
-      "art": { "style": "soil", "base": "#7a5236", "dark": "#62412a", "light": "#8d6343" }
+      "art": { "style": "soil", "base": "#7a5236", "dark": "#62412a", "light": "#8d6343" },
+      "material": "dirt"
     },
     {
       "id": "stone_wall",
       "name": "Stone wall",
       "natural": true,
       "mapColor": "#3f4146",
-      "art": { "style": "rock", "base": "#7c7f87", "dark": "#5c5f66", "light": "#9a9da5" }
+      "art": { "style": "rock", "base": "#7c7f87", "dark": "#5c5f66", "light": "#9a9da5" },
+      "material": "stone"
     },
     {
       "id": "deep_stone_wall",
       "name": "Deep stone wall",
       "natural": true,
       "mapColor": "#2b2e39",
-      "art": { "style": "rock", "base": "#545a6e", "dark": "#3c4152", "light": "#6a7187" }
+      "art": { "style": "rock", "base": "#545a6e", "dark": "#3c4152", "light": "#6a7187" },
+      "material": "deep_stone"
     },
     {
       "id": "basalt_wall",
       "name": "Basalt wall",
       "natural": true,
       "mapColor": "#201b1c",
-      "art": { "style": "rock", "base": "#3e3537", "dark": "#2a2224", "light": "#54484a" }
+      "art": { "style": "rock", "base": "#3e3537", "dark": "#2a2224", "light": "#54484a" },
+      "material": "basalt"
+    },
+    {
+      "id": "plank_wall",
+      "name": "Plank wall",
+      "natural": false,
+      "material": "plank",
+      "mapColor": "#5e4429",
+      "art": { "style": "planks", "base": "#a87a4b", "dark": "#74512f", "light": "#c69866" }
+    },
+    {
+      "id": "brick_wall",
+      "name": "Brick wall",
+      "natural": false,
+      "material": "brick",
+      "mapColor": "#5a2f25",
+      "art": { "style": "bricks", "base": "#a5523e", "dark": "#6e3326", "light": "#cdbba6" }
     }
   ],
   "liquids": [

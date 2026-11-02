@@ -4,6 +4,8 @@
  *
  *   debug.setSpeed(5)          run the simulation 5x faster on top of the chosen speed
  *   debug.spawnItem('stone', 20)   drop items at the Hearth (the dwarves store them)
+ *   debug.give('plank', 20)    put items straight into storage
+ *   debug.stockUp()            a bit of every raw material, plus one of each crafting station
  *   debug.skipToNight()
  *   debug.revealMap()
  *
@@ -13,6 +15,8 @@ import type { App } from '../app/App';
 
 export interface DebugApi {
   spawnItem(id: string, count?: number): void;
+  give(id: string, count?: number): void;
+  stockUp(): void;
   skipToNight(): void;
   revealMap(): void;
   setSpeed(multiplier: number): void;
@@ -29,6 +33,29 @@ declare global {
 function notYet(name: string, milestone: number): void {
   console.info(`debug.${name}() becomes available in Milestone ${milestone}.`);
 }
+
+/** What debug.stockUp() puts in storage. */
+const STARTER_KIT: ReadonlyArray<[string, number]> = [
+  ['log', 30],
+  ['plank', 40],
+  ['stone', 50],
+  ['dirt', 50],
+  ['clay', 20],
+  ['sand', 20],
+  ['fiber', 20],
+  ['copper_ore', 12],
+  ['iron_ore', 16],
+  ['gold_ore', 6],
+  ['crystal', 4],
+  ['torch', 6],
+  ['ladder', 10],
+  ['chest', 2],
+  ['workbench', 1],
+  ['furnace', 1],
+  ['anvil', 1],
+  ['loom', 1],
+  ['kitchen', 1],
+];
 
 export function installDebugApi(app: App): void {
   window.debug = {
@@ -47,6 +74,29 @@ export function installDebugApi(app: App): void {
       sim.dropItems(sim.items.item(id), amount, sim.hearth.x, sim.hearth.y);
       console.info(`Dropped ${amount} × ${sim.items.get(sim.items.item(id)).name} at the Hearth.`);
     },
+    give: (id, count = 1) => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.give() needs a running game: start a new game first.');
+        return;
+      }
+      if (!sim.items.has(id)) {
+        console.info(`Unknown item "${id}". Items: ${sim.items.items.map((item) => item.id).join(', ')}`);
+        return;
+      }
+      const amount = Math.max(1, Math.floor(count));
+      sim.storage.add(sim.items.item(id), amount);
+      console.info(`Put ${amount} × ${sim.items.get(sim.items.item(id)).name} into storage.`);
+    },
+    stockUp: () => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.stockUp() needs a running game: start a new game first.');
+        return;
+      }
+      for (const [id, count] of STARTER_KIT) if (sim.items.has(id)) sim.storage.add(sim.items.item(id), count);
+      console.info(`Stocked up: ${STARTER_KIT.map(([id, count]) => `${count} ${id}`).join(', ')}.`);
+    },
     skipToNight: () => notYet('skipToNight', 4),
     revealMap: () => {
       if (app.revealMap()) console.info('Fog of war lifted over the whole map.');
@@ -62,5 +112,5 @@ export function installDebugApi(app: App): void {
     },
     app,
   };
-  console.info('Gatewright dev build: helpers are on window.debug (spawnItem, skipToNight, revealMap, setSpeed).');
+  console.info('Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, revealMap, setSpeed).');
 }

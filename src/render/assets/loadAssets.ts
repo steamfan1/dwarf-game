@@ -7,8 +7,12 @@
  */
 import * as Phaser from 'phaser';
 import { Rng } from '../../core/Rng';
+import { FURNITURE } from '../../sim/content';
 import {
   ANIMATIONS,
+  FURNITURE_TEXTURES,
+  furnitureAnimationKey,
+  furnitureTextureKey,
   SOUNDS,
   TEXTURES,
   type FrameGrid,
@@ -38,6 +42,9 @@ export function queueFileAssets(scene: Phaser.Scene): void {
 export function createGeneratedAssets(scene: Phaser.Scene): void {
   for (const [key, source] of Object.entries(TEXTURES) as [string, TextureSource][]) {
     if (source.kind === 'generated' && !scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
+  }
+  for (const [key, source] of FURNITURE_TEXTURES) {
+    if (!scene.textures.exists(key)) addGeneratedTexture(scene, key, source);
   }
   createSynthSounds(scene);
   createAnimations(scene);
@@ -107,5 +114,13 @@ function createAnimations(scene: Phaser.Scene): void {
       frameRate: anim.frameRate,
       repeat: anim.repeat,
     });
+  }
+  // Furniture with several frames (torches) flickers through them, back and forth.
+  for (const def of FURNITURE.defs) {
+    const key = furnitureAnimationKey(def);
+    if (!key || scene.anims.exists(key)) continue;
+    const count = FURNITURE_TEXTURES.get(furnitureTextureKey(def))?.frames?.count ?? 1;
+    const frames = [...Array.from({ length: count }, (_, i) => i), ...Array.from({ length: Math.max(0, count - 2) }, (_, i) => count - 2 - i)];
+    scene.anims.create({ key, frames: frames.map((frame) => ({ key: furnitureTextureKey(def), frame })), frameRate: 8, repeat: -1 });
   }
 }

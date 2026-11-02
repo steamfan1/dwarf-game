@@ -1,0 +1,91 @@
+{
+  "furniture": [
+    {
+      "id": "chest",
+      "name": "Chest",
+      "size": [1, 1],
+      "storage": 16,
+      "mapColor": "#9a6a3c",
+      "art": { "style": "chest", "base": "#9a6a3c", "dark": "#5e3d20", "light": "#c08a52", "accent": "#e0b25a" }
+    },
+    {
+      "id": "torch",
+      "name": "Torch",
+      "size": [1, 1],
+      "mount": "wall",
+      "light": 12,
+      "mapColor": "#ffc04a",
+      "art": { "style": "torch", "base": "#8a5a32", "dark": "#5a3a20", "light": "#ffe38a", "accent": "#ff7a2a" }
+    },
+    {
+      "id": "workbench",
+      "name": "Workbench",
+      "size": [2, 1],
+      "station": "workbench",
+      "mapColor": "#a87a4b",
+      "art": { "style": "workbench", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866", "accent": "#9aa1ab" }
+    },
+    {
+      "id": "furnace",
+      "name": "Furnace",
+      "size": [2, 2],
+      "station": "furnace",
+      "light": 8,
+      "mapColor": "#7c7f87",
+      "art": { "style": "furnace", "base": "#7c7f87", "dark": "#4a4c52", "light": "#a2a5ad", "accent": "#ff8a2a" }
+    },
+    {
+      "id": "anvil",
+      "name": "Anvil",
+      "size": [1, 1],
+      "station": "anvil",
+      "mapColor": "#5d636c",
+      "art": { "style": "anvil", "base": "#5d636c", "dark": "#33373d", "light": "#9aa1ab", "accent": "#6b4628" }
+    },
+    {
+      "id": "loom",
+      "name": "Loom",
+      "size": [2, 2],
+      "station": "loom",
+      "mapColor": "#a87a4b",
+      "art": { "style": "loom", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866", "accent": "#d8cfb8" }
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen stove",
+      "size": [2, 2],
+      "station": "kitchen",
+      "light": 6,
+      "mapColor": "#7c7f87",
+      "art": { "style": "stove", "base": "#7c7f87", "dark": "#4a4c52", "light": "#a2a5ad", "accent": "#ff8a2a" }
+    },
+    {
+      "id": "bed",
+      "name": "Bed",
+      "size": [2, 1],
+      "mapColor": "#b84a4a",
+      "art": { "style": "bed", "base": "#a87a4b", "dark": "#6b4628", "light": "#d8cfb8", "accent": "#b84a4a" }
+    },
+    {
+      "id": "table",
+      "name": "Table",
+      "size": [2, 1],
+      "mapColor": "#a87a4b",
+      "art": { "style": "table", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" }
+    },
+    {
+      "id": "chair",
+      "name": "Chair",
+      "size": [1, 1],
+      "mapColor": "#a87a4b",
+      "art": { "style": "chair", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866" }
+    },
+    {
+      "id": "spike_trap",
+      "name": "Spike trap",
+      "size": [1, 1],
+      "mapColor": "#9aa1ab",
+      "art": { "style": "trap", "base": "#9aa1ab", "dark": "#5d636c", "light": "#d2d7de", "accent": "#6b4628" }
+    }
+  ]
+}

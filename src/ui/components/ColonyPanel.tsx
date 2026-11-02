@@ -2,13 +2,15 @@
  * The colony at a glance, on the right of the screen:
  *   - the roster: every dwarf, what it's doing and its health (click one to select it);
  *   - the selected dwarf's details: needs, skills, equipment and what it carries;
- *   - what the colony has stored at the Hearth.
+ *   - storage: how full it is, and everything stored in the Hearth and the chests
+ *     (I shows or hides the list).
  * The app refreshes the numbers a few times a second (UiState.colony).
  */
+import { keyLabel } from '../../core/actions';
 import { t } from '../../core/strings';
-import { useCommands } from '../commands';
+import { useCommands, useSettingsStore } from '../commands';
 import { useStore } from '../hooks';
-import { uiState, type DwarfSummary, type ResourceEntry } from '../state';
+import { uiState, type ColonyView, type DwarfSummary } from '../state';
 import { Icon } from './Icon';
 
 export function ColonyPanel() {
@@ -21,7 +23,7 @@ export function ColonyPanel() {
     <>
       <Roster dwarves={colony.dwarves} selected={selected} />
       {dwarf && <DwarfDetails dwarf={dwarf} />}
-      <Storage resources={colony.resources} />
+      <Storage colony={colony} />
     </>
   );
 }
@@ -120,42 +122,78 @@ function DwarfDetails({ dwarf }: { dwarf: DwarfSummary }) {
       </ul>
 
       <h4>{t('dwarf.equipment')}</h4>
-      <ul class="equipment">
-        {dwarf.equipment.map(({ slot, item }) => (
+      <ul class="equipment" data-testid="dwarf-equipment">
+        {dwarf.equipment.map(({ slot, item, icon }) => (
           <li key={slot}>
             <span>{t(`slot.${slot}`)}</span>
-            <span class={item ? '' : 'empty'}>{item ?? t('dwarf.emptySlot')}</span>
+            <span class={item ? 'equipped' : 'empty'}>
+              {icon && <img src={icon} alt="" width={16} height={16} />}
+              {item ?? t('dwarf.emptySlot')}
+            </span>
           </li>
         ))}
       </ul>
 
-      {dwarf.carrying && (
+      {dwarf.carrying.length > 0 && (
         <p class="carrying">
-          <img src={dwarf.carrying.icon} alt="" width={20} height={20} />
-          {t('dwarf.carrying', { count: dwarf.carrying.count, item: dwarf.carrying.name })}
+          {dwarf.carrying.map((load) => (
+            <img key={load.name} src={load.icon} alt="" width={20} height={20} />
+          ))}
+          {dwarf.carrying.length === 1
+            ? t('dwarf.carrying', { count: dwarf.carrying[0]!.count, item: dwarf.carrying[0]!.name })
+            : t('dwarf.carryingMany', { items: dwarf.carrying.map((load) => `${load.count} × ${load.name}`).join(', ') })}
         </p>
       )}
     </section>
   );
 }
 
-function Storage({ resources }: { resources: ResourceEntry[] }) {
+/** How full storage is, and (unless hidden with I) a grid of everything in it. */
+function Storage({ colony }: { colony: ColonyView }) {
+  const commands = useCommands();
+  const open = useStore(uiState, (s) => s.storageOpen);
+  const bindings = useStore(useSettingsStore(), (s) => s.bindings);
+  const { used, capacity } = colony.storage;
+  const full = used >= capacity;
+  const key = keyLabel(bindings.toggleStorage[0]);
   return (
-    <section class="colony-panel panel storage" aria-label={t('colony.storage')} data-testid="storage">
-      <h3>{t('colony.storage')}</h3>
-      {resources.length === 0 ? (
-        <p class="note">{t('colony.empty')}</p>
-      ) : (
-        <ul>
-          {resources.map((entry) => (
-            <li key={entry.id} title={entry.name} data-testid={`stored-${entry.id}`}>
-              <img src={entry.icon} alt="" width={20} height={20} />
-              <span class="name">{entry.name}</span>
-              <span class="count">{entry.count}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section class={`colony-panel panel storage${open ? '' : ' closed'}`} aria-label={t('colony.storage')} data-testid="storage">
+      <h3>
+        <button
+          type="button"
+          class="storage-toggle"
+          aria-expanded={open}
+          title={t('colony.toggleStorage', { key: key || t('key.unbound') })}
+          onClick={() => {
+            commands.playSound('uiClick');
+            commands.toggleStorage();
+          }}
+        >
+          <Icon name="chest" />
+          {t('colony.storage')}
+          <span class={`count${full ? ' warn' : ''}`} data-testid="storage-used">
+            {t('colony.storageUsed', { used, capacity })}
+          </span>
+          {key && <kbd>{key}</kbd>}
+        </button>
+      </h3>
+      <span class={`meter meter-storage${full ? ' full' : ''}`} role="meter" aria-label={t('colony.storage')} aria-valuemin={0} aria-valuemax={capacity} aria-valuenow={used}>
+        <span class="meter-fill" style={`width: ${Math.round(Math.min(1, capacity > 0 ? used / capacity : 1) * 100)}%`} />
+      </span>
+      {full && <p class="note warn">{t('colony.storageFull')}</p>}
+      {open &&
+        (colony.resources.length === 0 ? (
+          <p class="note">{t('colony.empty')}</p>
+        ) : (
+          <ul class="storage-grid">
+            {colony.resources.map((entry) => (
+              <li key={entry.id} title={`${entry.name}: ${entry.count}`} data-testid={`stored-${entry.id}`}>
+                <img src={entry.icon} alt={entry.name} width={20} height={20} />
+                <span class="count">{entry.count}</span>
+              </li>
+            ))}
+          </ul>
+        ))}
     </section>
   );
 }

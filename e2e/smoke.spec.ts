@@ -192,6 +192,107 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
+test('crafting and building: planks and a chest from a felled tree, then the Furniture, Build and Walls tools', async ({ page, browserErrors }, testInfo) => {
+  test.setTimeout(150_000);
+  await page.goto('./');
+  await createWorld(page, { seed: 'smoke-test' });
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
+  const tile = 32;
+  const surfaceY = centre.y + 3 * tile; // the ground the Hearth stands on
+  const openY = centre.y + 2 * tile; // the open row the Hearth stands in
+  const readout = page.getByTestId('hover-readout');
+  await page.keyboard.press('Backquote'); // the debug overlay counts the jobs
+  const jobs = page.getByTestId('debug-jobs');
+  await expect(jobs).toContainText(/^0 dig/);
+  await page.keyboard.press('Digit3');
+
+  // Materials: fell the tree six columns right (logs and fibre), and dig two blocks of ground.
+  await page.keyboard.press('KeyC');
+  await page.mouse.move(centre.x + 6 * tile, centre.y);
+  await expect(page.getByTestId('hover-title')).toHaveText('Oak trunk');
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.keyboard.press('KeyF');
+  await page.mouse.move(centre.x + 3 * tile, surfaceY);
+  await page.mouse.down();
+  await page.mouse.move(centre.x + 4 * tile, surfaceY, { steps: 3 });
+  await page.mouse.up();
+  await expect(jobs).toContainText(/^0 dig · 0 fell/, { timeout: 40_000 });
+  await expect(page.getByTestId('stored-log')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('stored-dirt')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('stored-fiber')).toBeVisible({ timeout: 30_000 });
+
+  // Crafting (K): two crafts of planks by hand (a log makes two), then a chest from four planks.
+  await page.keyboard.press('KeyK');
+  await expect(page.getByTestId('crafting-panel')).toBeVisible();
+  await page.getByTestId('queue-planks-1').click();
+  await page.getByTestId('queue-planks-1').click();
+  await expect(page.getByTestId('craft-order')).toHaveCount(1);
+  await expect(page.getByTestId('craft-order')).toContainText('of 2');
+  await page.screenshot({ path: testInfo.outputPath('m3-1-crafting.png') });
+  await expect(page.getByTestId('craft-order')).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByTestId('stored-plank')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('queue-chest-1').click();
+  await expect(page.getByTestId('stored-chest')).toBeVisible({ timeout: 40_000 });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('crafting-panel')).toBeHidden();
+
+  /** Move along the open row left of the Hearth until the hover readout offers `hint`; click there. */
+  const placeLeftOfHearth = async (hint: RegExp, from: number): Promise<number> => {
+    for (let dx = from; dx >= from - 6; dx--) {
+      await page.mouse.move(centre.x + dx * tile, openY);
+      await page.waitForTimeout(300);
+      if (hint.test((await readout.textContent()) ?? '')) {
+        await page.mouse.down();
+        await page.mouse.up();
+        return dx;
+      }
+    }
+    throw new Error(`Nowhere left of the Hearth offered "${hint.source}"`);
+  };
+
+  // Furniture (T): set the chest down left of the Hearth. Storage gets room for 16 more stacks.
+  await expect(page.getByTestId('storage-used')).toContainText('/ 24 stacks');
+  await page.keyboard.press('KeyT');
+  await expect(page.getByTestId('palette')).toBeVisible();
+  await page.getByTestId('palette-chest').click();
+  const chestAt = await placeLeftOfHearth(/Click to set it down here/, -2);
+  await expect(jobs).toContainText(/ 1 build/);
+  await page.screenshot({ path: testInfo.outputPath('m3-2-chest-planned.png') });
+  await expect(jobs).toContainText(/ 0 build/, { timeout: 40_000 });
+  await expect(page.getByTestId('storage-used')).toContainText('/ 40 stacks');
+  // (A dwarf passing in front of it would be named instead, so allow a moment.)
+  await page.mouse.move(centre.x + chestAt * tile, openY);
+  await expect(page.getByTestId('hover-title')).toHaveText('Chest', { timeout: 15_000 });
+
+  // Build (B): a dirt block on the ground, further left.
+  await page.keyboard.press('KeyB');
+  await page.getByTestId('palette-dirt').click();
+  const blockAt = await placeLeftOfHearth(/Click or drag to build here/, chestAt - 2);
+  await expect(jobs).toContainText(/ 1 build/);
+  await expect(jobs).toContainText(/ 0 build/, { timeout: 40_000 });
+  await page.mouse.move(centre.x + blockAt * tile, openY);
+  await expect(page.getByTestId('hover-title')).toHaveText('Dirt');
+
+  // Walls (V): a dirt wall on top of that block, held up by it.
+  await page.keyboard.press('KeyV');
+  await page.getByTestId('palette-dirt').click();
+  await page.mouse.move(centre.x + blockAt * tile, openY - tile);
+  await expect(readout).toContainText('Click or drag to put up a wall here');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(jobs).toContainText(/ 1 build/);
+  await expect(jobs).toContainText(/ 0 build/, { timeout: 40_000 });
+  await expect(page.getByTestId('hover-title')).toHaveText('Dirt wall', { timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await page.mouse.move(centre.x, centre.y - 4 * tile);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: testInfo.outputPath('m3-3-built.png') });
+
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
 test('a snowy world can be chosen in the New world dialog', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   await createWorld(page, { seed: 'frost-hollow', biome: 'snow' });

@@ -11,10 +11,12 @@
  * Keep the same frame size and frame order so animations keep working.
  *
  * The terrain atlas is special: its layout follows tiles.json (see render/world/tileAtlas.ts),
- * so a hand-made replacement has to keep that layout.
+ * so a hand-made replacement has to keep that layout. Furniture sprites follow
+ * furniture.json: one texture per piece, `width` x `height` cells of 16 px per frame.
  */
 import type { Rng } from '../../core/Rng';
-import { ITEMS, TILES } from '../../sim/content';
+import { FURNITURE, ITEMS, TILES } from '../../sim/content';
+import type { FurnitureDef } from '../../sim/furniture/FurnitureRegistry';
 import { createAtlasLayout, paintAtlas } from '../world/tileAtlas';
 import {
   CRACK_FRAMES,
@@ -26,6 +28,7 @@ import {
   paintMarks,
   type DwarfColours,
 } from './colonyArt';
+import { furnitureFrames, paintFurniture } from './furnitureArt';
 import { ITEM_ICON_SIZE, paintItemAtlas } from './itemArt';
 import {
   DWARF_FRAME_SIZE,
@@ -161,6 +164,33 @@ export const TEXTURES = {
 
 export type TextureKey = keyof typeof TEXTURES;
 
+/** Texture key of a piece of furniture's sprite (furniture.json id). */
+export function furnitureTextureKey(def: FurnitureDef): string {
+  return `furniture:${def.id}`;
+}
+
+/** Animation key for furniture with more than one frame (torches flicker), or null. */
+export function furnitureAnimationKey(def: FurnitureDef): string | null {
+  return furnitureFrames(def) > 1 ? `furniture:${def.id}:flicker` : null;
+}
+
+/** One texture per piece of furniture in furniture.json; frames left to right. */
+export const FURNITURE_TEXTURES: ReadonlyMap<string, GeneratedTexture> = new Map(
+  FURNITURE.defs.map((def) => {
+    const frameWidth = def.width * 16;
+    const frameHeight = def.height * 16;
+    const count = furnitureFrames(def);
+    const texture: GeneratedTexture = {
+      kind: 'generated',
+      width: frameWidth * count,
+      height: frameHeight,
+      frames: { frameWidth, frameHeight, count },
+      paint: (ctx) => paintFurniture(ctx, def),
+    };
+    return [furnitureTextureKey(def), texture];
+  }),
+);
+
 /** Animations built from frame grids; keys are what sprites call `play()` with. */
 export const ANIMATIONS = {
   dwarfWalk: { texture: 'dwarf', frames: [1, 2, 3, 4], frameRate: 8, repeat: -1 },
@@ -203,6 +233,23 @@ export const SOUNDS = {
   uiClose: {
     kind: 'synth',
     tones: [{ wave: 'sine', freq: 700, freqEnd: 380, duration: 0.11, release: 0.08, volume: 0.7 }],
+  },
+  /** A block, wall or piece of furniture put in place: a wooden knock. */
+  build: {
+    kind: 'synth',
+    tones: [
+      { wave: 'triangle', freq: 240, freqEnd: 150, duration: 0.07, release: 0.06, volume: 0.7 },
+      { wave: 'noise', freq: 0, duration: 0.03, release: 0.025, volume: 0.25 },
+      { wave: 'triangle', freq: 300, freqEnd: 190, start: 0.09, duration: 0.06, release: 0.05, volume: 0.45 },
+    ],
+  },
+  /** Something crafted: a small bright ring. */
+  craft: {
+    kind: 'synth',
+    tones: [
+      { wave: 'sine', freq: 660, duration: 0.12, release: 0.1, volume: 0.45 },
+      { wave: 'sine', freq: 990, start: 0.08, duration: 0.2, release: 0.18, volume: 0.4 },
+    ],
   },
   /** A block dug out: a short gritty crunch. */
   dig: {

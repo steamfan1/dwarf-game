@@ -9,6 +9,8 @@ const FILLED = {
 
 const STROKED = {
   close: 'M4 4L12 12M12 4L4 12',
+  plus: 'M8 3V13M3 8H13',
+  minus: 'M3 8H13',
 } as const;
 
 /** Icons drawn pixel by pixel on a 12 x 12 grid ('X' is filled), centred in the 16 x 16 box. */
@@ -97,6 +99,81 @@ const PIXELS = {
     '..XXXXXXXX..',
     '.....XX.....',
     '.....XX.....',
+  ],
+  // A hammer.
+  build: [
+    '..XXXXX.....',
+    '.XXXXXXX....',
+    '.XXXXXXX....',
+    '..XXXXX.....',
+    '....XXX.....',
+    '.....XXX....',
+    '......XXX...',
+    '.......XXX..',
+    '........XXX.',
+    '.........XXX',
+    '..........XX',
+    '............',
+  ],
+  // Courses of bricks.
+  wall: [
+    'XXXXXXXXXXXX',
+    'XX....XX....',
+    'XX....XX....',
+    'XXXXXXXXXXXX',
+    '....XX....XX',
+    '....XX....XX',
+    'XXXXXXXXXXXX',
+    'XX....XX....',
+    'XX....XX....',
+    'XXXXXXXXXXXX',
+    '....XX....XX',
+    '....XX....XX',
+  ],
+  // A chair.
+  furniture: [
+    '..XX........',
+    '..XX........',
+    '..XX........',
+    '..XX........',
+    '..XX........',
+    '..XXXXXXXX..',
+    '..XXXXXXXX..',
+    '..XX....XX..',
+    '..XX....XX..',
+    '..XX....XX..',
+    '..XX....XX..',
+    '............',
+  ],
+  // An anvil.
+  craft: [
+    '............',
+    '............',
+    'XXXXXXXXXX..',
+    '.XXXXXXXXXXX',
+    '..XXXXXXXX..',
+    '....XXXX....',
+    '....XXXX....',
+    '...XXXXXX...',
+    '..XXXXXXXX..',
+    '..XXXXXXXX..',
+    '............',
+    '............',
+  ],
+  // A chest.
+  chest: [
+    '............',
+    '.XXXXXXXXXX.',
+    'X..........X',
+    'X..........X',
+    'XXXXXXXXXXXX',
+    'X....XX....X',
+    'X....XX....X',
+    'X..........X',
+    'X..........X',
+    'XXXXXXXXXXXX',
+    '............',
+    '............',
   ],
 } as const;
 

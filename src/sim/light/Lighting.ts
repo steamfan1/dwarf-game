@@ -1,18 +1,19 @@
 /**
  * Light: two values per cell, each from 0 (pitch dark) to MAX_LIGHT (15, full daylight).
  *
- *  - `sun`: sunlight falls straight down every column until it meets a solid block, so
+ *  - `sun`: sunlight falls straight down every column until it meets an opaque block, so
  *    open sky and the bottom of a shaft open to the sky are fully lit; from there it
  *    spreads sideways and into the ground.
  *  - `glow`: light from things that shine on their own: lava, glow crystals and point
- *    lights such as the Hearth (and, later, torches).
+ *    lights such as the Hearth, torches and furnaces.
  *  - `light`: the brighter of the two, which is what the eye sees (the darkness overlay
  *    in Milestone 4, where night will dim the sun channel only).
  *
  * In both channels light spreads to the four neighbours of each lit cell by flood fill,
- * losing 1 per step through open space, 2 through water and 4 when it enters a solid
- * block. So daylight reaches about three blocks into the ground, which is enough to see
- * the surface everywhere, and a lava pool lights up a little of the cave around it.
+ * losing 1 per step through open space (and glass), 2 through water and 4 when it enters
+ * a solid block or a door. So daylight reaches about three blocks into the ground, which
+ * is enough to see the surface everywhere, and a lava pool lights up a little of the cave
+ * around it.
  *
  * Only sunlight uncovers the map: `discover()` marks sunlit cells as explored. A lava
  * lake glowing deep underground stays hidden until a dwarf finds it.
@@ -42,12 +43,12 @@ export class Lighting {
   readonly glow: Uint8Array;
   /** The brighter of `sun` and `glow` per cell. */
   readonly light: Uint8Array;
-  /** For each column, the row of the first solid block (sunlight stops there); the world's height if there is none. */
+  /** For each column, the row of the first opaque block (sunlight stops there); the world's height if there is none. */
   readonly sunDepth: Int16Array;
 
   private readonly world: World;
   private readonly tiles: TileRegistry;
-  /** Lights that aren't blocks or liquids, by cell index: the Hearth now, torches and lamps later. */
+  /** Lights that aren't blocks or liquids, by cell index: the Hearth, torches, furnaces... */
   private readonly pointLights = new Map<number, number>();
   /** Flood-fill work lists, one per light level, reused between updates. */
   private readonly buckets: number[][] = Array.from({ length: MAX_LIGHT + 1 }, () => []);
@@ -136,18 +137,18 @@ export class Lighting {
     return found;
   }
 
-  /** Row of the first solid block in a column (sunlight stops there), or the world's height. */
+  /** Row of the first opaque block in a column (sunlight stops there), or the world's height. */
   private scanSunDepth(x: number): number {
     const { world, tiles } = this;
     for (let y = 0; y < world.height; y++) {
-      if (tiles.solid[world.fg[y * world.width + x]!]) return y;
+      if (tiles.opaque[world.fg[y * world.width + x]!]) return y;
     }
     return world.height;
   }
 
-  /** Light needed to enter a cell: solid blocks and water dim light faster than open air. */
+  /** Light needed to enter a cell: opaque blocks (and doors) and water dim light faster than open air or glass. */
   private cost(i: number): number {
-    if (this.tiles.solid[this.world.fg[i]!]) return COST_SOLID;
+    if (this.tiles.opaque[this.world.fg[i]!]) return COST_SOLID;
     return this.waterType !== 0 && this.world.liquidType[i] === this.waterType ? COST_WATER : COST_OPEN;
   }
 

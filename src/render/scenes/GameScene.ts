@@ -1,6 +1,6 @@
 /**
  * The in-game scene. It draws the session's world and colony, and turns pointer input
- * into orders. The player never changes the world from here: a tool only marks work (or
+ * into orders. The player never changes the world from here: a tool only plans work (or
  * picks a dwarf), and the dwarves do the rest.
  *
  * Each animation frame it:
@@ -14,16 +14,19 @@
  *   4. updates the tile cursor, the minimap's view box, the HUD's colony panel and, if
  *      open, the debug overlay.
  *
- * Changes in the world arrive as events (TileChanged, DesignationChanged, ExploredChanged)
- * and redraw only the cells concerned; the fog texture is uploaded at most once per frame.
+ * Changes in the world arrive as events (TileChanged, DesignationChanged, ExploredChanged,
+ * FurnitureChanged) and redraw only what they concern; the fog texture is uploaded at
+ * most once per frame.
  */
 import * as Phaser from 'phaser';
 import { gameContext } from '../../app/context';
 import { CHUNK_SIZE, TILE_SIZE } from '../../config';
 import { BIOMES, TILES } from '../../sim/content';
 import type { GameSession } from '../../sim/GameSession';
+import type { Job } from '../../sim/jobs/JobBoard';
 import type { CellRect } from '../../sim/world/World';
-import { markFrame } from '../assets/colonyArt';
+import { isBuildTool, type Tool } from '../../ui/state';
+import { markFrame, type MarkKind } from '../assets/colonyArt';
 import { TERRAIN_LAYOUT } from '../assets/manifest';
 import { CameraController } from '../CameraController';
 import { DEPTH } from '../depths';
@@ -31,7 +34,9 @@ import { ColonyDebug } from '../world/ColonyDebug';
 import { describeActivity, describeCell } from '../world/describeCell';
 import { DwarfSprites } from '../world/DwarfSprites';
 import { FogOverlay } from '../world/FogOverlay';
+import { FurnitureSprites } from '../world/FurnitureSprites';
 import { ItemSprites } from '../world/ItemSprites';
+import { PlanGhosts, type PlanPicture } from '../world/PlanGhosts';
 import { SelectionBox } from '../world/SelectionBox';
 import { SkyBackdrop } from '../world/SkyBackdrop';
 import { TileCursor, type CursorState } from '../world/TileCursor';
@@ -46,8 +51,8 @@ const COLONY_REPORT_MS = 250;
 const HOVER_REFRESH_MS = 200;
 /** The light-level debug view is redrawn this often. */
 const LIGHT_VIEW_REFRESH_MS = 500;
-/** Don't play the digging sound more often than this. */
-const DIG_SOUND_GAP_MS = 120;
+/** Don't play the same work sound more often than this. */
+const WORK_SOUND_GAP_MS = 120;
 
 type Cell = { x: number; y: number };
 
@@ -60,6 +65,8 @@ export class GameScene extends Phaser.Scene {
   private selection!: SelectionBox;
   private dwarfSprites!: DwarfSprites;
   private itemSprites!: ItemSprites;
+  private furnitureSprites!: FurnitureSprites;
+  private plans!: PlanGhosts;
   private cracks!: WorkCracks;
   private colonyDebug!: ColonyDebug;
   private cameraControl!: CameraController;
@@ -74,7 +81,7 @@ export class GameScene extends Phaser.Scene {
   /** Where a tool drag started, while the left button is held with a tool other than Select. */
   private dragFrom: Cell | null = null;
   private dragTo: Cell | null = null;
-  private lastDigSound = 0;
+  private lastSound = new Map<string, number>();
   private gridZoom = 0;
   private lastSize = { width: 0, height: 0, scale: 1 };
 
@@ -113,14 +120,17 @@ export class GameScene extends Phaser.Scene {
 
     this.sky = new SkyBackdrop(this, BIOMES.get(world.biome).sky);
     this.worldView = new WorldView(this, world, TILES, TERRAIN_LAYOUT, { terrain: 'terrain', marks: 'marks' }, (x, y) => {
-      const job = sim.jobs.at(x, y);
-      return job && job.type !== 'haul' ? markFrame(job.type, job.priority, job.blocked) : -1;
+      // A planned wall shows its mark only where nothing else is planned in front of it.
+      const job = sim.jobs.at(x, y) ?? sim.jobs.wallAt(x, y);
+      return job && job.type !== 'haul' ? markFrame(markKind(job, x, y), job.priority, job.blocked, job.missing) : -1;
     });
     this.add
       .sprite((sim.hearth.x + 0.5) * TILE_SIZE, (sim.hearth.y + 1) * TILE_SIZE, 'hearth', 0)
       .setOrigin(0.5, 1)
       .setDepth(DEPTH.objects)
       .play('hearthFire');
+    this.furnitureSprites = new FurnitureSprites(this, sim);
+    this.plans = new PlanGhosts(this, sim, TERRAIN_LAYOUT);
     this.itemSprites = new ItemSprites(this);
     this.dwarfSprites = new DwarfSprites(this, world, sim.colony);
     this.cracks = new WorkCracks(this);
@@ -142,6 +152,13 @@ export class GameScene extends Phaser.Scene {
       }),
       session.bus.on('DesignationChanged', ({ x, y }) => {
         this.worldView.refreshMark(x, y);
+        this.plans.invalidate();
+        this.hoverDirty = true;
+      }),
+      session.bus.on('FurnitureChanged', ({ id, placed }) => {
+        const piece = sim.furniture.get(id);
+        this.furnitureSprites.changed(id, placed);
+        if (piece) this.workSound('build', piece.x, piece.y);
         this.hoverDirty = true;
       }),
       session.bus.on('ExploredChanged', (rect) => {
@@ -149,8 +166,13 @@ export class GameScene extends Phaser.Scene {
         // A newly explored cell under the pointer has something new to describe.
         this.hoverDirty = true;
       }),
-      session.bus.on('BlockDug', ({ x, y }) => this.workSound(x, y)),
-      session.bus.on('TreeFelled', ({ x, y }) => this.workSound(x, y)),
+      session.bus.on('BlockDug', ({ x, y }) => this.workSound('dig', x, y)),
+      session.bus.on('TreeFelled', ({ x, y }) => this.workSound('dig', x, y)),
+      session.bus.on('BlockBuilt', ({ x, y }) => this.workSound('build', x, y)),
+      session.bus.on('ItemCrafted', ({ dwarf }) => {
+        const crafter = sim.dwarf(dwarf);
+        if (crafter) this.workSound('craft', crafter.x, crafter.y);
+      }),
     );
     this.listenForPointer();
 
@@ -177,6 +199,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.fit(this.scale.width, this.scale.height, this.cameraControl.scale);
 
     const alpha = this.session.alpha;
+    this.plans.update();
     this.itemSprites.update(sim.ground, alpha);
     this.dwarfSprites.update(sim.dwarves, alpha, sim.tick, time, context.selectedDwarf);
     this.cracks.update(sim);
@@ -229,6 +252,13 @@ export class GameScene extends Phaser.Scene {
       const dwarf = this.dwarfSprites.dwarfAt(world.x, world.y, this.session.sim.dwarves);
       if (context.tool === 'select' || (context.tool === 'auto' && dwarf !== null)) {
         context.selectDwarf(dwarf);
+        return;
+      }
+      // Furniture goes where it's clicked: there is nothing to drag out.
+      if (context.tool === 'furniture') {
+        const { x, y } = this.hovered;
+        context.applyTool({ x0: x, y0: y, x1: x, y1: y });
+        this.hoverDirty = true;
         return;
       }
       this.dragFrom = this.hovered;
@@ -297,6 +327,7 @@ export class GameScene extends Phaser.Scene {
     const context = gameContext();
     const { sim } = this.session;
     const cell = this.hovered;
+    this.plans.hidePreview();
     if (!cell) {
       this.cursor.hide();
       context.reportHover(null);
@@ -314,26 +345,53 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const info = describeCell(sim, cell.x, cell.y, context.tool, context.priority);
+    const tool = context.tool;
+    const buildItem = context.buildItem;
+    const info = describeCell(sim, cell.x, cell.y, tool, context.priority, buildItem);
     if (!info) {
       this.cursor.hide();
       context.reportHover(null);
       return;
     }
     const state: CursorState = info.action === 'ok' ? 'ok' : info.action === 'blocked' ? 'blocked' : 'neutral';
-    this.cursor.show(cell.x, cell.y, state, this.cameraControl.scale);
+    // A build tool shows what it would put here; furniture is outlined whole.
+    const picture = buildItem === null || this.dragFrom !== null ? null : this.pictureFor(tool, buildItem);
+    if (picture && sim.world.isVisible(cell.x, cell.y)) this.plans.showPreview(picture, cell.x, cell.y, info.action === 'ok');
+    if (picture?.kind === 'furniture') {
+      const { width, height } = picture.def;
+      this.cursor.show(cell.x, cell.y - height + 1, state, this.cameraControl.scale, width, height);
+    } else {
+      this.cursor.show(cell.x, cell.y, state, this.cameraControl.scale);
+    }
     context.reportHover(info);
   }
 
-  /** A dwarf finished a block or a tree: a knock, if it happened on screen. */
-  private workSound(x: number, y: number): void {
+  /** What a build tool puts down with an item: a block, a wall or a piece of furniture. */
+  private pictureFor(tool: Tool, item: number): PlanPicture | null {
+    if (!isBuildTool(tool)) return null;
+    const { sim } = this.session;
+    const def = sim.items.items[item];
+    if (!def) return null;
+    if (tool === 'wall') {
+      const wall = sim.tiles.walls.findIndex((w) => w.material === def.id);
+      return wall < 0 ? null : { kind: 'wall', wall };
+    }
+    const builds = def.builds;
+    if (tool === 'build' && builds && 'tile' in builds) return { kind: 'tile', tile: sim.tiles.tile(builds.tile) };
+    if (tool === 'furniture' && builds && 'furniture' in builds) return { kind: 'furniture', def: sim.furnitureKinds.get(sim.furnitureKinds.id(builds.furniture)) };
+    return null;
+  }
+
+  /** Work finished in view: a knock for digging and building, a ring for crafting. */
+  private workSound(sound: 'dig' | 'build' | 'craft', x: number, y: number): void {
     const view = this.cameraControl.view;
     const px = (x + 0.5) * TILE_SIZE;
     const py = (y + 0.5) * TILE_SIZE;
     if (px < view.x || px > view.x + view.width || py < view.y || py > view.y + view.height) return;
-    if (this.time.now - this.lastDigSound < DIG_SOUND_GAP_MS) return;
-    this.lastDigSound = this.time.now;
-    gameContext().audio?.play('dig', 0.55);
+    const last = this.lastSound.get(sound) ?? -Infinity;
+    if (this.time.now - last < WORK_SOUND_GAP_MS) return;
+    this.lastSound.set(sound, this.time.now);
+    gameContext().audio?.play(sound, sound === 'craft' ? 0.4 : 0.55);
   }
 
   // ---- Resizing, debug, cleanup -------------------------------------------------------------
@@ -419,6 +477,8 @@ export class GameScene extends Phaser.Scene {
     this.worldView.destroy();
     this.dwarfSprites.destroy();
     this.itemSprites.destroy();
+    this.furnitureSprites.destroy();
+    this.plans.destroy();
     this.cracks.destroy();
     this.colonyDebug.destroy();
     this.selection.destroy();
@@ -427,5 +487,21 @@ export class GameScene extends Phaser.Scene {
     this.dragFrom = null;
     this.dragTo = null;
     this.hovered = null;
+  }
+}
+
+/** What a job's mark shows in one of its cells: on furniture, the icon goes in its bottom-left cell only. */
+function markKind(job: Job, x: number, y: number): MarkKind {
+  switch (job.type) {
+    case 'dig':
+      return 'dig';
+    case 'chop':
+      return 'chop';
+    case 'dismantle':
+      return x === job.x && y === job.y ? 'dismantle' : 'plain';
+    case 'place':
+      return x === job.x && y === job.y ? 'build' : 'plain';
+    default:
+      return 'build';
   }
 }

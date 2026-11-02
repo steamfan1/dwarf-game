@@ -1,8 +1,9 @@
 /**
- * In-game overlay: the top bar (time controls, stored resources, menu), the toolbar, the
- * readout for whatever is under the pointer, the minimap and a controls hint. The day
- * number and clock join the top bar in Milestone 4. The dwarf roster and the debug panel
- * sit in the right-hand column (see UiRoot).
+ * In-game overlay: the top bar (time controls, stored resources, the crafting and storage
+ * buttons, menu), the toolbar, the crafting panel when open, the readout for whatever is
+ * under the pointer, the minimap and a controls hint. The day number and clock join the
+ * top bar in Milestone 4. The dwarf roster, storage and the debug panel sit in the
+ * right-hand column (see UiRoot).
  */
 import { GAME_SPEEDS, GAME_TITLE } from '../../config';
 import { keyLabel } from '../../core/actions';
@@ -10,6 +11,7 @@ import { t } from '../../core/strings';
 import { useCommands, useSettingsStore } from '../commands';
 import { useStore } from '../hooks';
 import { uiState } from '../state';
+import { CraftingPanel } from './CraftingPanel';
 import { Icon } from './Icon';
 import { Minimap } from './Minimap';
 import { Toolbar } from './Toolbar';
@@ -21,6 +23,8 @@ export function GameHud() {
   const commands = useCommands();
   const time = useStore(uiState, (s) => s.time);
   const minimapOpen = useStore(uiState, (s) => s.minimapOpen);
+  const craftingOpen = useStore(uiState, (s) => s.craftingOpen);
+  const storageOpen = useStore(uiState, (s) => s.storageOpen);
   const bindings = useStore(useSettingsStore(), (s) => s.bindings);
   const paused = time?.paused ?? false;
   const speedKeys = [bindings.speed1, bindings.speed2, bindings.speed3];
@@ -66,6 +70,37 @@ export function GameHud() {
 
         <ResourceBar />
 
+        <div class="panel-buttons" role="group">
+          <button
+            type="button"
+            class={`btn btn-icon${craftingOpen ? ' active' : ''}`}
+            aria-pressed={craftingOpen}
+            title={t('hud.crafting', { key: keyLabel(bindings.toggleCrafting[0]) })}
+            aria-label={t('crafting.title')}
+            data-testid="open-crafting"
+            onClick={() => {
+              commands.playSound(craftingOpen ? 'uiClose' : 'uiOpen');
+              commands.toggleCrafting();
+            }}
+          >
+            <Icon name="craft" />
+          </button>
+          <button
+            type="button"
+            class={`btn btn-icon${storageOpen ? ' active' : ''}`}
+            aria-pressed={storageOpen}
+            title={t('hud.storage', { key: keyLabel(bindings.toggleStorage[0]) })}
+            aria-label={t('colony.storage')}
+            data-testid="open-storage"
+            onClick={() => {
+              commands.playSound('uiClick');
+              commands.toggleStorage();
+            }}
+          >
+            <Icon name="chest" />
+          </button>
+        </div>
+
         <button
           type="button"
           class="btn btn-icon"
@@ -87,6 +122,7 @@ export function GameHud() {
       )}
       <HoverReadout />
       <Toolbar />
+      {craftingOpen && <CraftingPanel />}
       {minimapOpen && <Minimap />}
       <p class="hud-hint">{t('hud.hint', { keys: moveKeys })}</p>
     </div>

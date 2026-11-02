@@ -252,9 +252,15 @@ body {
   color: #f6e3bf;
 }
 
-.time-controls {
+.time-controls,
+.panel-buttons {
   display: flex;
   gap: 0.25em;
+}
+
+.panel-buttons .icon {
+  width: 1.15em;
+  height: 1.15em;
 }
 
 .btn-speed {
@@ -401,6 +407,64 @@ body {
 .btn-priority.active {
   border-color: var(--pip);
   background: linear-gradient(#383a42, #26282f);
+}
+
+/* What a build tool builds with: beside the toolbar, one row per choice with its stock. */
+.palette {
+  position: absolute;
+  left: calc(100% + 0.5em);
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  width: 13.5em;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0.4em;
+  scrollbar-width: thin;
+}
+
+.palette h4 {
+  margin: 0 0 0.25em 0.2em;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-dim);
+}
+
+.palette-entry {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.2em 0.35em;
+  font: inherit;
+  font-size: 0.88em;
+  color: var(--c-text);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.palette-entry:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.palette-entry.selected {
+  border-color: var(--c-accent);
+  background: rgba(242, 163, 58, 0.14);
+}
+
+.palette-entry .count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.palette-entry.empty .count,
+.palette-entry.empty .name {
+  color: var(--c-text-dim);
 }
 
 .sr-only {
@@ -615,17 +679,102 @@ body {
   margin: 0.6em 0 0;
 }
 
-.storage li {
-  display: grid;
-  grid-template-columns: 20px 1fr auto;
+.equipment .equipped {
+  display: flex;
   align-items: center;
-  gap: 0.45em;
-  padding: 0.05em 0;
+  gap: 0.35em;
 }
 
-.storage .count {
+.equipment img,
+.carrying img,
+.palette img,
+.crafting img,
+.storage-grid img {
+  image-rendering: pixelated;
+  flex: none;
+}
+
+/* Storage: a header that shows or hides the list, how full it is, and a grid of goods. */
+.storage h3 {
+  margin-bottom: 0.25em;
+}
+
+.storage-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.storage-toggle .icon {
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--c-accent);
+}
+
+.storage-toggle .count {
+  flex: 1;
+  text-align: right;
+  font-size: 0.85em;
+}
+
+.storage-toggle kbd {
+  font: 700 0.7em var(--font-mono);
+  color: var(--c-text-dim);
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--c-edge);
+  border-radius: 2px;
+}
+
+.storage .count.warn,
+.note.warn {
+  color: var(--c-warning);
+}
+
+.meter-storage .meter-fill {
+  background: #c9a46a;
+}
+
+.meter-storage.full .meter-fill {
+  background: var(--c-warning);
+}
+
+.storage-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.25em;
+  margin-top: 0.45em !important;
+}
+
+.storage-grid li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.1em;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 3px;
+}
+
+.storage-grid .count {
+  position: absolute;
+  right: 0.15em;
+  bottom: 0;
+  font-size: 0.72em;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 2px #000;
 }
 
 /* A thin bar for health, food, energy and skill progress. */
@@ -1124,4 +1273,207 @@ input[type='checkbox'] {
   .btn {
     transition: none;
   }
+}
+
+/* ---- Crafting panel (K) --------------------------------------------------------------- */
+
+.crafting {
+  position: absolute;
+  top: 3.6em;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: min(46em, calc(100vw - 42em));
+  min-width: 30em;
+  max-height: calc(100% - 15em);
+  font-size: 0.9em;
+}
+
+.crafting > header {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 0.6em 0.4em 0.8em;
+  border-bottom: 1px solid var(--c-edge);
+}
+
+.crafting h2 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1em;
+  letter-spacing: 0.05em;
+  color: #f6e3bf;
+}
+
+.crafting h2 .icon {
+  color: var(--c-accent);
+}
+
+.crafting h2 kbd {
+  font: 700 0.65em var(--font-mono);
+  color: var(--c-text-dim);
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--c-edge);
+  border-radius: 2px;
+}
+
+.crafting-body {
+  display: grid;
+  grid-template-columns: 1fr 15em;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.crafting .recipes,
+.crafting .queue {
+  overflow-y: auto;
+  padding: 0.4em 0.7em 0.7em;
+  scrollbar-width: thin;
+}
+
+.crafting .queue {
+  border-left: 1px solid var(--c-edge);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.crafting h3 {
+  margin: 0.6em 0 0.25em;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-dim);
+}
+
+.crafting ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crafting .note {
+  margin: 0.1em 0 0.35em;
+  font-size: 0.85em;
+  color: var(--c-text-dim);
+}
+
+.recipe-group.no-station .recipe {
+  opacity: 0.6;
+}
+
+.recipe {
+  display: grid;
+  grid-template-columns: 20px minmax(7em, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.22em 0.3em;
+  border-radius: 3px;
+}
+
+.recipe:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recipe-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
+}
+
+.recipe-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.makes {
+  font-size: 0.85em;
+  color: var(--c-text-dim);
+}
+
+.recipe .inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe .input {
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+}
+
+.recipe .input.short {
+  color: var(--c-danger);
+}
+
+.recipe .time {
+  min-width: 3em;
+  text-align: right;
+  color: var(--c-text-dim);
+}
+
+.recipe .add {
+  display: flex;
+  gap: 0.2em;
+}
+
+.recipe .add .btn {
+  padding: 0.1em 0.45em;
+  font-size: 0.85em;
+}
+
+.order {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.3em 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.order-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  min-width: 0;
+}
+
+.order-text strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-status {
+  font-size: 0.8em;
+  color: var(--c-text-dim);
+}
+
+.order.status-missing-materials .order-status,
+.order.status-no-station .order-status {
+  color: var(--c-warning);
+}
+
+.order.status-working .order-status {
+  color: #a8dd88;
+}
+
+.order-buttons {
+  display: flex;
+  gap: 0.15em;
+}
+
+.order-buttons .btn {
+  min-width: 0;
+  padding: 0.2em 0.3em;
 }

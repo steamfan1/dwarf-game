@@ -9,8 +9,10 @@
  */
 import { Validator } from '../../core/validate';
 
-export type ArtStyle = 'none' | 'soil' | 'rock' | 'ore' | 'crystal' | 'ice' | 'log' | 'leaves' | 'sprite';
-const ART_STYLES: readonly ArtStyle[] = ['none', 'soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'sprite'];
+export type ArtStyle = 'none' | 'soil' | 'rock' | 'ore' | 'crystal' | 'ice' | 'log' | 'leaves' | 'planks' | 'bricks' | 'glass' | 'sprite';
+const ART_STYLES: readonly ArtStyle[] = ['none', 'soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass', 'sprite'];
+/** Styles painted from base, dark and light colours, which must all be given. */
+const SHADED_STYLES: readonly ArtStyle[] = ['soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass'];
 
 /** A layer drawn on a block's top edge when nothing sits on top of it (grass, snow). */
 export interface CapArt {
@@ -61,6 +63,10 @@ export interface TileDef {
   replaceable: boolean;
   /** Dwarves can climb up and down through it, and stand on top of it (ladders). */
   climbable: boolean;
+  /** A door: dwarves walk through it, but it blocks light (and, from Milestone 5, monsters). */
+  door: boolean;
+  /** A solid block that lets light through (glass). */
+  transparent: boolean;
   /** Light it gives off, 0 (none) to 15 (as bright as daylight). */
   light: number;
   connect: ConnectRule;
@@ -73,6 +79,8 @@ export interface WallDef {
   name: string;
   /** Generated with the world, as opposed to built by dwarves. */
   natural: boolean;
+  /** Item id a dwarf uses up to build this wall, or null if it can't be built. */
+  material: string | null;
   mapColor: string;
   art: TileArt;
 }
@@ -98,8 +106,12 @@ export class TileRegistry {
 
   /** 1 where a tile id blocks movement. */
   readonly solid: Uint8Array;
-  /** 1 where a tile id can be dug. */
+  /** 1 where a tile id can be dug: solid blocks and built fittings (ladders, doors). */
   readonly diggable: Uint8Array;
+  /** 1 where a tile id stops light: solid blocks except glass, and doors. */
+  readonly opaque: Uint8Array;
+  /** 1 where a tile id is a door. */
+  readonly door: Uint8Array;
   /** 1 where a tile id can be built over or replaced by generation. */
   readonly replaceable: Uint8Array;
   /** Tiles with equal non-zero groups join up visually; 0 never joins anything. */
@@ -125,13 +137,17 @@ export class TileRegistry {
 
     this.solid = new Uint8Array(tiles.length);
     this.diggable = new Uint8Array(tiles.length);
+    this.opaque = new Uint8Array(tiles.length);
+    this.door = new Uint8Array(tiles.length);
     this.replaceable = new Uint8Array(tiles.length);
     this.connectGroup = new Uint16Array(tiles.length);
     this.climbable = new Uint8Array(tiles.length);
     this.lightEmitted = new Uint8Array(tiles.length);
     tiles.forEach((tile, i) => {
       this.solid[i] = tile.solid ? 1 : 0;
-      this.diggable[i] = tile.solid && !tile.indestructible ? 1 : 0;
+      this.diggable[i] = (tile.solid || tile.door || tile.climbable) && !tile.indestructible ? 1 : 0;
+      this.opaque[i] = (tile.solid && !tile.transparent) || tile.door ? 1 : 0;
+      this.door[i] = tile.door ? 1 : 0;
       this.replaceable[i] = tile.replaceable ? 1 : 0;
       this.connectGroup[i] = tile.connect === 'solid' ? 1 : tile.connect === 'self' ? 2 + i : 0;
       this.climbable[i] = tile.climbable ? 1 : 0;
@@ -200,7 +216,7 @@ function parseArt(v: Validator, raw: unknown, path: string): TileArt {
   for (const key of ['base', 'dark', 'light', 'pebble', 'snow'] as const) {
     if (o?.[key] !== undefined) art[key] = v.color(o[key], `${path}.${key}`);
   }
-  if (['soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves'].includes(style)) {
+  if (SHADED_STYLES.includes(style)) {
     for (const key of ['base', 'dark', 'light'] as const) {
       if (!art[key]) v.problem(`${path}.${key} is required for style "${style}"`);
     }
@@ -256,6 +272,8 @@ function parseTile(v: Validator, raw: unknown, path: string): TileDef {
     drops: o?.drops === undefined ? null : v.identifier(o.drops, `${path}.drops`),
     replaceable: o?.replaceable === undefined ? false : v.boolean(o.replaceable, `${path}.replaceable`),
     climbable: o?.climbable === undefined ? false : v.boolean(o.climbable, `${path}.climbable`),
+    door: o?.door === undefined ? false : v.boolean(o.door, `${path}.door`),
+    transparent: o?.transparent === undefined ? false : v.boolean(o.transparent, `${path}.transparent`),
     light: o?.light === undefined ? 0 : Math.round(v.number(o.light, `${path}.light`, 0, 15)),
     connect,
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
@@ -269,6 +287,7 @@ function parseWall(v: Validator, raw: unknown, path: string): WallDef {
     id: v.identifier(o?.id, `${path}.id`),
     name: v.string(o?.name, `${path}.name`),
     natural: v.boolean(o?.natural, `${path}.natural`),
+    material: o?.material === undefined ? null : v.identifier(o.material, `${path}.material`),
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: parseArt(v, o?.art, `${path}.art`),
   };

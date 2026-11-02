@@ -4,12 +4,12 @@
  * A dug block or a felled tree drops an item stack where it was. Stacks fall until they
  * rest on something solid (through air, ladders and water; lava destroys them), merge
  * with a resting stack of the same item in the same cell, and wait there until a dwarf
- * hauls them to storage. The colony's inventory is the sum of all storage: for now the
- * Hearth's store, with chests joining it in Milestone 3.
+ * hauls them to storage. The colony's inventory is the sum of all storage: the Hearth's
+ * and every chest's.
  *
  * Pure: no Phaser and no DOM. The renderer keeps one pooled sprite per stack.
  */
-import type { ItemRegistry } from './ItemRegistry';
+import type { ItemCount, ItemRegistry } from './ItemRegistry';
 import type { TileRegistry } from '../world/TileRegistry';
 import type { World } from '../world/World';
 
@@ -83,6 +83,17 @@ export class GroundItems {
     return stack;
   }
 
+  /** Move every stack in one cell to another (a block is being built where they lie). */
+  moveAll(x: number, y: number, toX: number, toY: number): void {
+    for (const stack of this.stacks.values()) {
+      if (stack.x !== x || stack.y !== y) continue;
+      stack.x = toX;
+      stack.y = toY;
+      stack.falling = this.falls(toX, toY);
+      this.version++;
+    }
+  }
+
   /**
    * One tick of gravity: falling stacks drop a row; resting stacks start falling if their
    * floor was dug away. Returns the stacks destroyed by lava, so their jobs can go too.
@@ -129,11 +140,34 @@ export class GroundItems {
   }
 }
 
-/** Everything the colony has put away, by item number. */
+/**
+ * Everything the colony has put away, by item number.
+ *
+ * The colony has one store with several doors: the Hearth and every chest. A dwarf puts
+ * anything away at, and fetches anything from, whichever of them is nearest; the HUD
+ * shows the total.
+ *
+ *  - Room is counted in stacks: each item takes ceil(count / its stack size) of the slots
+ *    the Hearth and the chests provide. Dwarves don't start hauling something that won't
+ *    fit, but a delivery already on its way is always accepted, so nothing is ever lost
+ *    (the store can run a little over).
+ *  - A dwarf that takes on a job reserves the materials before setting off, so two
+ *    builders never count on the same plank. Reserved goods stay in storage until they
+ *    are fetched; `available` is what is left for new jobs.
+ */
 export class ColonyStorage {
+  private readonly items: ItemRegistry;
   private readonly counts = new Map<number, number>();
+  private readonly reserved = new Map<number, number>();
+  /** Stack slots the Hearth and the chests provide. */
+  capacity: number;
   /** Bumped on every change (for the HUD). */
   version = 0;
+
+  constructor(items: ItemRegistry, capacity: number) {
+    this.items = items;
+    this.capacity = capacity;
+  }
 
   add(item: number, count: number): void {
     if (count <= 0) return;
@@ -141,23 +175,88 @@ export class ColonyStorage {
     this.version++;
   }
 
-  /** Take up to `count`; returns how many were taken. */
-  take(item: number, count: number): number {
-    const have = this.counts.get(item) ?? 0;
-    const taken = Math.min(have, count);
-    if (taken === 0) return 0;
-    if (have === taken) this.counts.delete(item);
-    else this.counts.set(item, have - taken);
-    this.version++;
-    return taken;
-  }
-
   count(item: number): number {
     return this.counts.get(item) ?? 0;
   }
 
+  /** Stored and not promised to any job. */
+  available(item: number): number {
+    return this.count(item) - (this.reserved.get(item) ?? 0);
+  }
+
+  reservedCount(item: number): number {
+    return this.reserved.get(item) ?? 0;
+  }
+
+  /** Whether every listed amount is available. */
+  hasAll(list: readonly ItemCount[]): boolean {
+    return list.every(({ item, count }) => this.available(item) >= count);
+  }
+
+  /** Promise all of a list to a job, or (returning false) none of it. */
+  reserveAll(list: readonly ItemCount[]): boolean {
+    if (!this.hasAll(list)) return false;
+    for (const { item, count } of list) this.reserved.set(item, this.reservedCount(item) + count);
+    this.version++;
+    return true;
+  }
+
+  /** Give back a promise made with reserveAll (the job was dropped before the goods were fetched). */
+  unreserveAll(list: readonly ItemCount[]): void {
+    for (const { item, count } of list) {
+      const left = this.reservedCount(item) - count;
+      if (left > 0) this.reserved.set(item, left);
+      else this.reserved.delete(item);
+    }
+    this.version++;
+  }
+
+  /** Fetch reserved goods: they leave storage and the promise is kept. Returns what was taken. */
+  takeReserved(list: readonly ItemCount[]): ItemCount[] {
+    const taken: ItemCount[] = [];
+    for (const { item, count } of list) {
+      const amount = Math.min(count, this.count(item));
+      this.remove(item, amount);
+      const left = this.reservedCount(item) - count;
+      if (left > 0) this.reserved.set(item, left);
+      else this.reserved.delete(item);
+      if (amount > 0) taken.push({ item, count: amount });
+    }
+    this.version++;
+    return taken;
+  }
+
+  /** Take up to `count` of what isn't reserved; returns how many were taken. */
+  take(item: number, count: number): number {
+    const taken = Math.max(0, Math.min(this.available(item), count));
+    this.remove(item, taken);
+    return taken;
+  }
+
+  /** Stack slots in use. */
+  slotsUsed(): number {
+    let slots = 0;
+    for (const [item, count] of this.counts) slots += Math.ceil(count / this.items.get(item).stack);
+    return slots;
+  }
+
+  /** Whether at least one more of an item fits: in a part-filled stack of it, or in a free slot. */
+  hasRoom(item: number): boolean {
+    const count = this.count(item);
+    if (count % this.items.get(item).stack !== 0) return true;
+    return this.slotsUsed() < this.capacity;
+  }
+
   /** Every stored item with its count, in item order. */
-  entries(): Array<{ item: number; count: number }> {
+  entries(): ItemCount[] {
     return [...this.counts].sort((a, b) => a[0] - b[0]).map(([item, count]) => ({ item, count }));
+  }
+
+  private remove(item: number, count: number): void {
+    if (count <= 0) return;
+    const left = this.count(item) - count;
+    if (left > 0) this.counts.set(item, left);
+    else this.counts.delete(item);
+    this.version++;
   }
 }

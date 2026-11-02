@@ -39,8 +39,8 @@ describe('isBindable', () => {
 
 describe('rebind', () => {
   it('assigns a free key to a slot', () => {
-    const { bindings, swappedWith } = rebind(DEFAULT_BINDINGS, 'panUp', 0, 'KeyI');
-    expect(bindings.panUp).toEqual(['KeyI', 'ArrowUp']);
+    const { bindings, swappedWith } = rebind(DEFAULT_BINDINGS, 'panUp', 0, 'KeyJ');
+    expect(bindings.panUp).toEqual(['KeyJ', 'ArrowUp']);
     expect(swappedWith).toBeNull();
   });
 

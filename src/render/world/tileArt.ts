@@ -285,6 +285,64 @@ function paintLeaves(p: Pixels, art: TileArt, rng: Rng, mask: number): void {
   }
 }
 
+/** Sawn boards: four planks with seams, staggered joints, grain and a nail or two. */
+function paintPlanks(p: Pixels, art: TileArt, rng: Rng): void {
+  const base = rgb(art.base!);
+  const dark = rgb(art.dark!);
+  const light = rgb(art.light!);
+  for (let board = 0; board < 4; board++) {
+    const top = board * 4;
+    const tone = rng.range(-0.12, 0.12);
+    const boardColor = tone > 0 ? mix(base, light, tone) : mix(base, dark, -tone);
+    const joint = (board * 7 + rng.int(2, 13)) % FRAME;
+    for (let y = top; y < top + 4; y++) {
+      for (let x = 0; x < FRAME; x++) {
+        let color = boardColor;
+        if (y === top + 3) color = dark; // seam under each board
+        else if (y === top) color = mix(boardColor, light, 0.35);
+        else if (rng.chance(0.1)) color = mix(boardColor, dark, 0.4); // grain
+        if (x === joint && y !== top + 3) color = dark;
+        p.set(x, y, color);
+      }
+    }
+    if (rng.chance(0.6)) p.set((joint + 2) % FRAME, top + 1, mix(light, [255, 255, 255], 0.3));
+  }
+}
+
+/** Brickwork: three-pixel courses of bricks in light mortar, each course offset by half a brick. */
+function paintBricks(p: Pixels, art: TileArt, rng: Rng): void {
+  const base = rgb(art.base!);
+  const dark = rgb(art.dark!);
+  const mortar = rgb(art.light!);
+  for (let y = 0; y < FRAME; y++) {
+    const course = Math.floor(y / 4);
+    const inCourse = y % 4;
+    for (let x = 0; x < FRAME; x++) {
+      if (inCourse === 3 || (x + (course % 2) * 4) % 8 === 7) {
+        p.set(x, y, mortar);
+        continue;
+      }
+      let color = inCourse === 0 ? mix(base, mortar, 0.18) : inCourse === 2 ? mix(base, dark, 0.3) : base;
+      if (rng.chance(0.08)) color = mix(color, dark, 0.35);
+      p.set(x, y, color);
+    }
+  }
+}
+
+/** Glass: a pale see-through fill with a couple of bright streaks. Edges come from paintEdges. */
+function paintGlass(p: Pixels, art: TileArt, rng: Rng): void {
+  const base = rgb(art.base!);
+  const light = rgb(art.light!);
+  const streak = rng.int(0, 5);
+  for (let y = 0; y < FRAME; y++) {
+    for (let x = 0; x < FRAME; x++) {
+      const diagonal = (x + y + streak) % 11;
+      if (diagonal === 0 || diagonal === 1) p.set(x, y, light, 150);
+      else p.set(x, y, base, 70);
+    }
+  }
+}
+
 /** A sprite drawn from palette rows, bottom-aligned (grass tufts, flowers, mushrooms). */
 function paintSprite(p: Pixels, art: TileArt): void {
   const rows = art.rows ?? [];
@@ -364,6 +422,15 @@ export function paintTile(art: TileArt, solid: boolean, mask: number, rng: Rng):
     case 'leaves':
       paintLeaves(p, art, rng, mask);
       return p;
+    case 'planks':
+      paintPlanks(p, art, rng);
+      break;
+    case 'bricks':
+      paintBricks(p, art, rng);
+      break;
+    case 'glass':
+      paintGlass(p, art, rng);
+      break;
     case 'sprite':
       paintSprite(p, art);
       return p;

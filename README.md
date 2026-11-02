@@ -7,11 +7,12 @@ home from monsters at night, and finally build a gate to the next world.
 All names, art, sound and text are original to this project. Art and sound are generated
 at runtime as placeholders, so the game currently needs no image or audio files.
 
-**Status: Milestone 2 (dwarves).** Worlds are generated from a seed in a background worker
-(hills, caves, lakes, lava, ores, trees, two biomes) and drawn with chunked tilemaps. Three
-dwarves start beside the Hearth; you mark blocks to dig and trees to fell, and they find
-their way there, do the work and carry what comes out back to the Hearth. See
-[Roadmap](#roadmap) for what each milestone adds.
+**Status: Milestone 3 (building and crafting).** Worlds are generated from a seed in a
+background worker (hills, caves, lakes, lava, ores, trees, two biomes) and drawn with
+chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to dig and trees
+to fell, plan blocks, walls, ladders, doors and furniture, and queue crafts; the dwarves
+do all of it, fetching materials from storage (the Hearth and any chests) and walking to
+the right crafting station. See [Roadmap](#roadmap) for what each milestone adds.
 
 ## Requirements
 
@@ -37,24 +38,30 @@ Then open http://localhost:5173.
 | `npm run smoke` | Browser smoke tests against the build (run `npx playwright install chromium` once first) |
 | `npm run check` | Build, unit tests and smoke tests in one go |
 
-## Controls (Milestone 2)
+## Controls (Milestone 3)
 
-You never move dwarves or change the world yourself: you mark work, and idle dwarves
+You never move dwarves or change the world yourself: you plan work, and idle dwarves
 take it on. Pick a tool from the toolbar on the left (or press its key), then click or
 drag over the world.
 
 | Tool | Key | What a click or drag does |
 | --- | --- | --- |
-| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling. A click on a mark removes it; a click on a dwarf selects it |
+| Auto | E | The tool you start with. Marks whatever you click: blocks for digging, trees for felling, furniture to take apart. A click on a mark removes it; a click on a dwarf selects it |
 | Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
-| Dig | F | Mark blocks for digging |
+| Dig | F | Mark blocks (and, with a click, ladders, doors and furniture) to dig out or take apart |
 | Fell trees | C | Mark a tree for felling (click any part of it) |
-| Cancel marks | X | Remove dig and felling marks |
-| Priority | P | Set marked work to the priority picked under the tools (Low, Normal, High, Urgent) |
+| Build | B | Plan blocks, ladders and doors from the material picked in the palette beside the toolbar |
+| Walls | V | Plan background walls, which dwarves can climb, from the picked material |
+| Furniture | T | Click where a chest, torch, crafting station, bed, table... should stand |
+| Cancel | X | Remove planned work of any kind |
+| Priority | P | Set planned work to the priority picked under the tools (Low, Normal, High, Urgent) |
 
-New marks get the priority picked under the tools; dwarves always take the most urgent
-work first, then the nearest. Right-click (or Esc) puts the tool down, back to Auto; with
-Auto in hand it deselects the dwarf.
+New plans get the priority picked under the tools; dwarves always take the most urgent
+work first, then the nearest. The palette shows how much of each material is stored; you
+can plan with materials you don't have yet, and the work waits for them. While a build
+tool is in hand, a see-through picture shows what would go under the pointer: green where
+it can, red where it can't, and the readout in the top-left corner says why. Right-click
+(or Esc) puts the tool down, back to Auto; with Auto in hand it deselects the dwarf.
 
 | Input | Action |
 | --- | --- |
@@ -62,10 +69,12 @@ Auto in hand it deselects the dwarf.
 | Screen edges | Pan the camera when the pointer rests there (can be turned off in Settings) |
 | Middle-drag | Drag the map around |
 | Mouse wheel, + and - | Zoom between 1x and 4x, towards the pointer |
+| K | Crafting panel: every recipe, by station, and the queue of orders |
+| I | Show or hide the list of stored goods (the storage panel on the right) |
 | M | Show or hide the minimap (click it to jump there) |
 | Space | Pause / resume |
 | 1, 2, 3 | Normal, double, triple speed |
-| Esc | Close a dialog, put the tool down, deselect the dwarf, or open the in-game menu |
+| Esc | Close a dialog or the crafting panel, put the tool down, deselect the dwarf, or open the in-game menu |
 | ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
 
 Every key can be changed in **Settings → Key bindings**. Keys are matched by physical
@@ -80,10 +89,38 @@ mark work while paused too.
 
 - **Dwarves dig, fell and haul.** An idle dwarf takes the most urgent marked job it can
   reach, walks there (walking, jumping up one tile, climbing ladders and background
-  walls, swimming, and dropping up to four tiles; longer falls hurt), and works at it. Harder blocks take
-  longer, and dwarves dig faster as their mining skill grows. Dug blocks and felled trees
-  drop items, which dwarves carry to the Hearth when nothing more urgent is waiting. The
-  top bar shows what's stored; the panel on the right lists everything.
+  walls, swimming, and dropping up to four tiles; longer falls hurt), and works at it.
+  Harder blocks take longer, and dwarves dig faster as their mining skill grows (and with
+  a pickaxe). Dug blocks and felled trees drop items (trees give logs, and fibre from
+  their leaves), which dwarves carry to storage when nothing more urgent is waiting.
+- **Storage is the Hearth plus every chest.** They count as one store: a dwarf puts
+  things away at, and fetches them from, whichever is nearest. Room is counted in stacks
+  (the Hearth holds 24, each chest 16); when it's full, goods wait on the ground and the
+  game says so. The top bar shows the most plentiful goods, the storage panel on the
+  right shows everything and how full it is.
+- **Building fetches its materials.** A planned block, wall or piece of furniture shows
+  see-through where it will go. A dwarf reserves the material in storage, fetches it,
+  carries it over and builds. Work whose material isn't in storage waits with an amber
+  question mark, and starts by itself once some arrives. Blocks need something to hold
+  them up (a block, ladder or door beside them, or a wall behind); a planned block holds
+  up the next one, so a row or column can be planned in one drag and gets built outward.
+  Walls work the same way, and since dwarves climb walls, a column of walls is its own
+  scaffolding. Doors let dwarves through but stop light; ladders can be climbed; glass is
+  solid but lets light through. Dwarves won't put a block where it would shut someone in,
+  and they step out of the way of a block that's about to go where they stand.
+- **Furniture.** Chests add storage room; torches give light (and flicker); a workbench,
+  furnace, anvil, loom and kitchen stove are crafting stations. Most furniture stands on
+  the floor; torches hang on a wall or beside a block. A click with Auto or Dig marks
+  furniture to be taken apart: it comes back as an item, and nothing it held is lost.
+- **Crafting.** The crafting panel (K) lists every recipe by where it's made, with the
+  materials it takes (in red when the colony is short). Queuing one only asks for it: a
+  free dwarf reserves the materials, fetches them, walks to a free station of the right
+  kind (by-hand recipes are made right at the store) and puts what it made into storage.
+  Each order shows how many are done and whether it's waiting for materials or for a
+  station to be built. Crafting gives crafting experience, which makes dwarves quicker.
+- **Dwarves equip themselves.** A dwarf with nothing better to do takes better gear from
+  storage (a pickaxe, armour...) and puts back what it used before. Pickaxes make digging
+  faster; weapons and armour matter once monsters arrive (Milestone 5).
 - **Walls are for climbing.** Every block in the ground has a background wall behind it,
   and a dug-out block leaves its wall behind, so dwarves can climb straight up and down
   the shafts and caves they open (as they climb ladders).
@@ -122,17 +159,21 @@ src/
     worldgen/      seeded world generation: terrain, caves, liquids, ores, vegetation
     light/         per-tile light (sunlight, lava, the Hearth) that also decides what's explored
     nav/           how dwarves move, A* pathfinding with a per-tick budget and a path cache
-    jobs/          the job board: dig, fell and haul jobs, reservations and priorities
+    jobs/          the job board: dig, fell, haul, build, craft... jobs, claims and priorities
     dwarves/       dwarves (data), their behaviour (DwarfAI) and colony settings
     items/         the item registry, items lying in the world, and the colony's storage
+    furniture/     the furniture registry and the furniture standing in the world
+    crafting/      recipes and the queue of crafting orders
   workers/         the world-generation Web Worker
   platform/        browser APIs with graceful failure: storage, keyboard, input guards
   render/          Phaser: scenes, camera, asset manifest, viewport sizing, audio
-    world/         chunked tilemaps, terrain atlas and tile art, fog of war, dwarf and item
-                   sprites, designation marks, selection box, tile cursor
+    world/         chunked tilemaps, terrain atlas and tile art, fog of war, dwarf, item and
+                   furniture sprites, designation marks, planned-work ghosts, selection box,
+                   tile cursor
   ui/              HTML/CSS overlay in Preact: menus, HUD, settings, debug panel
   debug/           window.debug helpers (dev builds only)
-  data/            game content as JSON: tiles, biomes, world generation, items, dwarves, strings
+  data/            game content as JSON: tiles, biomes, world generation, items, furniture,
+                   recipes, dwarves, strings
 e2e/               browser smoke tests (Playwright)
 .github/workflows/ CI and GitHub Pages deployment
 ```
@@ -163,8 +204,8 @@ e2e/               browser smoke tests (Playwright)
   just that cell and its four neighbours. Block edges, outlines and grass caps come from
   one generated terrain atlas.
 - **Sunlight decides what's explored.** `sim/light/Lighting.ts` keeps two light values per
-  tile: sunlight, which falls down each column, and glow, from lava, glow crystals and the
-  Hearth (torches later). Both spread by flood fill, dimming faster through blocks and
+  tile: sunlight, which falls down each column, and glow, from lava, glow crystals, the
+  Hearth, torches and furnaces. Both spread by flood fill, dimming faster through blocks and
   water. Any sunlit cell counts as explored, as do cells near a dwarf; glow alone never
   uncovers anything. A dug block relights only the cells within reach of it (a few
   hundred), never the whole world.
@@ -179,11 +220,24 @@ e2e/               browser smoke tests (Playwright)
   chunk. Two flood fills from the Hearth (`HomeMaps`) tell which cells a dwarf can reach
   and come back from, which is how dwarves avoid work that would strand them.
 - **Jobs** live on a board (`sim/jobs/JobBoard.ts`): most urgent first, then nearest, then
-  oldest. Claiming a job reserves it, so two dwarves never take the same one. Work done is
-  kept on the job, so an interrupted dig isn't lost.
-- **The player only gives orders.** Tools call `Simulation.designate`, `cancelDesignations`
-  and `prioritize`, which only add, remove or change jobs. The world changes only through
-  the dwarves' work (and, in Milestone 7, spells).
+  oldest. Claiming a job reserves it, so two dwarves never take the same one, and sets
+  aside what it needs: its materials in storage and, for a craft, a station. Whenever a
+  job is given back or cancelled, those are freed again, and anything the dwarf was
+  already carrying goes back to storage before it takes on new work, so materials are
+  never lost. Work done is kept on the job, so an interrupted dig or craft isn't lost.
+- **Storage** (`sim/items/Items.ts`) is one pool of goods with several access points (the
+  Hearth and every chest); a dwarf heads for whichever is nearest, found by one A* search
+  with several goal areas. Reserved goods stay in storage until fetched, and `available`
+  is what's left for new jobs. Every few ticks the waiting build and craft jobs are handed
+  the available materials, most urgent first, and the rest are flagged as missing them.
+- **The player only gives orders.** Tools call `Simulation.designate`, `designateBuild`,
+  `designateWall`, `designateFurniture`, `designateDismantle`, `queueCraft`,
+  `cancelDesignations` and `prioritize`, which only add, remove or change jobs and
+  orders. The world changes only through the dwarves' work (and, in Milestone 7, spells).
+- **Furniture** (`sim/furniture/`) stands in front of the tile grid, covering a few cells
+  from its bottom-left corner; a grid of piece ids answers "what's here?" in one lookup.
+  It isn't solid, so it never changes how dwarves move. Blocks a piece stands on can't be
+  dug out until it's taken apart.
 - **Event bus.** Systems announce what happened on a typed bus (`core/EventBus.ts`,
   event list in `sim/events.ts`) instead of calling each other.
 - **HTML UI over the canvas.** Panels are Preact components styled with plain CSS
@@ -206,9 +260,10 @@ at runtime.
 - **Text:** every player-visible string is in `src/data/strings/en.json` and is looked up
   with `t('key')`. Placeholders look like `{name}`. A translation would be another file
   with the same keys.
-- **Items** are in `src/data/items.json` and **dwarves** (names, looks, speeds, skills) in
-  `src/data/dwarves.json`, both described below. **Recipes, the tech tree, creatures and
-  spells** get their JSON files in Milestones 3 to 7, documented here as they arrive.
+- **Items** are in `src/data/items.json`, **furniture** in `src/data/furniture.json`,
+  **recipes** in `src/data/recipes.json` and **dwarves** (names, looks, speeds, skills)
+  in `src/data/dwarves.json`, all described below. **The tech tree, creatures and spells**
+  get their JSON files in Milestones 5 to 7, documented here as they arrive.
 
 Every file is checked when the game starts. A mistake (a misspelt tile id, a colour that
 isn't `#rrggbb`, a range with min above max) stops the game with a message naming the
@@ -246,6 +301,8 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 | `drops` | Item id (from items.json) left behind when dug, or when a tree's trunk is felled. |
 | `replaceable` | Building or growing over it simply removes it (grass tufts, flowers). |
 | `climbable` | Dwarves climb up and down through it and can stand on it (ladders). |
+| `door` | Dwarves walk through it, but it stops light (and, from Milestone 5, monsters). |
+| `transparent` | A solid block that lets light through (glass). |
 | `light` | Light it gives off, 0 to 15 (15 is daylight). Liquids can glow too (lava is 12). |
 | `connect` | What the tile visually joins with: `solid` (default for solid tiles), `self` or `none`. |
 | `mapColor` | Colour on the minimap. |
@@ -253,12 +310,15 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 
 `art.style` picks a painter: `soil` (speckled earth), `rock` (cobbled stone), `ore` (rock
 with nuggets, needs `ore` colours), `crystal` (rock with shards), `ice`, `log` (tree
-trunk), `leaves`, or `sprite` (a small picture drawn from `rows` of palette characters, as
-in the `tall_grass` and `flowers` entries). `base`, `dark` and `light` are the main colours.
+trunk), `leaves`, `planks`, `bricks`, `glass`, or `sprite` (a small picture drawn from
+`rows` of palette characters, as in the `tall_grass`, `ladder` and `wooden_door` entries). `base`, `dark` and `light` are the main colours.
 A `cap` (grass, snow) is drawn along a block's top edge only when nothing sits on it.
 Edges, outlines and rounded corners are worked out automatically from the neighbours.
 
-Walls use the same art fields; liquids have `base`, `light`, `dark` and `alpha`.
+Walls use the same art fields, plus `material`: the item a dwarf uses up to build that
+wall (walls without one can't be built). Liquids have `base`, `light`, `dark` and `alpha`.
+A block that can be built (an item's `builds.tile`) must drop that same item when dug, so
+nothing is ever lost; the game checks this at start-up.
 
 ### Biomes: `src/data/biomes.json`
 
@@ -297,24 +357,70 @@ in tiles.json and an ore rule here.
 
 | Field | Meaning |
 | --- | --- |
-| `id` | snake_case, unique. Tiles' `drops` and (later) recipes refer to items by this id. |
+| `id` | snake_case, unique. Tiles' `drops`, walls' `material` and recipes refer to items by this id. |
 | `name`, `description` | Shown in the HUD. |
 | `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food` or `furniture`. |
-| `stack` | Most of the item in one pile on the ground or in a dwarf's arms (default 50). |
-| `icon` | The placeholder icon: `style` is `lump`, `pile`, `ball`, `gem`, `ore` or `log`, with `base`, `dark` and `light` colours and an `accent` for ore flecks. |
+| `stack` | Most of the item in one pile on the ground or in a dwarf's arms, and in one storage slot (default 50). |
+| `icon` | The placeholder icon: a `style` (`lump`, `pile`, `ore`, `log`, `plank`, `bar`, `pickaxe`, `chest`, `torch`... see `ICON_STYLES` in `sim/items/ItemRegistry.ts`) with `base`, `dark` and `light` colours and an optional `accent`. |
+| `builds` | Optional. What building with it puts in the world: `{ "tile": "plank" }` (the Build tool's palette) or `{ "furniture": "chest" }` (the Furniture tool's). Items that are a wall's `material` appear in the Walls palette. |
+| `equip` | Optional. Gear: `slot` (`head`, `body`, `weapon`, `tool` or `accessory`), `tier` (dwarves swap up to higher tiers by themselves), and `digSpeed` (tools), `damage` (weapons) or `armor`. |
+| `food` | Optional. `{ "hunger": 40 }`: how much eating one restores (Milestone 4). |
 
 Every tile's `drops` must name an item here; the game checks this at start-up. So a new
 ore takes three entries: the tile, its ore rule in worldgen.json, and the item it drops.
+
+### Furniture: `src/data/furniture.json`
+
+```json
+{
+  "id": "workbench",
+  "name": "Workbench",
+  "size": [2, 1],
+  "station": "workbench",
+  "mapColor": "#a87a4b",
+  "art": { "style": "workbench", "base": "#a87a4b", "dark": "#6b4628", "light": "#c69866", "accent": "#9aa1ab" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `size` | Width and height in cells; it stands on its bottom-left cell. |
+| `mount` | `floor` (default: solid ground under its whole width) or `wall` (a background wall behind it, or a block beside it). |
+| `storage` | Stacks of goods it adds to the colony's storage (chests). |
+| `station` | The crafting station it provides, named by recipes (`workbench`, `furnace`, `anvil`, `loom`, `kitchen`...). |
+| `light` | Light it gives off, 0 to 15. |
+| `art` | Placeholder sprite: a `style` (see `FURNITURE_STYLES` in `sim/furniture/FurnitureRegistry.ts`) and colours. |
+
+Each piece of furniture is built from exactly one item whose `builds` names it, and that
+item is what comes back when the piece is taken apart.
+
+### Recipes: `src/data/recipes.json`
+
+```json
+{
+  "id": "iron_bar",
+  "output": { "item": "iron_bar", "count": 1 },
+  "inputs": [{ "item": "iron_ore", "count": 2 }],
+  "station": "furnace",
+  "time": 120
+}
+```
+
+`station` is `none` for recipes made by hand (at the Hearth or a chest), or a station some
+furniture provides. `time` is in ticks (20 per second) for a beginner; crafting skill
+makes it quicker. Items and stations are checked at start-up.
 
 ### Dwarves: `src/data/dwarves.json`
 
 How many dwarves the colony starts with (`startingDwarves`) and can grow to
 (`maxDwarves`), the name parts and colours new dwarves are made from, and the numbers that
 set the pace of the game: `movement` (ticks per step for each kind of move, the safe drop
-and fall damage), `vision` (how near a dwarf must be to uncover a cell), `work` (ticks to
-dig a block of hardness 1, to fell a tree, to pick up and put down) and `skills` (the
-experience each level needs and how much faster each level works). There are 20 ticks per
-second at normal speed.
+and fall damage), `vision` (how near a dwarf must be to uncover a cell), `storage` (stack
+slots the Hearth holds), `work` (ticks to dig a block of hardness 1, to fell a tree, to
+pick up and put down, to build a block, a wall or furniture, to take furniture apart, and
+how many leaf tiles give one fibre) and `skills` (the experience each level needs, how
+much faster each level works, and the experience for digging, felling, building and each
+second of crafting). There are 20 ticks per second at normal speed.
 
 ### Replacing placeholder art and sound
 
@@ -330,9 +436,10 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 - `npm run smoke` drives the game in headless Chromium twice, once on the production build
   and once on the dev server (`npm run dev`): creating worlds in both biomes, checking the
   picture and that the sunlit surface is visible, marking blocks and a tree and watching
-  the dwarves dig, fell and haul, the dwarf panel, zooming and panning, the minimap, the
-  simulation ticking at the right rate, pause, menu, settings, right-click and mouse-wheel
-  blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
+  the dwarves dig, fell and haul, crafting planks and a chest from the felled tree and
+  setting the chest down (storage grows), building a block and a wall, the dwarf panel,
+  zooming and panning, the minimap, the simulation ticking at the right rate, pause, menu,
+  settings, right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
   each test's browser console log go to `test-results/`. `e2e/perf.spec.ts` also records
   frame rates and a CPU profile for comparing runs.
 - GitHub Actions runs type-checking, unit tests, the build and the smoke test on every
@@ -351,9 +458,11 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   Milestone 4.
 - In dev builds (`npm run dev`), the browser console has `window.debug`:
   `debug.setSpeed(5)` runs the simulation 5x faster on top of the chosen speed,
-  `debug.revealMap()` lifts the fog of war, and `debug.spawnItem('stone', 20)` drops items
-  beside the Hearth for the dwarves to store. `skipToNight()` becomes active with day and
-  night in Milestone 4.
+  `debug.revealMap()` lifts the fog of war, `debug.spawnItem('stone', 20)` drops items
+  beside the Hearth for the dwarves to store, `debug.give('plank', 20)` puts items straight
+  into storage, and `debug.stockUp()` stocks a bit of every raw material plus one of each
+  crafting station, for trying out building and crafting quickly. `skipToNight()` becomes
+  active with day and night in Milestone 4.
 
 ## Deploying
 
@@ -396,8 +505,8 @@ static host works the same way: upload the contents of `dist/`.
 | 0 | Scaffold: Vite + TypeScript + Phaser 4, title screen, empty game scene, settings, CI | Done |
 | 1 | World generation in a worker, chunked tile rendering, camera, digging by click | Done |
 | 2 | Dwarves, pathfinding, job queue (dig, chop, haul); light shows the surface | Done |
-| 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Next |
-| 4 | Hunger and sleep, day/night, lighting overlay, room detection | |
+| 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Done |
+| 4 | Hunger and sleep, day/night, lighting overlay, room detection | Next |
 | 5 | Monsters, combat, invasion waves, defences | |
 | 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | |
 | 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | |

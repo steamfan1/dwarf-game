@@ -7,9 +7,9 @@
  * which entries are current), so searching allocates almost nothing and never stutters
  * the garbage collector. A cap on expanded cells bounds the cost of hopeless searches.
  *
- * The heuristic is the Chebyshev distance to the goal area minus the reach. Every move
- * costs at least as much as the distance it covers, so the heuristic never overestimates
- * and paths are the cheapest possible. Ties go to the cell that has come further, and
+ * The heuristic is the Chebyshev distance to the nearest goal area minus the reach. Every
+ * move costs at least as much as the distance it covers, so the heuristic never
+ * overestimates and paths are the cheapest possible. Ties go to the cell that has come further, and
  * nothing depends on timing or randomness, so the same question always gets the same path.
  */
 import type { CellRect } from '../world/World';
@@ -18,6 +18,8 @@ import type { NavGrid } from './NavGrid';
 export interface PathGoal {
   /** The cells to get near (inclusive). */
   area: CellRect;
+  /** More places that would do as well (e.g. every chest): the search stops at whichever is cheapest to reach. */
+  alternatives?: readonly CellRect[];
   /** How close the dwarf must stand: 0 = inside the area, 1 = in it or next to it (diagonals count). */
   reach: number;
   /** Extra condition on the end cell, e.g. "not on top of the block being dug". */
@@ -63,7 +65,7 @@ export class Pathfinder {
 
   /** Whether a cell already satisfies a goal. */
   isGoal(cell: number, goal: PathGoal): boolean {
-    return distanceToArea(cell, this.nav.world.width, goal.area) <= goal.reach && (goal.accept?.(cell) ?? true);
+    return distanceToGoal(cell, this.nav.world.width, goal) <= goal.reach && (goal.accept?.(cell) ?? true);
   }
 
   find(from: number, goal: PathGoal): PathOutcome {
@@ -78,7 +80,7 @@ export class Pathfinder {
     const x = from % width;
     if (!nav.standable(x, (from - x) / width)) return { found: false, reason: 'unreachable', expanded: 0 };
 
-    const heuristic = (cell: number): number => Math.max(0, distanceToArea(cell, width, goal.area) - goal.reach);
+    const heuristic = (cell: number): number => Math.max(0, distanceToGoal(cell, width, goal) - goal.reach);
     this.heapSize = 0;
     g[from] = 0;
     parent[from] = -1;
@@ -174,6 +176,13 @@ export class Pathfinder {
     this.heapF = f;
     this.heapG = g;
   }
+}
+
+/** Chebyshev distance from a cell to the nearest of a goal's areas. */
+export function distanceToGoal(cell: number, width: number, goal: PathGoal): number {
+  let best = distanceToArea(cell, width, goal.area);
+  if (goal.alternatives) for (const area of goal.alternatives) best = Math.min(best, distanceToArea(cell, width, area));
+  return best;
 }
 
 /** Chebyshev distance (king moves) from a cell to the nearest cell of a rectangle; 0 inside it. */

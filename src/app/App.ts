@@ -7,8 +7,8 @@
  *   - GameContext: what Phaser scenes need to read (session, input, current tool...).
  * Nothing else wires systems together, so this file is the map of how the app fits.
  *
- * Player orders go through here to the simulation, and only ever mark work (dig, fell,
- * cancel, re-prioritise): the dwarves are the ones who change the world.
+ * Player orders go through here to the simulation, and only ever plan work (dig, fell,
+ * build, craft, cancel, re-prioritise): the dwarves are the ones who change the world.
  */
 import type * as Phaser from 'phaser';
 import type { GameSpeed } from '../config';
@@ -30,14 +30,28 @@ import { SceneKeys } from '../render/scenes/keys';
 import { ViewportManager } from '../render/ViewportManager';
 import { describeActivity } from '../render/world/describeCell';
 import { BIOMES, CONTENT, TILES } from '../sim/content';
+import { HAND_CRAFTED } from '../sim/crafting/Recipes';
 import { EQUIPMENT_SLOTS, SKILLS, type Dwarf } from '../sim/dwarves/Dwarf';
 import { GameSession } from '../sim/GameSession';
 import type { Priority } from '../sim/jobs/JobBoard';
 import type { Simulation } from '../sim/Simulation';
 import { World, type CellRect } from '../sim/world/World';
 import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
-import { DEFAULT_TOOL, pushToast, uiState, type DebugStats, type DwarfSummary, type HoverInfo, type Tool } from '../ui/state';
+import {
+  DEFAULT_TOOL,
+  isBuildTool,
+  pushToast,
+  uiState,
+  type BuildTool,
+  type Catalogue,
+  type ColonyView,
+  type DebugStats,
+  type DwarfSummary,
+  type HoverInfo,
+  type Tool,
+} from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
+import { buildCatalogue } from './catalogue';
 import { provideGameContext, type GameContext, type GameView } from './context';
 import { randomSeed, worldOptionsFromQuery } from './worldOptions';
 
@@ -136,15 +150,11 @@ export class App implements UiCommands, GameContext {
     uiState.set({ debug: stats });
   }
 
-  /** Refresh the HUD's dwarf roster and stored resources from the simulation. */
+  /** Refresh the HUD's dwarf roster, storage and crafting queue from the simulation. */
   reportColony(): void {
     const sim = this.session?.sim;
     if (!sim) return;
-    const resources = sim.storage.entries().map(({ item, count }) => {
-      const def = sim.items.get(item);
-      return { id: def.id, name: def.name, count, icon: itemIconUrl(sim.items, item) };
-    });
-    uiState.set({ colony: { dwarves: sim.dwarves.map((dwarf) => summarizeDwarf(sim, dwarf)), resources } });
+    uiState.set({ colony: summarizeColony(sim) });
   }
 
   get tool(): Tool {
@@ -155,6 +165,13 @@ export class App implements UiCommands, GameContext {
     return uiState.get().priority;
   }
 
+  get buildItem(): number | null {
+    const ui = uiState.get();
+    if (!isBuildTool(ui.tool)) return null;
+    const id = ui.buildChoice[ui.tool];
+    return id !== null && CONTENT.items.has(id) ? CONTENT.items.item(id) : null;
+  }
+
   get selectedDwarf(): number | null {
     return uiState.get().selectedDwarf;
   }
@@ -163,15 +180,20 @@ export class App implements UiCommands, GameContext {
     return uiState.get().debugLight;
   }
 
-  /** Use the current tool on a rectangle of cells. Tools only mark work; dwarves do it. */
+  /** Use the current tool on a rectangle of cells. Tools only plan work; dwarves do it. */
   applyTool(rect: CellRect): void {
     const sim = this.session?.sim;
     if (!sim) return;
     const { tool, priority } = uiState.get();
+    const click = rect.x0 === rect.x1 && rect.y0 === rect.y1;
+    // A click on a piece of furniture with Auto or Dig marks it to be taken apart.
+    const furniture = click && (tool === 'auto' || tool === 'dig') && !sim.jobs.at(rect.x0, rect.y0) ? sim.furniture.at(rect.x0, rect.y0) : undefined;
+    const item = this.buildItem;
     let changed: number;
     let removed = false;
-    if (tool === 'auto') {
-      const click = rect.x0 === rect.x1 && rect.y0 === rect.y1;
+    if (furniture) {
+      changed = sim.designateDismantle(rect.x0, rect.y0, priority) ? 1 : 0;
+    } else if (tool === 'auto') {
       const marked = click ? sim.jobs.at(rect.x0, rect.y0) : undefined;
       if (marked && marked.type !== 'haul') {
         // Clicking a mark again takes it away.
@@ -183,6 +205,9 @@ export class App implements UiCommands, GameContext {
         if (click && changed === 0) this.selectDwarf(null);
       }
     } else if (tool === 'dig' || tool === 'chop') changed = sim.designate(tool, rect, priority);
+    else if (tool === 'build' && item !== null) changed = sim.designateBuild(item, rect, priority);
+    else if (tool === 'wall' && item !== null) changed = sim.designateWall(item, rect, priority);
+    else if (tool === 'furniture' && item !== null) changed = sim.designateFurniture(item, rect.x0, rect.y0, priority) ? 1 : 0;
     else if (tool === 'cancel') {
       changed = sim.cancelDesignations(rect);
       removed = true;
@@ -243,7 +268,43 @@ export class App implements UiCommands, GameContext {
   }
 
   setTool(tool: Tool): void {
+    const ui = uiState.get();
+    // A build tool picked up for the first time starts with the first thing in its palette.
+    if (isBuildTool(tool) && ui.buildChoice[tool] === null && ui.catalogue) {
+      const first = paletteOf(ui.catalogue, tool)[0];
+      uiState.set({ tool, buildChoice: { ...ui.buildChoice, [tool]: first?.id ?? null } });
+      return;
+    }
     uiState.set({ tool });
+  }
+
+  setBuildChoice(tool: BuildTool, item: string): void {
+    uiState.update((s) => ({ tool, buildChoice: { ...s.buildChoice, [tool]: item } }));
+  }
+
+  toggleCrafting(): void {
+    uiState.update((s) => ({ craftingOpen: !s.craftingOpen }));
+  }
+
+  toggleStorage(): void {
+    uiState.update((s) => ({ storageOpen: !s.storageOpen }));
+  }
+
+  queueCraft(recipe: string, count: number): void {
+    const sim = this.session?.sim;
+    if (!sim || !sim.recipes.has(recipe)) return;
+    sim.queueCraft(sim.recipes.get(recipe).index, count);
+    this.reportColony();
+  }
+
+  setCraftRemaining(orderId: number, remaining: number): void {
+    this.session?.sim.setCraftRemaining(orderId, remaining);
+    this.reportColony();
+  }
+
+  cancelCraft(orderId: number): void {
+    this.session?.sim.cancelCraft(orderId);
+    this.reportColony();
   }
 
   setPriority(priority: Priority): void {
@@ -359,6 +420,13 @@ export class App implements UiCommands, GameContext {
           this.lastBlockedToast = now;
           pushToast(t('toast.jobBlocked'), 'warning', 7000);
         }),
+        session.bus.on('Equipped', ({ name, item }) => {
+          pushToast(t('toast.equipped', { name, item: session.sim.items.get(item).name.toLowerCase() }), 'info', 5000);
+        }),
+        session.bus.on('StorageFull', () => pushToast(t('toast.storageFull'), 'warning', 7000)),
+        session.bus.on('CraftOrderDone', ({ item, count }) => {
+          pushToast(t('toast.orderDone', { count, item: session.sim.items.get(item).name }), 'info', 4000);
+        }),
       );
       uiState.set({
         loading: { stage: 'building', progress: 0.97 },
@@ -367,6 +435,7 @@ export class App implements UiCommands, GameContext {
         hover: null,
         world: { seed: options.seed, biomeName: BIOMES.get(options.biome).name },
         ...FRESH_COLONY_UI,
+        catalogue: uiState.get().catalogue ?? buildCatalogue(CONTENT),
       });
       // Let the loading screen show its last step before building the map blocks the thread briefly.
       await nextFrame();
@@ -433,8 +502,16 @@ export class App implements UiCommands, GameContext {
     this.input.onPressed('toolSelect', () => this.setTool('select'));
     this.input.onPressed('toolDig', () => this.setTool('dig'));
     this.input.onPressed('toolChop', () => this.setTool('chop'));
+    this.input.onPressed('toolBuild', () => this.setTool('build'));
+    this.input.onPressed('toolWall', () => this.setTool('wall'));
+    this.input.onPressed('toolFurniture', () => this.setTool('furniture'));
     this.input.onPressed('toolCancel', () => this.setTool('cancel'));
     this.input.onPressed('toolPriority', () => this.setTool('priority'));
+    this.input.onPressed('toggleCrafting', () => {
+      this.playSound(uiState.get().craftingOpen ? 'uiClose' : 'uiOpen');
+      this.toggleCrafting();
+    });
+    this.input.onPressed('toggleStorage', () => this.toggleStorage());
     this.input.onPressed('cancel', () => this.cancel());
     this.input.attach(window);
   }
@@ -446,7 +523,7 @@ export class App implements UiCommands, GameContext {
     return ui.screen === 'game' && !ui.menuOpen && !ui.settingsOpen;
   }
 
-  /** Esc: close the topmost dialog, put down the tool, deselect the dwarf, or else open the in-game menu. */
+  /** Esc: close the topmost dialog or panel, put down the tool, deselect the dwarf, or else open the in-game menu. */
   private cancel(): void {
     const ui = uiState.get();
     if (ui.settingsOpen) {
@@ -458,6 +535,9 @@ export class App implements UiCommands, GameContext {
     } else if (ui.screen === 'game' && ui.menuOpen) {
       this.playSound('uiClose');
       this.closeMenu();
+    } else if (ui.screen === 'game' && ui.craftingOpen) {
+      this.playSound('uiClose');
+      this.toggleCrafting();
     } else if (ui.screen === 'game' && (ui.tool !== DEFAULT_TOOL || ui.selectedDwarf !== null)) {
       this.dropTool();
     } else if (ui.screen === 'game') {
@@ -504,7 +584,50 @@ export class App implements UiCommands, GameContext {
 }
 
 /** The HUD's colony state for a world that has just started (or ended). */
-const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null } as const;
+const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null, craftingOpen: false } as const;
+
+function paletteOf(catalogue: Catalogue, tool: BuildTool): Catalogue['blocks'] {
+  return tool === 'build' ? catalogue.blocks : tool === 'wall' ? catalogue.walls : catalogue.furniture;
+}
+
+/** The roster, storage and crafting queue as the HUD shows them. */
+function summarizeColony(sim: Simulation): ColonyView {
+  const resources = sim.storage.entries().map(({ item, count }) => {
+    const def = sim.items.get(item);
+    return { id: def.id, name: def.name, count, icon: itemIconUrl(sim.items, item) };
+  });
+  const stations: Record<string, number> = {};
+  for (const piece of sim.furniture.all()) if (piece.def.station) stations[piece.def.station] = (stations[piece.def.station] ?? 0) + 1;
+  const stationNames = new Map(sim.furnitureKinds.defs.flatMap((def) => (def.station ? [[def.station, def.name] as const] : [])));
+  const orders = sim.crafting.orders.map((order) => {
+    const recipe = sim.recipes.recipes[order.recipe]!;
+    const output = sim.items.get(recipe.output.item);
+    // The craft furthest along, if anyone is on it.
+    let progress: number | null = null;
+    for (const job of sim.jobs.all()) {
+      if (job.type === 'craft' && job.orderId === order.id && job.claimedBy !== 0) progress = Math.max(progress ?? 0, sim.jobProgress(job));
+    }
+    return {
+      id: order.id,
+      recipe: recipe.id,
+      name: output.name,
+      icon: itemIconUrl(sim.items, recipe.output.item),
+      outputCount: recipe.output.count,
+      made: order.made,
+      count: order.count,
+      status: sim.craftStatus(order),
+      station: recipe.station === HAND_CRAFTED ? null : (stationNames.get(recipe.station) ?? recipe.station),
+      progress,
+    };
+  });
+  return {
+    dwarves: sim.dwarves.map((dwarf) => summarizeDwarf(sim, dwarf)),
+    resources,
+    storage: { used: sim.storage.slotsUsed(), capacity: sim.storage.capacity },
+    orders,
+    stations,
+  };
+}
 
 /** One dwarf as the roster and the dwarf panel show it. */
 function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {
@@ -527,11 +650,9 @@ function summarizeDwarf(sim: Simulation, dwarf: Dwarf): DwarfSummary {
     }),
     equipment: EQUIPMENT_SLOTS.map((slot) => {
       const item = dwarf.equipment[slot];
-      return { slot, item: item === null ? null : sim.items.get(item).name };
+      return { slot, item: item === null ? null : sim.items.get(item).name, icon: item === null ? null : itemIconUrl(sim.items, item) };
     }),
-    carrying: dwarf.carrying
-      ? { name: sim.items.get(dwarf.carrying.item).name, count: dwarf.carrying.count, icon: itemIconUrl(sim.items, dwarf.carrying.item) }
-      : null,
+    carrying: dwarf.carrying.map(({ item, count }) => ({ name: sim.items.get(item).name, count, icon: itemIconUrl(sim.items, item) })),
     dead,
     stranded,
     tunic: sim.colony.looks.tunic[dwarf.looks.tunic] ?? '#888888',

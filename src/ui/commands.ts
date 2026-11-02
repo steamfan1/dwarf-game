@@ -9,7 +9,7 @@ import type { GameSpeed } from '../config';
 import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
 import type { Priority } from '../sim/jobs/JobBoard';
-import type { Tool } from './state';
+import type { BuildTool, Tool } from './state';
 
 export type UiSound = 'uiClick' | 'uiOpen' | 'uiClose';
 
@@ -48,6 +48,15 @@ export interface UiCommands {
   toggleMinimap(): void;
   /** Pick a toolbar tool. */
   setTool(tool: Tool): void;
+  /** Pick the material a build tool builds with (an items.json id); also takes that tool up. */
+  setBuildChoice(tool: BuildTool, item: string): void;
+  toggleCrafting(): void;
+  toggleStorage(): void;
+  /** Queue crafts of a recipe (recipes.json id). */
+  queueCraft(recipe: string, count: number): void;
+  /** Change how many crafts an order still wants (0 cancels it). */
+  setCraftRemaining(orderId: number, remaining: number): void;
+  cancelCraft(orderId: number): void;
   /** The priority for new marks and for the Priority tool. */
   setPriority(priority: Priority): void;
   /** Select a dwarf (null to deselect); `focus` also moves the camera to it. */

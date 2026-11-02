@@ -55,7 +55,16 @@ export function DebugPanel() {
         <dd>{stats ? stats.chunkLayers : '—'}</dd>
         <dt>{t('debug.jobs')}</dt>
         <dd data-testid="debug-jobs">
-          {stats ? t('debug.jobsValue', { dig: stats.jobs.dig, chop: stats.jobs.chop, haul: stats.jobs.haul, blocked: stats.jobs.blocked }) : '—'}
+          {stats
+            ? t('debug.jobsValue', {
+                dig: stats.jobs.dig,
+                chop: stats.jobs.chop,
+                build: stats.jobs.build + stats.jobs.wall + stats.jobs.place + stats.jobs.dismantle,
+                craft: stats.jobs.craft,
+                haul: stats.jobs.haul,
+                blocked: stats.jobs.blocked,
+              })
+            : '—'}
         </dd>
         <dt>{t('debug.paths')}</dt>
         <dd>{stats ? t('debug.pathsValue', { searches: stats.paths.searches, hits: stats.paths.cacheHits, busy: stats.paths.busy }) : '—'}</dd>

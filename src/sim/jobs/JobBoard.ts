@@ -1,24 +1,41 @@
 /**
- * The job queue. The player designates work (dig this, chop that), the colony adds
- * chores (haul this stack to storage), and idle dwarves claim jobs for themselves.
+ * The job queue. The player designates work (dig this, build a wall there, craft five
+ * torches), the colony adds chores (haul this stack to storage), and idle dwarves claim
+ * jobs for themselves.
  *
  *  - Priority first: a dwarf takes the most urgent open job, then the nearest one, then
  *    the oldest, so equal jobs get done in a sensible order.
- *  - Claiming reserves a job: two dwarves never take the same one.
+ *  - Claiming reserves a job: two dwarves never take the same one. Whenever a claimed job
+ *    is given back or removed, `onLetGo` runs, so whatever the job had set aside
+ *    (materials in storage, a crafting station) is freed again.
  *  - Jobs no dwarf can reach (or come back from) are flagged as blocked, shown with a
  *    warning icon; the simulation works that out from its home maps after the terrain
- *    changes, so blocked jobs are retried whenever digging opens a new way.
+ *    changes, so blocked jobs are retried whenever digging opens a new way. Build and
+ *    craft jobs whose materials the colony doesn't have are flagged as missing them.
  *  - A dwarf whose path search to a job fails anyway skips it until the maps are next
  *    rebuilt. A job that would strand its digger in a hole is marked unsafe until the
  *    terrain near it changes.
- *  - Dig and chop jobs are also indexed by cell, for the designation overlay and for
- *    designating, cancelling and re-prioritising by rectangle.
+ *  - Jobs in the world are indexed by cell, for the designation overlay and for
+ *    designating, cancelling and re-prioritising by rectangle. There are two layers, so a
+ *    background wall can be planned in a cell that also has a block or furniture planned:
+ *    walls go in the back layer, everything else in the front.
  *
  * Pure: no Phaser and no DOM.
  */
+import type { ItemCount } from '../items/ItemRegistry';
 import type { CellRect, World } from '../world/World';
 
-export type JobType = 'dig' | 'chop' | 'haul';
+/**
+ *   dig        remove a block                     chop      fell a tree
+ *   haul       carry a stack to storage           build     put a block in a cell
+ *   wall       put up a background wall           place     set down a piece of furniture
+ *   dismantle  take a piece of furniture apart    craft     make a recipe (one craft)
+ *   equip      a dwarf fetches better gear for itself
+ */
+export type JobType = 'dig' | 'chop' | 'haul' | 'build' | 'wall' | 'place' | 'dismantle' | 'craft' | 'equip';
+export const JOB_TYPES: readonly JobType[] = ['dig', 'chop', 'haul', 'build', 'wall', 'place', 'dismantle', 'craft', 'equip'];
+
+export type MarkLayer = 'front' | 'back';
 
 /** 1 low, 2 normal, 3 high, 4 urgent. */
 export type Priority = 1 | 2 | 3 | 4;
@@ -33,7 +50,10 @@ const UNSAFE_RADIUS = 4;
 export interface Job {
   readonly id: number;
   readonly type: JobType;
-  /** Dig: the block. Chop: the bottom of the trunk. Haul: where the stack lies. */
+  /**
+   * Dig, build, wall: the cell. Chop: the bottom of the trunk. Haul: where the stack lies.
+   * Place, dismantle: the furniture's bottom-left cell. Craft: the station (or the Hearth).
+   */
   x: number;
   y: number;
   priority: Priority;
@@ -43,14 +63,27 @@ export interface Job {
   readonly unreachableFor: Set<number>;
   /** No dwarf can do it right now: shown with a warning icon. */
   blocked: boolean;
-  /** Doing it would leave the digger unable to get home. */
+  /** Doing it would leave a dwarf unable to get home. */
   unsafe: boolean;
-  /** Ticks of work done so far (dig and chop). */
+  /** Waiting for materials the colony doesn't have. */
+  missing: boolean;
+  /** Ticks of work done so far. */
   progress: number;
   /** Haul: the item stack. */
   readonly stackId: number;
-  /** Chop: the trunk cells, which carry the designation marks. */
+  /** Cells that carry the job's mark (dig: the block; chop: the trunk; place: the footprint...). */
   readonly cells: readonly number[];
+  readonly layer: MarkLayer;
+  /** What the job uses up, fetched from storage before the work starts. */
+  readonly inputs: readonly ItemCount[];
+  /** Build: the tile. Wall: the wall. Place: the furniture kind. Craft: the recipe. Equip: the item. -1 otherwise. */
+  readonly target: number;
+  /** Craft: the order it belongs to. */
+  readonly orderId: number;
+  /** Dismantle: the piece to take apart. Craft: the station claimed for it (0 for none yet, or by hand). */
+  furnitureId: number;
+  /** Its inputs are reserved in storage (claimed, not fetched yet). */
+  reserved: boolean;
   readonly createdTick: number;
 }
 
@@ -61,24 +94,33 @@ export interface NewJob {
   priority: Priority;
   tick: number;
   stackId?: number;
-  /** Cells to mark (dig: the block; chop: the trunk). Haul jobs mark none. */
+  /** Cells to mark. Haul, craft and equip jobs mark none. */
   cells?: readonly number[];
+  layer?: MarkLayer;
+  inputs?: readonly ItemCount[];
+  target?: number;
+  orderId?: number;
+  furnitureId?: number;
 }
 
 export class JobBoard {
   private readonly world: World;
   private readonly jobs = new Map<number, Job>();
-  /** Dig or chop job id marked on each cell, 0 for none. */
-  private readonly marks: Int32Array;
+  /** Job id marked on each cell, 0 for none: front layer and back (walls). */
+  private readonly front: Int32Array;
+  private readonly back: Int32Array;
   private nextId = 1;
-  /** Called for each cell whose designation mark appears, changes or disappears. */
+  /** Called for each cell whose mark appears, changes or disappears. */
   onMarkChanged: (x: number, y: number) => void = () => {};
   /** Called when a job becomes blocked: no dwarf can reach it. */
   onBlocked: (job: Job) => void = () => {};
+  /** Called when a claimed job is given back, and when any job is removed. */
+  onLetGo: (job: Job) => void = () => {};
 
   constructor(world: World) {
     this.world = world;
-    this.marks = new Int32Array(world.width * world.height);
+    this.front = new Int32Array(world.width * world.height);
+    this.back = new Int32Array(world.width * world.height);
   }
 
   get size(): number {
@@ -93,11 +135,14 @@ export class JobBoard {
     return this.jobs.get(id);
   }
 
-  /** The dig or chop job marked on a cell, if any. */
+  /** The job marked on a cell's front layer (dig, chop, build, place, dismantle), if any. */
   at(x: number, y: number): Job | undefined {
-    if (!this.world.inBounds(x, y)) return undefined;
-    const id = this.marks[this.world.index(x, y)]!;
-    return id === 0 ? undefined : this.jobs.get(id);
+    return this.markAt(this.front, x, y);
+  }
+
+  /** The wall job marked on a cell, if any. */
+  wallAt(x: number, y: number): Job | undefined {
+    return this.markAt(this.back, x, y);
   }
 
   add(spec: NewJob): Job {
@@ -111,13 +156,21 @@ export class JobBoard {
       unreachableFor: new Set(),
       blocked: false,
       unsafe: false,
+      missing: false,
       progress: 0,
       stackId: spec.stackId ?? 0,
       cells: spec.cells ?? [],
+      layer: spec.layer ?? 'front',
+      inputs: spec.inputs ?? [],
+      target: spec.target ?? -1,
+      orderId: spec.orderId ?? 0,
+      furnitureId: spec.furnitureId ?? 0,
+      reserved: false,
       createdTick: spec.tick,
     };
     this.jobs.set(job.id, job);
-    for (const cell of job.cells) this.marks[cell] = job.id;
+    const marks = this.layer(job);
+    for (const cell of job.cells) marks[cell] = job.id;
     this.markChanged(job);
     return job;
   }
@@ -126,10 +179,12 @@ export class JobBoard {
     const job = this.jobs.get(id);
     if (!job) return undefined;
     this.jobs.delete(id);
+    const marks = this.layer(job);
     for (const cell of job.cells) {
-      if (this.marks[cell] === id) this.marks[cell] = 0;
+      if (marks[cell] === id) marks[cell] = 0;
     }
     this.markChanged(job);
+    this.onLetGo(job);
     return job;
   }
 
@@ -144,7 +199,9 @@ export class JobBoard {
   /** Give a job back (the dwarf was interrupted); its progress is kept. */
   release(id: number, dwarf: number): void {
     const job = this.jobs.get(id);
-    if (job && job.claimedBy === dwarf) job.claimedBy = 0;
+    if (!job || job.claimedBy !== dwarf) return;
+    this.onLetGo(job);
+    job.claimedBy = 0;
   }
 
   /** A dwarf's path search to a job failed: it skips the job until the maps are rebuilt. */
@@ -152,7 +209,7 @@ export class JobBoard {
     this.jobs.get(id)?.unreachableFor.add(dwarf);
   }
 
-  /** Doing this job would strand the digger; leave it until the terrain near it changes. */
+  /** Doing this job would strand a dwarf; leave it until the terrain near it changes. */
   markUnsafe(id: number): void {
     const job = this.jobs.get(id);
     if (!job || job.unsafe) return;
@@ -168,6 +225,13 @@ export class JobBoard {
     if (blocked) this.onBlocked(job);
   }
 
+  /** Flag or unflag a job as waiting for materials. */
+  setMissing(job: Job, missing: boolean): void {
+    if (job.missing === missing) return;
+    job.missing = missing;
+    this.markChanged(job);
+  }
+
   setPriority(id: number, priority: Priority): void {
     const job = this.jobs.get(id);
     if (!job || job.priority === priority) return;
@@ -175,13 +239,14 @@ export class JobBoard {
     this.markChanged(job);
   }
 
-  /** Dig and chop jobs with a mark inside a rectangle, each once. */
+  /** Jobs with a mark inside a rectangle, in either layer, each once. */
   inRect(rect: CellRect): Job[] {
     const found = new Set<number>();
     for (let y = Math.max(0, rect.y0); y <= Math.min(this.world.height - 1, rect.y1); y++) {
       for (let x = Math.max(0, rect.x0); x <= Math.min(this.world.width - 1, rect.x1); x++) {
-        const id = this.marks[this.world.index(x, y)]!;
-        if (id !== 0) found.add(id);
+        const i = this.world.index(x, y);
+        if (this.front[i] !== 0) found.add(this.front[i]!);
+        if (this.back[i] !== 0) found.add(this.back[i]!);
       }
     }
     return [...found].map((id) => this.jobs.get(id)!).filter(Boolean);
@@ -195,16 +260,16 @@ export class JobBoard {
     let best: Job | null = null;
     let bestDistance = Infinity;
     for (const job of this.jobs.values()) {
-      if (job.claimedBy !== 0 || job.unsafe || job.unreachableFor.has(dwarf) || !allow(job)) continue;
+      if (job.claimedBy !== 0 || job.unsafe || job.unreachableFor.has(dwarf)) continue;
       const distance = Math.max(Math.abs(job.x - x), Math.abs(job.y - y));
-      if (
+      const better =
         best === null ||
         job.priority > best.priority ||
-        (job.priority === best.priority && (distance < bestDistance || (distance === bestDistance && job.id < best.id)))
-      ) {
-        best = job;
-        bestDistance = distance;
-      }
+        (job.priority === best.priority && (distance < bestDistance || (distance === bestDistance && job.id < best.id)));
+      // `allow` can be costly, so it is only asked about jobs that would win.
+      if (!better || !allow(job)) continue;
+      best = job;
+      bestDistance = distance;
     }
     return best;
   }
@@ -223,9 +288,19 @@ export class JobBoard {
 
   /** Counts by type, for the debug overlay. */
   counts(): Record<JobType, number> {
-    const counts: Record<JobType, number> = { dig: 0, chop: 0, haul: 0 };
+    const counts = Object.fromEntries(JOB_TYPES.map((type) => [type, 0])) as Record<JobType, number>;
     for (const job of this.jobs.values()) counts[job.type]++;
     return counts;
+  }
+
+  private layer(job: Job): Int32Array {
+    return job.layer === 'back' ? this.back : this.front;
+  }
+
+  private markAt(marks: Int32Array, x: number, y: number): Job | undefined {
+    if (!this.world.inBounds(x, y)) return undefined;
+    const id = marks[this.world.index(x, y)]!;
+    return id === 0 ? undefined : this.jobs.get(id);
   }
 
   private markChanged(job: Job): void {

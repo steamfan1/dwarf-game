@@ -1,6 +1,7 @@
 /**
  * Colony tuning from src/data/dwarves.json: how many dwarves there are, how they are
- * named and dressed, how fast they move and work, and how their skills grow.
+ * named and dressed, how fast they move and work, how much the Hearth stores, and how
+ * their skills grow.
  */
 import { Validator } from '../../core/validate';
 
@@ -10,6 +11,8 @@ export interface ColonySettings {
   names: { first: string[]; familyStart: string[]; familyEnd: string[] };
   looks: { skin: string[]; beard: string[]; tunic: string[] };
   health: { max: number };
+  /** Storage is counted in stacks (slots); chests add theirs (see furniture.json). */
+  storage: { hearthSlots: number };
   movement: {
     /** Ticks to walk one tile (20 ticks = 1 second at 1x). */
     walkTicks: number;
@@ -33,6 +36,16 @@ export interface ColonySettings {
     chopTicks: number;
     pickUpTicks: number;
     dropOffTicks: number;
+    /** Ticks to build a block of hardness 1 at building level 1. */
+    buildTicksPerHardness: number;
+    /** Ticks to build a background wall. */
+    wallTicks: number;
+    /** Ticks to set up a piece of furniture, per cell it covers. */
+    furnitureTicks: number;
+    /** Ticks to take a piece of furniture apart. */
+    dismantleTicks: number;
+    /** A felled tree gives one fibre for every this many leaf tiles (at least one). */
+    leavesPerFiber: number;
     /** Idle dwarves wander up to this many tiles from the Hearth. */
     wanderRadius: number;
   };
@@ -41,7 +54,7 @@ export interface ColonySettings {
     levels: number[];
     /** Work speed gained per level above 1 (0.12 = 12% faster each level). */
     speedPerLevel: number;
-    xp: { digPerHardness: number; chop: number };
+    xp: { digPerHardness: number; chop: number; build: number; craftPerSecond: number };
   };
 }
 
@@ -60,6 +73,7 @@ export function parseColonySettings(data: unknown): ColonySettings {
   const names = section('names');
   const looks = section('looks');
   const health = section('health');
+  const storage = section('storage');
   const movement = section('movement');
   const vision = section('vision');
   const work = section('work');
@@ -88,6 +102,7 @@ export function parseColonySettings(data: unknown): ColonySettings {
       tunic: strings(looks?.tunic, 'looks.tunic', color),
     },
     health: { max: count(health, 'max', 'health', 1, 10000) },
+    storage: { hearthSlots: count(storage, 'hearthSlots', 'storage', 1, 1000) },
     movement: {
       walkTicks: count(movement, 'walkTicks', 'movement', 1, 100),
       jumpTicks: count(movement, 'jumpTicks', 'movement', 1, 100),
@@ -103,6 +118,11 @@ export function parseColonySettings(data: unknown): ColonySettings {
       chopTicks: count(work, 'chopTicks', 'work', 1, 1000),
       pickUpTicks: count(work, 'pickUpTicks', 'work', 1, 100),
       dropOffTicks: count(work, 'dropOffTicks', 'work', 1, 100),
+      buildTicksPerHardness: count(work, 'buildTicksPerHardness', 'work', 1, 1000),
+      wallTicks: count(work, 'wallTicks', 'work', 1, 1000),
+      furnitureTicks: count(work, 'furnitureTicks', 'work', 1, 1000),
+      dismantleTicks: count(work, 'dismantleTicks', 'work', 1, 1000),
+      leavesPerFiber: count(work, 'leavesPerFiber', 'work', 1, 100),
       wanderRadius: count(work, 'wanderRadius', 'work', 0, 50),
     },
     skills: {
@@ -111,6 +131,8 @@ export function parseColonySettings(data: unknown): ColonySettings {
       xp: {
         digPerHardness: v.number(xp?.digPerHardness, 'skills.xp.digPerHardness', 0, 1000),
         chop: v.number(xp?.chop, 'skills.xp.chop', 0, 1000),
+        build: v.number(xp?.build, 'skills.xp.build', 0, 1000),
+        craftPerSecond: v.number(xp?.craftPerSecond, 'skills.xp.craftPerSecond', 0, 1000),
       },
     },
   };

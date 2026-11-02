@@ -45,6 +45,8 @@ export interface GameContext {
   /** The toolbar's current tool and priority. */
   readonly tool: Tool;
   readonly priority: Priority;
+  /** The item the current build tool builds with (an item number), or null for other tools. */
+  readonly buildItem: number | null;
   /** Use the current tool on a rectangle of cells (a click is a 1 x 1 rectangle). */
   applyTool(rect: CellRect): void;
   /** Right-click: put the current tool down (back to selecting). */

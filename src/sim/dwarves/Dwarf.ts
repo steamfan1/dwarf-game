@@ -5,6 +5,7 @@
  * what a dwarf does each tick; this file only creates dwarves and handles their skills.
  */
 import type { Rng } from '../../core/Rng';
+import type { ItemCount } from '../items/ItemRegistry';
 import type { MoveKind } from '../nav/NavGrid';
 import type { ColonySettings } from './settings';
 
@@ -21,10 +22,15 @@ export interface SkillState {
 
 /**
  * What a dwarf is doing, step by step:
- *   idle -> to-job -> working                          (dig, chop)
- *   idle -> to-item -> picking-up -> to-storage -> dropping-off   (haul)
- *   idle -> wandering                                  (nothing to do)
- * Falling interrupts anything; a dwarf whose health reaches 0 is dead.
+ *   idle -> to-job -> working                                  dig, chop, dismantle
+ *   idle -> to-item -> picking-up -> to-storage -> dropping-off   haul
+ *   idle -> to-supply -> fetching -> to-job -> working            build, wall, place
+ *   idle -> to-supply -> fetching -> to-job -> working -> to-storage -> dropping-off   craft
+ *   idle -> to-supply -> fetching                                 equip
+ *   idle -> wandering                                          nothing to do
+ * "Supply" and "storage" are the same places (the Hearth and the chests): whichever is
+ * nearest. A hand-made craft is worked right where its materials were fetched. Falling
+ * interrupts anything; a dwarf whose health reaches 0 is dead.
  */
 export type Phase =
   | 'idle'
@@ -34,6 +40,8 @@ export type Phase =
   | 'picking-up'
   | 'to-storage'
   | 'dropping-off'
+  | 'to-supply'
+  | 'fetching'
   | 'wandering'
   | 'falling'
   | 'dead';
@@ -63,7 +71,7 @@ export interface Dwarf {
   /** 100 is rested. Sleep arrives in Milestone 4. */
   energy: number;
   skills: Record<Skill, SkillState>;
-  /** Item numbers; equipment arrives with crafting in Milestone 3. */
+  /** What it wears and wields, by item number. Dwarves equip better gear from storage by themselves. */
   equipment: Record<EquipmentSlot, number | null>;
 
   phase: Phase;
@@ -75,9 +83,12 @@ export interface Dwarf {
   movement: Movement | null;
   /** Rows fallen in the current fall. */
   fallRows: number;
-  carrying: { item: number; count: number } | null;
+  /** What it has in its arms: a hauled stack, a job's materials, a finished craft. Empty for nothing. */
+  carrying: ItemCount[];
   /** Ticks spent on the current piece of work. */
   workTicks: number;
+  /** Ticks spent waiting for someone to get out of the way. */
+  waitTicks: number;
   /** Ticks to wait before looking for something to do again. */
   restTicks: number;
   /** Where a wandering dwarf is strolling to (a cell), or -1. */
@@ -121,8 +132,9 @@ export function createDwarf(id: number, x: number, y: number, rng: Rng, colony: 
     pathIndex: 0,
     movement: null,
     fallRows: 0,
-    carrying: null,
+    carrying: [],
     workTicks: 0,
+    waitTicks: 0,
     restTicks: rng.int(0, 20),
     wanderTarget: -1,
   };

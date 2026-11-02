@@ -48,7 +48,7 @@ describe('GroundItems', () => {
 
 describe('ColonyStorage', () => {
   it('adds, counts and takes items', () => {
-    const storage = new ColonyStorage();
+    const storage = new ColonyStorage(ITEMS, 10);
     storage.add(DIRT, 3);
     storage.add(STONE, 2);
     storage.add(DIRT, 1);
@@ -56,5 +56,46 @@ describe('ColonyStorage', () => {
     expect(storage.take(DIRT, 10)).toBe(4);
     expect(storage.take(DIRT, 1)).toBe(0);
     expect(storage.entries()).toEqual([{ item: STONE, count: 2 }]);
+  });
+
+  it('reserves materials for jobs, so two jobs never count on the same ones', () => {
+    const storage = new ColonyStorage(ITEMS, 10);
+    storage.add(DIRT, 3);
+    expect(storage.reserveAll([{ item: DIRT, count: 2 }])).toBe(true);
+    expect(storage.available(DIRT)).toBe(1);
+    // All or nothing: not enough stone means nothing is reserved.
+    expect(storage.reserveAll([{ item: DIRT, count: 1 }, { item: STONE, count: 1 }])).toBe(false);
+    expect(storage.available(DIRT)).toBe(1);
+    // Reserved goods can't be taken by anyone else...
+    expect(storage.take(DIRT, 3)).toBe(1);
+    // ...but the job that reserved them fetches them.
+    expect(storage.takeReserved([{ item: DIRT, count: 2 }])).toEqual([{ item: DIRT, count: 2 }]);
+    expect(storage.count(DIRT)).toBe(0);
+    expect(storage.reservedCount(DIRT)).toBe(0);
+  });
+
+  it('gives back a reservation when its job is dropped', () => {
+    const storage = new ColonyStorage(ITEMS, 10);
+    storage.add(STONE, 2);
+    storage.reserveAll([{ item: STONE, count: 2 }]);
+    storage.unreserveAll([{ item: STONE, count: 2 }]);
+    expect(storage.available(STONE)).toBe(2);
+  });
+
+  it('counts room in stacks: a part-filled stack still has room when every slot is used', () => {
+    const storage = new ColonyStorage(ITEMS, 2);
+    const max = ITEMS.get(DIRT).stack;
+    storage.add(DIRT, max);
+    expect(storage.slotsUsed()).toBe(1);
+    expect(storage.hasRoom(STONE)).toBe(true);
+    storage.add(STONE, 1);
+    expect(storage.slotsUsed()).toBe(2);
+    expect(storage.hasRoom(STONE)).toBe(true);
+    expect(storage.hasRoom(DIRT)).toBe(false);
+    expect(storage.hasRoom(ITEMS.item('log'))).toBe(false);
+    // A delivery already under way is still taken in: the store runs over rather than lose it.
+    storage.add(DIRT, 5);
+    expect(storage.count(DIRT)).toBe(max + 5);
+    expect(storage.slotsUsed()).toBe(3);
   });
 });

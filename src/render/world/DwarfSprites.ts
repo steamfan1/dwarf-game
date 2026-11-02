@@ -63,12 +63,14 @@ export class DwarfSprites {
       view.body.setPosition(Math.round(px), Math.round(py)).setFlipX(dwarf.facing < 0);
       view.body.setFrame(this.frameFor(dwarf, place, tick, timeMs));
 
-      if (dwarf.carrying) {
-        view.load.setFrame(dwarf.carrying.item).setPosition(Math.round(px), Math.round(py) - 13).setVisible(true);
+      // A load of several things (a job's materials) shows the first of them.
+      const load = dwarf.carrying[0];
+      if (load) {
+        view.load.setFrame(load.item).setPosition(Math.round(px), Math.round(py) - 13).setVisible(true);
       } else {
         view.load.setVisible(false);
       }
-      if (dwarf.id === selected) this.drawMarker(px, py - (dwarf.carrying ? 26 : 18));
+      if (dwarf.id === selected) this.drawMarker(px, py - (load ? 26 : 18));
     }
   }
 

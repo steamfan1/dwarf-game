@@ -1,0 +1,314 @@
+{
+  "recipes": [
+    {
+      "id": "planks",
+      "output": { "item": "plank", "count": 2 },
+      "inputs": [
+        { "item": "log", "count": 1 }
+      ],
+      "station": "none",
+      "time": 40
+    },
+    {
+      "id": "torches",
+      "output": { "item": "torch", "count": 2 },
+      "inputs": [
+        { "item": "plank", "count": 1 },
+        { "item": "fiber", "count": 1 }
+      ],
+      "station": "none",
+      "time": 30
+    },
+    {
+      "id": "ladders",
+      "output": { "item": "ladder", "count": 2 },
+      "inputs": [
+        { "item": "plank", "count": 2 }
+      ],
+      "station": "none",
+      "time": 40
+    },
+    {
+      "id": "chest",
+      "output": { "item": "chest", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 4 }
+      ],
+      "station": "none",
+      "time": 80
+    },
+    {
+      "id": "workbench",
+      "output": { "item": "workbench", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 4 },
+        { "item": "stone", "count": 2 }
+      ],
+      "station": "none",
+      "time": 100
+    },
+    {
+      "id": "wooden_door",
+      "output": { "item": "wooden_door", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 3 }
+      ],
+      "station": "workbench",
+      "time": 80
+    },
+    {
+      "id": "table",
+      "output": { "item": "table", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 4 }
+      ],
+      "station": "workbench",
+      "time": 80
+    },
+    {
+      "id": "chair",
+      "output": { "item": "chair", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 2 }
+      ],
+      "station": "workbench",
+      "time": 60
+    },
+    {
+      "id": "bed",
+      "output": { "item": "bed", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 4 },
+        { "item": "cloth", "count": 2 }
+      ],
+      "station": "workbench",
+      "time": 120
+    },
+    {
+      "id": "furnace",
+      "output": { "item": "furnace", "count": 1 },
+      "inputs": [
+        { "item": "stone", "count": 10 }
+      ],
+      "station": "workbench",
+      "time": 120
+    },
+    {
+      "id": "loom",
+      "output": { "item": "loom", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 6 },
+        { "item": "fiber", "count": 4 }
+      ],
+      "station": "workbench",
+      "time": 120
+    },
+    {
+      "id": "kitchen",
+      "output": { "item": "kitchen", "count": 1 },
+      "inputs": [
+        { "item": "brick", "count": 6 },
+        { "item": "iron_bar", "count": 1 }
+      ],
+      "station": "workbench",
+      "time": 140
+    },
+    {
+      "id": "crossbow",
+      "output": { "item": "crossbow", "count": 1 },
+      "inputs": [
+        { "item": "plank", "count": 3 },
+        { "item": "fiber", "count": 2 },
+        { "item": "iron_bar", "count": 1 }
+      ],
+      "station": "workbench",
+      "time": 120
+    },
+    {
+      "id": "bricks",
+      "output": { "item": "brick", "count": 2 },
+      "inputs": [
+        { "item": "clay", "count": 2 }
+      ],
+      "station": "furnace",
+      "time": 80
+    },
+    {
+      "id": "glass",
+      "output": { "item": "glass", "count": 2 },
+      "inputs": [
+        { "item": "sand", "count": 2 }
+      ],
+      "station": "furnace",
+      "time": 80
+    },
+    {
+      "id": "copper_bar",
+      "output": { "item": "copper_bar", "count": 1 },
+      "inputs": [
+        { "item": "copper_ore", "count": 2 }
+      ],
+      "station": "furnace",
+      "time": 100
+    },
+    {
+      "id": "iron_bar",
+      "output": { "item": "iron_bar", "count": 1 },
+      "inputs": [
+        { "item": "iron_ore", "count": 2 }
+      ],
+      "station": "furnace",
+      "time": 120
+    },
+    {
+      "id": "gold_bar",
+      "output": { "item": "gold_bar", "count": 1 },
+      "inputs": [
+        { "item": "gold_ore", "count": 2 }
+      ],
+      "station": "furnace",
+      "time": 140
+    },
+    {
+      "id": "anvil",
+      "output": { "item": "anvil", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 4 }
+      ],
+      "station": "furnace",
+      "time": 140
+    },
+    {
+      "id": "copper_pickaxe",
+      "output": { "item": "copper_pickaxe", "count": 1 },
+      "inputs": [
+        { "item": "copper_bar", "count": 3 },
+        { "item": "plank", "count": 1 }
+      ],
+      "station": "anvil",
+      "time": 120
+    },
+    {
+      "id": "iron_pickaxe",
+      "output": { "item": "iron_pickaxe", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 3 },
+        { "item": "plank", "count": 1 }
+      ],
+      "station": "anvil",
+      "time": 140
+    },
+    {
+      "id": "crystal_pickaxe",
+      "output": { "item": "crystal_pickaxe", "count": 1 },
+      "inputs": [
+        { "item": "crystal", "count": 3 },
+        { "item": "iron_bar", "count": 2 },
+        { "item": "plank", "count": 1 }
+      ],
+      "station": "anvil",
+      "time": 180
+    },
+    {
+      "id": "copper_sword",
+      "output": { "item": "copper_sword", "count": 1 },
+      "inputs": [
+        { "item": "copper_bar", "count": 3 }
+      ],
+      "station": "anvil",
+      "time": 120
+    },
+    {
+      "id": "iron_sword",
+      "output": { "item": "iron_sword", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 3 }
+      ],
+      "station": "anvil",
+      "time": 140
+    },
+    {
+      "id": "copper_helmet",
+      "output": { "item": "copper_helmet", "count": 1 },
+      "inputs": [
+        { "item": "copper_bar", "count": 4 }
+      ],
+      "station": "anvil",
+      "time": 120
+    },
+    {
+      "id": "iron_helmet",
+      "output": { "item": "iron_helmet", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 4 }
+      ],
+      "station": "anvil",
+      "time": 140
+    },
+    {
+      "id": "iron_armor",
+      "output": { "item": "iron_armor", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 8 }
+      ],
+      "station": "anvil",
+      "time": 200
+    },
+    {
+      "id": "spike_trap",
+      "output": { "item": "spike_trap", "count": 1 },
+      "inputs": [
+        { "item": "iron_bar", "count": 2 },
+        { "item": "plank", "count": 2 }
+      ],
+      "station": "anvil",
+      "time": 120
+    },
+    {
+      "id": "gold_amulet",
+      "output": { "item": "gold_amulet", "count": 1 },
+      "inputs": [
+        { "item": "gold_bar", "count": 2 },
+        { "item": "crystal", "count": 1 }
+      ],
+      "station": "anvil",
+      "time": 160
+    },
+    {
+      "id": "cloth",
+      "output": { "item": "cloth", "count": 1 },
+      "inputs": [
+        { "item": "fiber", "count": 3 }
+      ],
+      "station": "loom",
+      "time": 80
+    },
+    {
+      "id": "cloth_tunic",
+      "output": { "item": "cloth_tunic", "count": 1 },
+      "inputs": [
+        { "item": "cloth", "count": 4 }
+      ],
+      "station": "loom",
+      "time": 120
+    },
+    {
+      "id": "cooked_meat",
+      "output": { "item": "cooked_meat", "count": 1 },
+      "inputs": [
+        { "item": "raw_meat", "count": 1 }
+      ],
+      "station": "kitchen",
+      "time": 60
+    },
+    {
+      "id": "bread",
+      "output": { "item": "bread", "count": 1 },
+      "inputs": [
+        { "item": "wheat", "count": 3 }
+      ],
+      "station": "kitchen",
+      "time": 80
+    }
+  ]
+}

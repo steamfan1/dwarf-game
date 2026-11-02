@@ -23,6 +23,7 @@
     "tunic": ["#4f8040", "#3d6aa8", "#a8463d", "#7a5aa0", "#c08a2e", "#3f8f86"]
   },
   "health": { "max": 100 },
+  "storage": { "hearthSlots": 24 },
   "movement": {
     "walkTicks": 5,
     "jumpTicks": 7,
@@ -38,11 +39,16 @@
     "chopTicks": 60,
     "pickUpTicks": 6,
     "dropOffTicks": 6,
+    "buildTicksPerHardness": 16,
+    "wallTicks": 20,
+    "furnitureTicks": 40,
+    "dismantleTicks": 30,
+    "leavesPerFiber": 5,
     "wanderRadius": 6
   },
   "skills": {
     "levels": [0, 60, 150, 280, 450, 680, 960, 1300, 1700, 2200],
     "speedPerLevel": 0.12,
-    "xp": { "digPerHardness": 10, "chop": 15 }
+    "xp": { "digPerHardness": 10, "chop": 15, "build": 6, "craftPerSecond": 4 }
   }
 }
