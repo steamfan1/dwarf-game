@@ -332,6 +332,24 @@ test('night: a world started at 22:00 is dark but for the Hearth, and the clock 
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
+test('night, dev build: tired dwarves lie down by the Hearth and sleep', async ({ page, browserErrors }, testInfo) => {
+  test.skip(testInfo.project.name !== 'dev', 'window.debug exists only in dev builds');
+  await page.goto('./?hour=22');
+  await createWorld(page, { seed: 'smoke-test' });
+  // Wear the dwarves out (through the dev build's window.debug), rather than waiting.
+  await page.evaluate(() => {
+    const debug = (window as unknown as { debug: { app: { session: { sim: { dwarves: Array<{ energy: number }> } } } } }).debug;
+    for (const dwarf of debug.app.session.sim.dwarves) dwarf.energy = 40;
+  });
+  // No beds yet, so all three sleep on the floor by the Hearth.
+  await expect(page.getByTestId('roster-dwarf')).toHaveText([/Asleep on the floor/, /Asleep on the floor/, /Asleep on the floor/], {
+    timeout: 20_000,
+  });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: testInfo.outputPath('night-asleep.png') });
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
 test('a snowy world can be chosen in the New world dialog', async ({ page, browserErrors }, testInfo) => {
   await page.goto('./');
   await createWorld(page, { seed: 'frost-hollow', biome: 'snow' });
