@@ -252,6 +252,13 @@ body {
   color: #f6e3bf;
 }
 
+/* On narrower screens the game's name gives its room to the controls. */
+@media (max-width: 1400px) {
+  .top-bar-title {
+    display: none;
+  }
+}
+
 .time-controls,
 .panel-buttons {
   display: flex;
@@ -307,7 +314,7 @@ body {
   flex-direction: column;
   gap: 0.1em;
   min-width: 11em;
-  max-width: min(22em, 40vw);
+  max-width: min(20em, 28vw);
   padding: 0.4em 0.75em;
   font-size: 0.9em;
   pointer-events: none !important;
@@ -502,9 +509,10 @@ body {
 
 /* ---- Right-hand column: debug panel, roster, dwarf details, storage -------------------- */
 
+/* Below the top bar, so the two never meet however narrow the screen. */
 .side-column {
   position: absolute;
-  top: 0.5em;
+  top: 3.6em;
   right: 0.5em;
   bottom: 11em; /* clear of the minimap */
   display: flex;
@@ -1277,17 +1285,22 @@ input[type='checkbox'] {
 
 /* ---- Crafting panel (K) --------------------------------------------------------------- */
 
+/* Beside the toolbar (and its palette, when one is open), clear of the right-hand column. */
 .crafting {
   position: absolute;
-  top: 3.6em;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 4em;
+  left: 12em;
+  right: 22em;
   display: flex;
   flex-direction: column;
-  width: min(46em, calc(100vw - 42em));
-  min-width: 30em;
+  max-width: 52em;
+  min-width: 28em;
   max-height: calc(100% - 15em);
   font-size: 0.9em;
+}
+
+.hud:has(.palette) .crafting {
+  left: 27.5em;
 }
 
 .crafting > header {

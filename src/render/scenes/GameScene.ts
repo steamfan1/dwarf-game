@@ -334,9 +334,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // A dwarf under the pointer is described instead of the cell it stands in.
+    // A dwarf under the pointer is described instead of the cell it stands in, except with
+    // a build tool in hand: then what matters is whether something can be built there.
     const world = this.pointerWorld;
-    const dwarfId = world ? this.dwarfSprites.dwarfAt(world.x, world.y, sim.dwarves) : null;
+    const dwarfId = world && !isBuildTool(context.tool) ? this.dwarfSprites.dwarfAt(world.x, world.y, sim.dwarves) : null;
     const dwarf = dwarfId === null ? undefined : sim.dwarf(dwarfId);
     if (dwarf && this.dragFrom === null) {
       const stranded = dwarf.phase !== 'dead' && !sim.homeMaps.canGetHome(sim.world.index(dwarf.x, dwarf.y));

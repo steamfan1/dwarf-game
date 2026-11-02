@@ -115,14 +115,14 @@ export function GameHud() {
         </button>
       </div>
 
+      <Toolbar />
+      {craftingOpen && <CraftingPanel />}
       {paused && (
         <div class="paused-banner" role="status">
           {t('hud.paused')}
         </div>
       )}
       <HoverReadout />
-      <Toolbar />
-      {craftingOpen && <CraftingPanel />}
       {minimapOpen && <Minimap />}
       <p class="hud-hint">{t('hud.hint', { keys: moveKeys })}</p>
     </div>

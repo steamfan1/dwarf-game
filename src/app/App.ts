@@ -194,7 +194,7 @@ export class App implements UiCommands, GameContext {
     if (furniture) {
       changed = sim.designateDismantle(rect.x0, rect.y0, priority) ? 1 : 0;
     } else if (tool === 'auto') {
-      const marked = click ? sim.jobs.at(rect.x0, rect.y0) : undefined;
+      const marked = click ? (sim.jobs.at(rect.x0, rect.y0) ?? sim.jobs.wallAt(rect.x0, rect.y0)) : undefined;
       if (marked && marked.type !== 'haul') {
         // Clicking a mark again takes it away.
         changed = sim.cancelDesignations(rect);
