@@ -107,6 +107,10 @@ test('a new world: dwarves dig and fell what the player marks; camera, minimap, 
   await expect(page.getByTestId('hover-readout')).toContainText(/Marked for digging|on the way|is on it/);
   await expect(jobs).toContainText(/^[1-3] dig/);
   await page.screenshot({ path: testInfo.outputPath('3-marked.png') });
+  // The readout in the top-left corner, at its widest here, never covers the top bar.
+  const readoutBox = (await page.getByTestId('hover-readout').boundingBox())!;
+  const topBarBox = (await page.getByTestId('top-bar').boundingBox())!;
+  expect(readoutBox.x + readoutBox.width, 'right edge of the hover readout').toBeLessThan(topBarBox.x);
 
   // At triple speed the dwarves dig all three, then carry the dirt to the Hearth.
   await page.keyboard.press('Digit3');
@@ -314,12 +318,15 @@ test('night: a world started at 22:00 is dark but for the Hearth, and the clock 
     const [red, green, blue] = pixelAt(shot, x, y);
     return red + green + blue;
   };
-  // Only moonlight on the open sky far from the colony (left of it, clear of the panels on
-  // the right); the Hearth's fire lights the air above it.
-  const farSky = brightness(centre.x - 9 * tile, centre.y - 5 * tile);
+  // Only moonlight reaches the open sky far from the colony; the Hearth's fire lights the
+  // air just above it. The darkest of a few points well away from the Hearth (in case a
+  // treetop is in the way of one): the daytime sky there is far brighter (over 400).
+  const farSky = Math.min(
+    ...[-9, -4.5, 8].map((dx) => brightness(centre.x + dx * tile, centre.y - 7.5 * tile)),
+  );
   const nearHearth = brightness(centre.x, centre.y - tile);
   testInfo.annotations.push({ type: 'brightness', description: `far sky ${farSky}, above the Hearth ${nearHearth}` });
-  expect(farSky, 'the night sky far from the Hearth').toBeLessThan(220);
+  expect(farSky, 'the night sky far from the Hearth').toBeLessThan(160);
   expect(nearHearth, 'the sky lit by the Hearth').toBeGreaterThan(farSky + 60);
 
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);

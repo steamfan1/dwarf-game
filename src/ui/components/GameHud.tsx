@@ -32,7 +32,7 @@ export function GameHud() {
 
   return (
     <div class="hud" data-testid="hud">
-      <div class="top-bar panel">
+      <div class="top-bar panel" data-testid="top-bar">
         <span class="top-bar-title">{GAME_TITLE}</span>
 
         <div class="time-controls" role="group" aria-label={t('action.pause')}>

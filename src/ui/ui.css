@@ -232,18 +232,32 @@ body {
 .hud {
   position: absolute;
   inset: 0;
+  /* The widest the hover readout in the top-left corner gets. */
+  --readout-width: min(19em, 28vw);
 }
 
+/*
+ * Centred in the space to the right of the hover readout (top-left corner), so the two
+ * never overlap. On a narrow screen the resource bar gives up room first.
+ */
 .top-bar {
   position: absolute;
   top: 0.5em;
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(1em + var(--readout-width));
+  right: 0.5em;
+  width: fit-content;
+  max-width: calc(100% - 1.5em - var(--readout-width));
+  box-sizing: border-box;
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: 1em;
   padding: 0.3em 0.4em 0.3em 0.9em;
   white-space: nowrap;
+}
+
+.top-bar > * {
+  flex: none;
 }
 
 .top-bar-title {
@@ -299,10 +313,11 @@ body {
   min-width: 2.6em;
 }
 
+/* Centred under the top bar. */
 .paused-banner {
   position: absolute;
   top: 3.8em;
-  left: 50%;
+  left: calc(50% + (0.5em + var(--readout-width)) / 2);
   transform: translateX(-50%);
   padding: 0.25em 1.2em;
   letter-spacing: 0.25em;
@@ -337,10 +352,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.1em;
+  box-sizing: border-box;
   min-width: 11em;
-  max-width: min(17em, 26vw);
-  /* At most five lines, so it never reaches the toolbar below it. */
-  max-height: 7em;
+  max-width: var(--readout-width);
+  /* At most five lines (plus padding and border), so it never reaches the toolbar below. */
+  max-height: calc(7.8em + 4px);
   overflow: hidden;
   padding: 0.4em 0.75em;
   font-size: 1em;
@@ -524,9 +540,19 @@ body {
 
 /* ---- Stored resources in the top bar ---------------------------------------------------- */
 
+/* Shows as many of its goods as fit on one line: the rest wrap out of sight. */
+.top-bar > .resource-bar {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .resource-bar {
   display: flex;
-  gap: 0.7em;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 1em 0.7em;
+  height: 1.6em;
+  overflow: hidden;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -535,6 +561,7 @@ body {
 .resource-bar li {
   display: flex;
   align-items: center;
+  height: 1.6em;
   gap: 0.25em;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
