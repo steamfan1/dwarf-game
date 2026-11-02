@@ -122,7 +122,6 @@
   "priority.label.4": "Urgent",
   "mark.dig": "Marked for digging, {priority}",
   "mark.chop": "Marked for felling, {priority}",
-  "mark.build": "Planned, {priority}",
   "mark.dismantle": "Marked to take apart, {priority}",
   "mark.missing": "Waiting for {item}: there's none in storage",
   "mark.support": "Waiting for what will hold it up to be built first",

@@ -100,7 +100,7 @@ function markStatus(sim: Simulation, job: Job): string {
   if (worker) return t('mark.claimed', { name: worker.name });
   if (building && job.missing) return t('mark.missing', { item: sim.items.get(job.inputs[0]!.item).name.toLowerCase() });
   if (building && sim.waitingForSupport(job)) return t('mark.support');
-  if (building) return t('mark.build', { priority: priorityName(job.priority) });
+  if (building) return priorityName(job.priority);
   if (job.type === 'dismantle') return t('mark.dismantle', { priority: priorityName(job.priority) });
   return t(job.type === 'dig' ? 'mark.dig' : 'mark.chop', { priority: priorityName(job.priority) });
 }
