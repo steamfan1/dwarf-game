@@ -20,6 +20,7 @@ import { effectiveDpr } from '../core/viewport';
 import { installDebugApi } from '../debug/debugApi';
 import { installBrowserGuards } from '../platform/browserGuards';
 import { InputActions } from '../platform/InputActions';
+import { SaveStore } from '../platform/saves';
 import { probeStorage, SafeKeyValueStore, storageIsPersistent } from '../platform/storage';
 import { generateWorldInWorker } from '../platform/worldgenClient';
 import { AudioService } from '../render/AudioService';
@@ -31,9 +32,10 @@ import { ViewportManager } from '../render/ViewportManager';
 import { describeActivity } from '../render/world/describeCell';
 import { BIOMES, CONTENT, TILES } from '../sim/content';
 import { HAND_CRAFTED } from '../sim/crafting/Recipes';
-import { EQUIPMENT_SLOTS, SKILLS, type Dwarf } from '../sim/dwarves/Dwarf';
+import { EQUIPMENT_SLOTS, SKILLS, travellerOf, type Dwarf } from '../sim/dwarves/Dwarf';
 import { GameSession } from '../sim/GameSession';
 import type { Priority } from '../sim/jobs/JobBoard';
+import { SaveError } from '../sim/save/SaveFile';
 import type { Simulation } from '../sim/Simulation';
 import { World, type CellRect } from '../sim/world/World';
 import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
@@ -51,8 +53,10 @@ import {
   type NeedWarning,
   type ThreatView,
   type Tool,
+  type TravellerChoice,
 } from '../ui/state';
 import { mountUi } from '../ui/UiRoot';
+import { loadCampaign, nextBiome, saveCampaign, winWorld, type Campaign } from './campaign';
 import { buildCatalogue } from './catalogue';
 import { provideGameContext, type GameContext, type GameView } from './context';
 import { randomSeed, worldOptionsFromQuery } from './worldOptions';
@@ -66,6 +70,8 @@ const RETREAT_TOAST_GAP_MS = 30_000;
 /** Map dots: monsters, and the invasion portal. */
 const MONSTER_DOT = '#ff4a3a';
 const PORTAL_DOT = '#c48cff';
+/** The one save slot of Milestone 6 (autosaves and "Save game" both use it). */
+const SAVE_SLOT = 'main';
 
 export interface AppElements {
   /** Wraps the canvas and the overlay. */
@@ -96,11 +102,16 @@ export class App implements UiCommands, GameContext {
   private generation = 0;
   private lastBlockedToast = -Infinity;
   private readonly lastRetreatToast = new Map<number, number>();
+  private readonly saves = new SaveStore();
+  private campaign: Campaign;
+  /** The research version last shown in the HUD (-1: none yet). */
+  private researchVersion = -1;
 
   constructor(elements: AppElements) {
     this.elements = elements;
     this.settings = new Store(parseSettings(this.storage.getItem(SETTINGS_STORAGE_KEY)));
     this.input = new InputActions(this.settings.get().bindings);
+    this.campaign = loadCampaign(this.storage, BIOMES.ids);
   }
 
   start(): void {
@@ -112,9 +123,11 @@ export class App implements UiCommands, GameContext {
     provideGameContext(this);
     mountUi(this.elements.ui, { commands: this, settings: this.settings });
 
+    uiState.set({ unlockedBiomes: this.campaign.unlockedBiomes });
     void probeStorage().then((status) => {
       uiState.set({ storagePersistent: storageIsPersistent(status) && this.storage.persistent });
     });
+    void this.saves.meta(SAVE_SLOT).then((save) => uiState.set({ save }));
 
     if (import.meta.env.DEV) installDebugApi(this);
     this.bootPhaser();
@@ -177,7 +190,13 @@ export class App implements UiCommands, GameContext {
     const clock = { day: sim.time.day(sim.tick), hour, minute: minute - (minute % 10), night: sim.isNight() };
     const previous = uiState.get().clock;
     const same = previous && previous.day === clock.day && previous.hour === clock.hour && previous.minute === clock.minute && previous.night === clock.night;
-    uiState.set({ colony: summarizeColony(sim), threat: threatView(sim), ...(same ? {} : { clock }) });
+    const { research } = sim;
+    let researchView = {};
+    if (research.version !== this.researchVersion) {
+      this.researchVersion = research.version;
+      researchView = { research: { tier: research.tier, points: research.points, needed: research.needed, crafted: [...research.crafted].map((item) => sim.items.get(item).id) } };
+    }
+    uiState.set({ colony: summarizeColony(sim), threat: threatView(sim), ...researchView, ...(same ? {} : { clock }) });
   }
 
   get tool(): Tool {
@@ -193,6 +212,12 @@ export class App implements UiCommands, GameContext {
     if (!isBuildTool(ui.tool)) return null;
     const id = ui.buildChoice[ui.tool];
     return id !== null && CONTENT.items.has(id) ? CONTENT.items.item(id) : null;
+  }
+
+  get farmCrop(): number | null {
+    const id = uiState.get().farmCrop;
+    const index = id === null ? -1 : CONTENT.crops.crops.findIndex((crop) => crop.id === id);
+    return index < 0 ? null : index;
   }
 
   get selectedDwarf(): number | null {
@@ -231,6 +256,7 @@ export class App implements UiCommands, GameContext {
     else if (tool === 'build' && item !== null) changed = sim.designateBuild(item, rect, priority);
     else if (tool === 'wall' && item !== null) changed = sim.designateWall(item, rect, priority);
     else if (tool === 'furniture' && item !== null) changed = sim.designateFurniture(item, rect.x0, rect.y0, priority) ? 1 : 0;
+    else if (tool === 'farm' && this.farmCrop !== null) changed = sim.designateFarm(this.farmCrop, rect, priority);
     else if (tool === 'cancel') {
       changed = sim.cancelDesignations(rect);
       removed = true;
@@ -252,7 +278,7 @@ export class App implements UiCommands, GameContext {
   newGame(): void {
     if (!this.game) return;
     this.audio?.unlock();
-    uiState.set({ newWorld: worldOptionsFromQuery(window.location.search, BIOMES.ids, randomSeed) });
+    uiState.set({ newWorld: { ...worldOptionsFromQuery(window.location.search, BIOMES.ids, randomSeed), travellers: [] } });
   }
 
   closeNewWorld(): void {
@@ -275,6 +301,7 @@ export class App implements UiCommands, GameContext {
     this.endSession();
     game.scene.start(SceneKeys.title);
     uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null, hover: null, world: null, ...FRESH_COLONY_UI });
+    void this.saves.meta(SAVE_SLOT).then((save) => uiState.set({ save }));
   }
 
   centerCameraOn(tileX: number, tileY: number): void {
@@ -292,6 +319,11 @@ export class App implements UiCommands, GameContext {
 
   setTool(tool: Tool): void {
     const ui = uiState.get();
+    // The Farm tool picked up for the first time grows the first crop.
+    if (tool === 'farm' && ui.farmCrop === null) {
+      uiState.set({ tool, farmCrop: CONTENT.crops.crops[0]?.id ?? null });
+      return;
+    }
     // A build tool picked up for the first time starts with the first thing in its palette.
     if (isBuildTool(tool) && ui.buildChoice[tool] === null && ui.catalogue) {
       const first = paletteOf(ui.catalogue, tool)[0];
@@ -305,8 +337,16 @@ export class App implements UiCommands, GameContext {
     uiState.update((s) => ({ tool, buildChoice: { ...s.buildChoice, [tool]: item } }));
   }
 
+  setFarmCrop(crop: string): void {
+    uiState.set({ tool: 'farm', farmCrop: crop });
+  }
+
   toggleCrafting(): void {
-    uiState.update((s) => ({ craftingOpen: !s.craftingOpen }));
+    uiState.update((s) => ({ craftingOpen: !s.craftingOpen, techOpen: false }));
+  }
+
+  toggleTech(): void {
+    uiState.update((s) => ({ techOpen: !s.techOpen, craftingOpen: false }));
   }
 
   toggleStorage(): void {
@@ -347,6 +387,35 @@ export class App implements UiCommands, GameContext {
 
   dismissColonyLost(): void {
     uiState.set({ colonyLost: false });
+  }
+
+  travel(dwarfIds: number[]): void {
+    const sim = this.session?.sim;
+    if (!sim || !this.game) return;
+    const itemId = (item: number): string => sim.items.get(item).id;
+    const travellers = dwarfIds.slice(0, sim.colony.startingDwarves).flatMap((id) => {
+      const dwarf = sim.dwarf(id);
+      return dwarf && dwarf.phase !== 'dead' ? [travellerOf(dwarf, itemId)] : [];
+    });
+    const biome = nextBiome(this.campaign, sim.world.biome, BIOMES.ids);
+    this.quitToTitle();
+    uiState.set({ newWorld: { seed: randomSeed(), biome, reveal: false, hour: null, forcedBiome: null, travellers } });
+  }
+
+  stayInWorld(): void {
+    uiState.set({ won: null });
+  }
+
+  saveGame(): void {
+    void this.saveNow(false);
+  }
+
+  continueGame(): void {
+    const game = this.game;
+    if (!game || uiState.get().saving) return;
+    this.audio?.unlock();
+    this.endSession();
+    void this.loadSave(game);
   }
 
   toggleHunt(creatureId: number): void {
@@ -442,78 +511,156 @@ export class App implements UiCommands, GameContext {
       });
       if (generation !== this.generation) return;
       console.info(`World "${options.seed}" (${options.biome}) generated in ${result.stats.milliseconds} ms`, result.stats);
-
-      const session = new GameSession(World.fromSnapshot(result.snapshot), CONTENT, undefined, options.hour ?? undefined);
-      this.session = session;
-      this.pendingReveal = options.reveal;
-      this.minimap = new MinimapRenderer(session.world, TILES, BIOMES.get(session.world.biome).sky);
-      this.minimap.attach(this.minimapCanvas);
-      const minimap = this.minimap;
-      this.sessionCleanup.push(
-        session.bus.on('TimeChanged', (time) => uiState.set({ time })),
-        session.bus.on('TileChanged', ({ x, y }) => minimap.updateCells({ x0: x, y0: y, x1: x, y1: y })),
-        session.bus.on('ExploredChanged', (rect) => minimap.updateCells(rect)),
-        session.bus.on('SkillUp', ({ name, skill, level }) => {
-          pushToast(t('toast.skillUp', { name, skill: t(`skill.${skill}`), level }), 'info', 5000);
-        }),
-        session.bus.on('DwarfDied', ({ name, cause, by, revivable }) => {
-          const why = cause === 'monster' ? t('toast.cause.monster', { creature: by ?? '' }) : t(`toast.cause.${cause}`);
-          pushToast(`${t('toast.dwarfDied', { name, cause: why })}${revivable ? ` ${t('toast.reviveHint')}` : ''}`, 'error', 10000);
-        }),
-        session.bus.on('JobBlocked', () => {
-          const now = performance.now();
-          if (now - this.lastBlockedToast < BLOCKED_TOAST_GAP_MS) return;
-          this.lastBlockedToast = now;
-          pushToast(t('toast.jobBlocked'), 'warning', 7000);
-        }),
-        session.bus.on('Equipped', ({ name, item }) => {
-          pushToast(t('toast.equipped', { name, item: session.sim.items.get(item).name.toLowerCase() }), 'info', 5000);
-        }),
-        session.bus.on('StorageFull', () => pushToast(t('toast.storageFull'), 'warning', 7000)),
-        session.bus.on('NightStarted', ({ day }) => pushToast(t('toast.night', { day }), 'info', 5000)),
-        session.bus.on('DayStarted', ({ day }) => pushToast(t('toast.day', { day }), 'info', 4000)),
-        session.bus.on('DwarfStarving', ({ name }) => pushToast(t('toast.starving', { name }), 'error', 8000)),
-        session.bus.on('DwarfCollapsed', ({ name }) => pushToast(t('toast.collapsed', { name }), 'warning', 6000)),
-        session.bus.on('CraftOrderDone', ({ item, count }) => {
-          pushToast(t('toast.orderDone', { count, item: session.sim.items.get(item).name }), 'info', 4000);
-        }),
-        session.bus.on('NightThreat', () => pushToast(t('toast.nightThreat'), 'warning', 7000)),
-        session.bus.on('WaveWarning', ({ x }) => {
-          const side = x < session.sim.hearth.x ? 'west' : 'east';
-          pushToast(t('toast.waveWarning', { side: t(`side.${side}`) }), 'error', 10000);
-          this.audio?.play('horn', 0.9);
-        }),
-        session.bus.on('WaveStarted', ({ size }) => pushToast(t('toast.waveStarted', { size }), 'error', 8000)),
-        session.bus.on('WaveEnded', ({ defeated }) => pushToast(t(defeated ? 'toast.waveDefeated' : 'toast.waveRetreat'), 'info', 7000)),
-        session.bus.on('DwarfRetreating', ({ dwarf, name }) => {
-          const now = performance.now();
-          if (now - (this.lastRetreatToast.get(dwarf) ?? -Infinity) < RETREAT_TOAST_GAP_MS) return;
-          this.lastRetreatToast.set(dwarf, now);
-          pushToast(t('toast.retreating', { name }), 'warning', 6000);
-        }),
-        session.bus.on('DwarfRevived', ({ name }) => pushToast(t('toast.dwarfRevived', { name }), 'info', 6000)),
-        session.bus.on('ColonyLost', () => uiState.set({ colonyLost: true })),
-      );
-      uiState.set({
-        loading: { stage: 'building', progress: 0.97 },
-        time: session.time.state(),
-        debug: null,
-        hover: null,
-        world: { seed: options.seed, biomeName: BIOMES.get(options.biome).name },
-        ...FRESH_COLONY_UI,
-        catalogue: uiState.get().catalogue ?? buildCatalogue(CONTENT),
-      });
-      // Let the loading screen show its last step before building the map blocks the thread briefly.
-      await nextFrame();
-      if (generation !== this.generation) return;
-      game.scene.stop(SceneKeys.title);
-      game.scene.start(SceneKeys.game);
+      const session = new GameSession(World.fromSnapshot(result.snapshot), CONTENT, undefined, options.hour ?? undefined, options.travellers);
+      await this.enterSession(game, session, generation, options.reveal);
+      if (options.travellers.length > 0) {
+        pushToast(t('toast.travellers', { names: options.travellers.map((traveller) => traveller.name).join(', ') }), 'info', 8000);
+      }
     } catch (error) {
       if (generation !== this.generation) return;
       this.endSession();
       pushToast(t('loading.failed', { message: errorMessage(error) }), 'error', 9000);
       uiState.set({ screen: 'title', loading: null });
     }
+  }
+
+  /** Load the saved game behind the loading screen and carry on playing it. */
+  private async loadSave(game: Phaser.Game): Promise<void> {
+    const generation = ++this.generation;
+    uiState.set({ screen: 'loading', loading: { stage: 'loading', progress: 0.3 }, menuOpen: false, settingsOpen: false, newWorld: null, saving: true });
+    try {
+      const stored = await this.saves.get(SAVE_SLOT);
+      if (generation !== this.generation) return;
+      if (!stored) throw new SaveError('damaged', 'There is no saved game');
+      uiState.set({ loading: { stage: 'loading', progress: 0.7 } });
+      await nextFrame();
+      const session = GameSession.fromSave(stored.bytes, CONTENT);
+      console.info(`Loaded the save of world "${stored.meta.seed}", day ${stored.meta.day}`);
+      await this.enterSession(game, session, generation, false);
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.endSession();
+      pushToast(t('toast.loadFailed', { message: saveErrorMessage(error) }), 'error', 10000);
+      uiState.set({ screen: 'title', loading: null });
+    } finally {
+      uiState.set({ saving: false });
+    }
+  }
+
+  /** Save the running world in the save slot (`auto`: the dawn autosave). */
+  private async saveNow(auto: boolean): Promise<void> {
+    const session = this.session;
+    if (!session || uiState.get().saving) return;
+    uiState.set({ saving: true });
+    try {
+      const { bytes, meta } = session.save(Date.now());
+      await this.saves.put(SAVE_SLOT, { bytes, meta });
+      uiState.set({ save: meta });
+      if (!this.saves.persistent) uiState.set({ storagePersistent: false });
+      pushToast(t(auto ? 'toast.autosaved' : 'toast.saved', { day: meta.day }), 'info', auto ? 3500 : 4000);
+    } catch (error) {
+      pushToast(t('toast.saveFailed', { message: errorMessage(error) }), 'error', 9000);
+    } finally {
+      uiState.set({ saving: false });
+    }
+  }
+
+  /** Make a session the running world: wire its events to the HUD, toasts and sounds, and start the game scene. */
+  private async enterSession(game: Phaser.Game, session: GameSession, generation: number, reveal: boolean): Promise<void> {
+    this.session = session;
+    this.pendingReveal = reveal;
+    this.researchVersion = -1;
+    this.minimap = new MinimapRenderer(session.world, TILES, BIOMES.get(session.world.biome).sky);
+    this.minimap.attach(this.minimapCanvas);
+    const minimap = this.minimap;
+    const sim = session.sim;
+    this.sessionCleanup.push(
+      session.bus.on('TimeChanged', (time) => uiState.set({ time })),
+      session.bus.on('TileChanged', ({ x, y }) => minimap.updateCells({ x0: x, y0: y, x1: x, y1: y })),
+      session.bus.on('ExploredChanged', (rect) => minimap.updateCells(rect)),
+      session.bus.on('SkillUp', ({ name, skill, level }) => {
+        pushToast(t('toast.skillUp', { name, skill: t(`skill.${skill}`), level }), 'info', 5000);
+      }),
+      session.bus.on('DwarfDied', ({ name, cause, by, revivable }) => {
+        const why = cause === 'monster' ? t('toast.cause.monster', { creature: by ?? '' }) : t(`toast.cause.${cause}`);
+        pushToast(`${t('toast.dwarfDied', { name, cause: why })}${revivable ? ` ${t('toast.reviveHint')}` : ''}`, 'error', 10000);
+      }),
+      session.bus.on('JobBlocked', () => {
+        const now = performance.now();
+        if (now - this.lastBlockedToast < BLOCKED_TOAST_GAP_MS) return;
+        this.lastBlockedToast = now;
+        pushToast(t('toast.jobBlocked'), 'warning', 7000);
+      }),
+      session.bus.on('Equipped', ({ name, item }) => {
+        pushToast(t('toast.equipped', { name, item: sim.items.get(item).name.toLowerCase() }), 'info', 5000);
+      }),
+      session.bus.on('StorageFull', () => pushToast(t('toast.storageFull'), 'warning', 7000)),
+      session.bus.on('NightStarted', ({ day }) => pushToast(t('toast.night', { day }), 'info', 5000)),
+      session.bus.on('DayStarted', ({ day }) => {
+        pushToast(t('toast.day', { day }), 'info', 4000);
+        // Autosave every dawn, once the tick that brought the dawn has finished.
+        queueMicrotask(() => void this.saveNow(true));
+      }),
+      session.bus.on('DwarfStarving', ({ name }) => pushToast(t('toast.starving', { name }), 'error', 8000)),
+      session.bus.on('DwarfCollapsed', ({ name }) => pushToast(t('toast.collapsed', { name }), 'warning', 6000)),
+      session.bus.on('CraftOrderDone', ({ item, count }) => {
+        pushToast(t('toast.orderDone', { count, item: sim.items.get(item).name }), 'info', 4000);
+      }),
+      session.bus.on('NightThreat', () => pushToast(t('toast.nightThreat'), 'warning', 7000)),
+      session.bus.on('WaveWarning', ({ x }) => {
+        const side = x < sim.hearth.x ? 'west' : 'east';
+        pushToast(t('toast.waveWarning', { side: t(`side.${side}`) }), 'error', 10000);
+        this.audio?.play('horn', 0.9);
+      }),
+      session.bus.on('WaveStarted', ({ size }) => pushToast(t('toast.waveStarted', { size }), 'error', 8000)),
+      session.bus.on('WaveEnded', ({ defeated }) => pushToast(t(defeated ? 'toast.waveDefeated' : 'toast.waveRetreat'), 'info', 7000)),
+      session.bus.on('DwarfRetreating', ({ dwarf, name }) => {
+        const now = performance.now();
+        if (now - (this.lastRetreatToast.get(dwarf) ?? -Infinity) < RETREAT_TOAST_GAP_MS) return;
+        this.lastRetreatToast.set(dwarf, now);
+        pushToast(t('toast.retreating', { name }), 'warning', 6000);
+      }),
+      session.bus.on('DwarfRevived', ({ name }) => pushToast(t('toast.dwarfRevived', { name }), 'info', 6000)),
+      session.bus.on('ColonyLost', () => uiState.set({ colonyLost: true })),
+      session.bus.on('ResearchGained', ({ item, points }) => {
+        pushToast(t('toast.research', { item: sim.items.get(item).name.toLowerCase(), points }), 'info', 4500);
+      }),
+      session.bus.on('TierReached', ({ name, dwarves }) => {
+        const key = dwarves > 1 ? 'toast.tierDwarves' : dwarves === 1 ? 'toast.tierDwarf' : 'toast.tierReached';
+        pushToast(t(key, { tier: name, count: dwarves }), 'info', 9000);
+        this.audio?.play('research');
+      }),
+      session.bus.on('DwarfArrived', ({ name }) => pushToast(t('toast.dwarfArrived', { name }), 'info', 7000)),
+      session.bus.on('WorldWon', ({ day }) => this.worldWon(day)),
+    );
+    uiState.set({
+      loading: { stage: 'building', progress: 0.97 },
+      time: session.time.state(),
+      debug: null,
+      hover: null,
+      world: { seed: session.world.seed, biomeName: BIOMES.get(session.world.biome).name },
+      ...FRESH_COLONY_UI,
+      catalogue: uiState.get().catalogue ?? buildCatalogue(CONTENT),
+    });
+    // Let the loading screen show its last step before building the map blocks the thread briefly.
+    await nextFrame();
+    if (generation !== this.generation) return;
+    game.scene.stop(SceneKeys.title);
+    game.scene.start(SceneKeys.game);
+  }
+
+  /** The World Gate is built: the campaign moves on, and the victory dialog comes up. */
+  private worldWon(day: number): void {
+    const sim = this.session?.sim;
+    if (!sim) return;
+    const { campaign, opened } = winWorld(this.campaign, sim.world.biome, BIOMES.ids);
+    this.campaign = campaign;
+    saveCampaign(this.storage, campaign);
+    this.audio?.play('gateOpen');
+    uiState.set({
+      unlockedBiomes: campaign.unlockedBiomes,
+      won: { day, unlocked: opened ? BIOMES.get(opened).name : null, dwarves: travellerChoices(sim), max: sim.colony.startingDwarves },
+    });
   }
 
   // ---- Wiring --------------------------------------------------------------------------
@@ -568,6 +715,7 @@ export class App implements UiCommands, GameContext {
     this.input.onPressed('toolSelect', () => this.setTool('select'));
     this.input.onPressed('toolDig', () => this.setTool('dig'));
     this.input.onPressed('toolChop', () => this.setTool('chop'));
+    this.input.onPressed('toolFarm', () => this.setTool('farm'));
     this.input.onPressed('toolBuild', () => this.setTool('build'));
     this.input.onPressed('toolWall', () => this.setTool('wall'));
     this.input.onPressed('toolFurniture', () => this.setTool('furniture'));
@@ -578,6 +726,10 @@ export class App implements UiCommands, GameContext {
       this.toggleCrafting();
     });
     this.input.onPressed('toggleStorage', () => this.toggleStorage());
+    this.input.onPressed('toggleTech', () => {
+      this.playSound(uiState.get().techOpen ? 'uiClose' : 'uiOpen');
+      this.toggleTech();
+    });
     this.input.onPressed('cancel', () => this.cancel());
     this.input.attach(window);
   }
@@ -604,6 +756,9 @@ export class App implements UiCommands, GameContext {
     } else if (ui.screen === 'game' && ui.craftingOpen) {
       this.playSound('uiClose');
       this.toggleCrafting();
+    } else if (ui.screen === 'game' && ui.techOpen) {
+      this.playSound('uiClose');
+      this.toggleTech();
     } else if (ui.screen === 'game' && (ui.tool !== DEFAULT_TOOL || ui.selectedDwarf !== null)) {
       this.dropTool();
     } else if (ui.screen === 'game') {
@@ -650,7 +805,39 @@ export class App implements UiCommands, GameContext {
 }
 
 /** The HUD's colony state for a world that has just started (or ended). */
-const FRESH_COLONY_UI = { tool: DEFAULT_TOOL, selectedDwarf: null, colony: null, craftingOpen: false, threat: null, colonyLost: false } as const;
+const FRESH_COLONY_UI = {
+  tool: DEFAULT_TOOL,
+  selectedDwarf: null,
+  colony: null,
+  craftingOpen: false,
+  techOpen: false,
+  threat: null,
+  colonyLost: false,
+  research: null,
+  won: null,
+} as const;
+
+/** The living dwarves who could step through the gate, the most skilled first. */
+function travellerChoices(sim: Simulation): TravellerChoice[] {
+  return sim.livingDwarves
+    .map((dwarf) => {
+      const best = SKILLS.reduce((top, skill) => (dwarf.skills[skill].level > dwarf.skills[top].level ? skill : top), SKILLS[0]);
+      const total = SKILLS.reduce((sum, skill) => sum + dwarf.skills[skill].xp, 0);
+      return { choice: { id: dwarf.id, name: dwarf.name, skill: t(`skill.${best}`), level: dwarf.skills[best].level }, total };
+    })
+    .sort((a, b) => b.total - a.total || a.choice.id - b.choice.id)
+    .map(({ choice }) => choice);
+}
+
+/** Why a save couldn't be loaded, in words. */
+function saveErrorMessage(error: unknown): string {
+  if (error instanceof SaveError) {
+    if (error.problem === 'newer') return t('error.saveVersionNewer');
+    if (error.problem === 'older') return t('error.saveVersionOlder');
+    return t('error.saveDamaged');
+  }
+  return errorMessage(error);
+}
 
 /** An invasion coming or under way, for the top bar. */
 function threatView(sim: Simulation): ThreatView {

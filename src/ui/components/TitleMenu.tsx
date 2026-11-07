@@ -3,10 +3,14 @@ import { useEffect, useRef } from 'preact/hooks';
 import { GAME_TITLE, MILESTONE } from '../../config';
 import { t } from '../../core/strings';
 import { useCommands } from '../commands';
+import { useStore } from '../hooks';
+import { uiState } from '../state';
 
 export function TitleMenu() {
   const commands = useCommands();
   const newGameButton = useRef<HTMLButtonElement>(null);
+  const save = useStore(uiState, (s) => s.save);
+  const saving = useStore(uiState, (s) => s.saving);
 
   useEffect(() => {
     newGameButton.current?.focus();
@@ -31,12 +35,29 @@ export function TitleMenu() {
         >
           {t('title.newGame')}
         </button>
-        {/* Saves arrive in Milestone 6; the wrapper carries the tooltip because disabled buttons don't show one everywhere. */}
-        <span class="tooltip-wrap" title={t('title.continueUnavailable')}>
-          <button type="button" class="btn" disabled>
+        {save ? (
+          <button
+            type="button"
+            class="btn"
+            disabled={saving}
+            title={t('title.continueTip', { day: save.day, dwarves: save.dwarves, seed: save.seed })}
+            data-testid="continue"
+            onClick={() => {
+              commands.playSound('uiClick');
+              commands.continueGame();
+            }}
+          >
             {t('title.continue')}
+            <span class="continue-detail">{t('title.continueDetail', { day: save.day, dwarves: save.dwarves })}</span>
           </button>
-        </span>
+        ) : (
+          // The wrapper carries the tooltip because disabled buttons don't show one everywhere.
+          <span class="tooltip-wrap" title={t('title.continueUnavailable')}>
+            <button type="button" class="btn" disabled data-testid="continue">
+              {t('title.continue')}
+            </button>
+          </span>
+        )}
         <button
           type="button"
           class="btn"

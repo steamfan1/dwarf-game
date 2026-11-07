@@ -3,7 +3,7 @@
  * temperate biome; for testing and sharing worlds, the page address can preset them:
  *
  *   ?seed=mossy-cavern      a specific world (the same seed always gives the same world)
- *   ?biome=snow             start in another biome (the campaign unlocks biomes later)
+ *   ?biome=snow             start in another biome, even one the campaign hasn't opened yet
  *   ?reveal=1               lift the fog of war over the whole map
  *   ?hour=22                start at that hour (0-23) instead of the morning: 22 is night
  */
@@ -13,6 +13,8 @@ export interface NewWorldOptions {
   reveal: boolean;
   /** The hour to start at, or null for the usual morning. */
   hour: number | null;
+  /** The biome the address named, if it named a known one (it can be picked even while locked). */
+  forcedBiome: string | null;
 }
 
 export const DEFAULT_BIOME = 'temperate';
@@ -29,6 +31,7 @@ export function worldOptionsFromQuery(query: string, knownBiomes: readonly strin
     biome: biome && knownBiomes.includes(biome) ? biome : DEFAULT_BIOME,
     reveal: reveal === '1' || reveal === 'true' || reveal === '',
     hour: Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : null,
+    forcedBiome: biome && knownBiomes.includes(biome) ? biome : null,
   };
 }
 

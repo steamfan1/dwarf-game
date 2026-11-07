@@ -363,9 +363,22 @@ test('night, dev build: tired dwarves lie down by the Hearth and sleep', async (
 interface DevDebug {
   spawnCreature(id: string, dx?: number): void;
   startWave(): void;
+  setSpeed(multiplier: number): void;
+  techTier(tier: number): void;
+  ripenCrops(): void;
+  placeGate(): void;
+  give(id: string, count?: number): void;
   app: {
     centerCameraOn(x: number, y: number): void;
-    session: { sim: { portal: { x: number; y: number } | null } };
+    session: {
+      sim: {
+        portal: { x: number; y: number } | null;
+        farms: { all(): Iterable<{ state: string }> };
+        storage: { count(item: number): number };
+        items: { item(id: string): number };
+        dwarves: Array<{ name: string }>;
+      };
+    };
   };
 }
 
@@ -403,8 +416,151 @@ test('monsters, dev build: dwarves fight off a gloomling, and an invasion portal
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
-test('a snowy world can be chosen in the New world dialog', async ({ page, browserErrors }, testInfo) => {
+test('the tech tree, farming and the World Gate, dev build: research unlocks tiers, crops grow, the gate wins the world', async ({
+  page,
+  browserErrors,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'dev', 'window.debug exists only in dev builds');
+  test.setTimeout(150_000);
   await page.goto('./');
+  await createWorld(page, { seed: 'smoke-test' });
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
+  const tile = 32;
+
+  // The tech tree (R): the first tier is in progress, the rest are locked.
+  await page.keyboard.press('KeyR');
+  await expect(page.getByTestId('tech-panel')).toBeVisible();
+  await expect(page.getByTestId('tier-0')).toContainText('In progress');
+  await expect(page.getByTestId('tier-1')).toContainText('Locked');
+  await expect(page.getByTestId('tech-progress')).toContainText('0 / 40 research');
+  await page.screenshot({ path: testInfo.outputPath('m6-1-tech.png') });
+  await page.keyboard.press('KeyR');
+  await expect(page.getByTestId('tech-panel')).toBeHidden();
+
+  // The Farm tool (G) plants wheat: drag along the open ground left of the Hearth.
+  await page.keyboard.press('KeyG');
+  await expect(page.getByTestId('crop-palette')).toBeVisible();
+  await expect(page.getByTestId('crop-wheat')).toHaveAttribute('aria-selected', 'true');
+  const row = centre.y + 2 * tile; // the open row the Hearth stands in, over the ground
+  await page.mouse.move(centre.x - 7 * tile, row);
+  await expect(page.getByTestId('hover-readout')).toContainText('farm wheat here');
+  await page.mouse.down();
+  await page.mouse.move(centre.x - 4 * tile, row, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByTestId('hover-readout')).toContainText(/Farm plot|till|Tilling|sow|grown/);
+  const plotStates = () =>
+    page.evaluate(() => [...(window as unknown as { debug: DevDebug }).debug.app.session.sim.farms.all()].map((plot) => plot.state).sort());
+  expect((await plotStates()).length).toBeGreaterThanOrEqual(3);
+  // Dwarves till and sow them (faster, here), and the crops come up.
+  await page.keyboard.press('Digit3');
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.setSpeed(4));
+  await expect.poll(plotStates, { timeout: 40_000 }).toEqual(expect.arrayContaining(['growing']));
+  await expect.poll(async () => (await plotStates()).every((state) => state === 'growing'), { timeout: 40_000 }).toBe(true);
+  await page.keyboard.press('Digit1');
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.setSpeed(1));
+  await page.mouse.move(centre.x, centre.y - 6 * tile); // out of the way of the picture
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: testInfo.outputPath('m6-2-sown.png') });
+  // Ripe (sped up by the debug helper), picked, and the wheat goes into storage.
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.ripenCrops());
+  await expect.poll(plotStates, { timeout: 10_000 }).toEqual(expect.arrayContaining(['ripe']));
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: testInfo.outputPath('m6-3-ripe.png') });
+  await page.keyboard.press('Digit3');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const { sim } = (window as unknown as { debug: DevDebug }).debug.app.session;
+          return sim.storage.count(sim.items.item('wheat'));
+        }),
+      { timeout: 40_000 },
+    )
+    .toBeGreaterThanOrEqual(3);
+  await page.keyboard.press('Digit1');
+
+  // Making something new earns research: a plank from the starting logs... none, so give one.
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.give('log', 2));
+  await page.getByTestId('open-crafting').click();
+  await page.getByTestId('queue-planks-1').click();
+  await page.keyboard.press('KeyK');
+  await page.keyboard.press('Digit3');
+  await page.keyboard.press('KeyR');
+  await expect(page.getByTestId('tech-progress')).toContainText('10 / 40 research', { timeout: 30_000 });
+  await expect(page.getByTestId('tech-item-planks')).toHaveClass(/made/);
+  await page.keyboard.press('Digit1');
+
+  // The last tier (debug): nine more dwarves come, twelve in all, and the World Gate unlocks.
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.techTier(6));
+  await expect(page.getByTestId('roster-dwarf')).toHaveCount(12);
+  await expect(page.getByTestId('tier-5')).toContainText('In progress');
+  await expect(page.getByTestId('tech-panel')).toContainText('Build the World Gate to win this world');
+  await page.screenshot({ path: testInfo.outputPath('m6-4-tiers.png') });
+  await page.keyboard.press('KeyR');
+
+  // The World Gate is built: the world is won, and three dwarves step through to a new one.
+  await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.placeGate());
+  const won = page.getByTestId('world-won');
+  await expect(won).toBeVisible();
+  await expect(won).toContainText('A new biome is open to you: Frozen north');
+  await expect(page.getByTestId('traveller').locator('input:checked')).toHaveCount(3);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: testInfo.outputPath('m6-5-won.png') });
+  const chosen = await page.getByTestId('traveller').filter({ has: page.locator('input:checked') }).locator('strong').allTextContents();
+  await page.getByTestId('travel').click();
+  await expect(page.getByTestId('new-world')).toBeVisible();
+  await expect(page.getByTestId('travellers-note')).toContainText(chosen.join(', '));
+  await expect(page.getByTestId('biome-snow')).toBeChecked();
+  await page.screenshot({ path: testInfo.outputPath('m6-6-travel.png') });
+  await page.getByTestId('create-world').click();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'game', { timeout: 30_000 });
+  await expect(page.getByTestId('roster-dwarf')).toHaveCount(3);
+  const arrived = await page.evaluate(() => (window as unknown as { debug: DevDebug }).debug.app.session.sim.dwarves.map((dwarf) => dwarf.name));
+  expect(arrived.sort()).toEqual([...chosen].sort());
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: testInfo.outputPath('m6-7-new-world.png') });
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
+test('saving: the menu saves the world, and Continue on the title screen picks it up, even after a reload', async ({ page, browserErrors }, testInfo) => {
+  test.setTimeout(90_000);
+  await page.goto('./');
+  await expect(page.getByTestId('continue')).toBeDisabled({ timeout: 30_000 });
+  await createWorld(page, { seed: 'save-test' });
+  await page.waitForTimeout(1500);
+  const names = await page.getByTestId('roster-dwarf').locator('strong, .roster-name').first().textContent();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('game-menu')).toBeVisible();
+  await page.getByTestId('save-game').click();
+  await expect(page.locator('.toast').filter({ hasText: 'Game saved (day 1)' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Quit to title' }).click();
+  await expect(page.getByTestId('continue')).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByTestId('continue')).toContainText('Day 1 · 3 dwarves');
+
+  // A reload: the save is still there (IndexedDB), and Continue loads it.
+  await page.reload();
+  await expect(page.getByTestId('continue')).toBeEnabled({ timeout: 30_000 });
+  await page.screenshot({ path: testInfo.outputPath('m6-8-continue.png') });
+  await page.getByTestId('continue').click();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'game', { timeout: 30_000 });
+  await expect(page.getByTestId('roster-dwarf')).toHaveCount(3);
+  if (names) await expect(page.getByTestId('roster-dwarf').first()).toContainText(names);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('world-info')).toContainText('save-test');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: testInfo.outputPath('m6-9-continued.png') });
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});
+
+test('the campaign: the snowy north opens with a World Gate, or with ?biome=snow for testing', async ({ page, browserErrors }, testInfo) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'New game' }).click({ timeout: 30_000 });
+  await expect(page.getByTestId('biome-snow')).toBeDisabled();
+  await expect(page.getByTestId('biome-temperate')).toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.goto('./?biome=snow');
   await createWorld(page, { seed: 'frost-hollow', biome: 'snow' });
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath('snow-world.png') });

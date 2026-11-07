@@ -41,6 +41,22 @@
       }
     },
     {
+      "id": "farmland",
+      "name": "Tilled soil",
+      "solid": true,
+      "hardness": 1,
+      "hp": 100,
+      "drops": "dirt",
+      "mapColor": "#5a3a22",
+      "art": {
+        "style": "furrows",
+        "base": "#5e3d24",
+        "dark": "#3e2716",
+        "light": "#7a5232",
+        "pebble": "#8d6a4a"
+      }
+    },
+    {
       "id": "clay",
       "name": "Clay",
       "solid": true,
@@ -351,6 +367,117 @@
           "..gGGGGgGGGGg...",
           "...gggGbGGgg....",
           ".......bb......."
+        ]
+      }
+    },
+    {
+      "id": "wheat_sprout",
+      "name": "Wheat (sprouting)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#4f9a36", "G": "#86c858" },
+        "rows": [
+          "................",
+          "................",
+          "....g......g....",
+          "...gG..g..gG.g..",
+          ".g.G..gG..G..Gg."
+        ]
+      }
+    },
+    {
+      "id": "wheat_young",
+      "name": "Wheat (growing)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#4f9a36", "G": "#86c858", "y": "#b8c25a" },
+        "rows": [
+          "..G.....G....G..",
+          "..g..G..g..G.g..",
+          ".Gg..g.Gg..g.g..",
+          ".gG.Gg.gG.Gg.gG.",
+          ".g..g..g..g..g..",
+          "Gg.Gg.Gg.Gg.Gg.G",
+          "g..g..g..g..g..g"
+        ]
+      }
+    },
+    {
+      "id": "wheat_ripe",
+      "name": "Wheat (ripe)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "y": "#f2d45c", "Y": "#c9a23a", "s": "#a88a3a" },
+        "rows": [
+          "..y.....y....y..",
+          ".yYy...yYy..yYy.",
+          ".yYy.y.yYy..yYy.",
+          "..Yy.YyYYy.y.Yy.",
+          "..s.yYys...YyYs.",
+          "..s..Ys.s..Ys.s.",
+          "..s..s..s...s.s.",
+          ".ss.ss.ss.ss.ss.",
+          "s..s..s..s..s..s"
+        ]
+      }
+    },
+    {
+      "id": "sunroot_sprout",
+      "name": "Sunroot (sprouting)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#4f9a36", "G": "#86c858" },
+        "rows": [
+          "................",
+          "......G..G......",
+          ".....gG..Gg.....",
+          "......g..g......"
+        ]
+      }
+    },
+    {
+      "id": "sunroot_young",
+      "name": "Sunroot (growing)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#3f8a2c", "G": "#6fb848" },
+        "rows": [
+          ".....G....G.....",
+          "....GgG..GgG....",
+          "...GgggGGgggG...",
+          "....gGgggggG....",
+          "......gggg......",
+          "......g..g......"
+        ]
+      }
+    },
+    {
+      "id": "sunroot_ripe",
+      "name": "Sunroot (ripe)",
+      "solid": false,
+      "mapColor": "#6fa83e",
+      "art": {
+        "style": "sprite",
+        "palette": { "g": "#3f8a2c", "G": "#6fb848", "o": "#e0a03a", "O": "#f6d27a", "k": "#7a4a1c" },
+        "rows": [
+          "...G.G....G.G...",
+          "..GgGgG..GgGgG..",
+          "...GgG....GgG...",
+          "....g..GG..g....",
+          ".....kOOOOk.....",
+          "....kOooooOk....",
+          "....kooooook....",
+          "......kkkk......"
         ]
       }
     },

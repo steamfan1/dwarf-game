@@ -31,6 +31,8 @@ import type { CellRect, World } from '../world/World';
  *   build      put a block in a cell              wall      put up a background wall
  *   place      set down a piece of furniture      dismantle take a piece of furniture apart
  *   craft      make a recipe (one craft)
+ *   till       turn the soil under a farm plot into farmland
+ *   plant      sow a seed in a farm plot (the seed is fetched from storage)
  *   hunt       go after an animal the player marked, and kill it
  *   revive     pour a revival draught on a fallen dwarf
  * A dwarf's own needs are jobs too, taken by that dwarf alone:
@@ -48,6 +50,8 @@ export type JobType =
   | 'place'
   | 'dismantle'
   | 'craft'
+  | 'till'
+  | 'plant'
   | 'hunt'
   | 'revive'
   | 'equip'
@@ -64,6 +68,8 @@ export const JOB_TYPES: readonly JobType[] = [
   'place',
   'dismantle',
   'craft',
+  'till',
+  'plant',
   'hunt',
   'revive',
   'equip',
@@ -119,8 +125,8 @@ export interface Job {
   readonly inputs: readonly ItemCount[];
   /**
    * Build: the tile. Wall: the wall. Place: the furniture kind. Craft: the recipe. Equip,
-   * eat: the item. Harvest: the plant's tile. Hunt, fight: the creature's id. Revive: the
-   * fallen dwarf's id. -1 otherwise.
+   * eat: the item. Harvest: the plant's tile. Till, plant: the crop. Hunt, fight: the
+   * creature's id. Revive: the fallen dwarf's id. -1 otherwise.
    */
   readonly target: number;
   /** Craft: the order it belongs to. */

@@ -5,6 +5,7 @@
  *   Select      pick a dwarf to see its details;
  *   Dig         mark blocks for the dwarves to dig;
  *   Fell trees  mark trees for the dwarves to cut down;
+ *   Farm        mark farm plots for a crop: dwarves till, sow and harvest them, again and again;
  *   Build       plan blocks, ladders and doors;
  *   Walls       plan background walls (dwarves climb them);
  *   Furniture   plan chests, torches, crafting stations...;
@@ -36,6 +37,7 @@ const TOOLS: readonly ToolSpec[] = [
   { tool: 'select', icon: 'select', label: 'tool.select', tip: 'tool.select.tip', action: 'toolSelect' },
   { tool: 'dig', icon: 'pick', label: 'tool.dig', tip: 'tool.dig.tip', action: 'toolDig' },
   { tool: 'chop', icon: 'axe', label: 'tool.chop', tip: 'tool.chop.tip', action: 'toolChop' },
+  { tool: 'farm', icon: 'farm', label: 'tool.farm', tip: 'tool.farm.tip', action: 'toolFarm' },
   { tool: 'build', icon: 'build', label: 'tool.build', tip: 'tool.build.tip', action: 'toolBuild' },
   { tool: 'wall', icon: 'wall', label: 'tool.wall', tip: 'tool.wall.tip', action: 'toolWall' },
   { tool: 'furniture', icon: 'furniture', label: 'tool.furniture', tip: 'tool.furniture.tip', action: 'toolFurniture' },
@@ -44,7 +46,7 @@ const TOOLS: readonly ToolSpec[] = [
 ];
 
 /** Tools whose marks or changes use the priority level. */
-const USES_PRIORITY: ReadonlySet<Tool> = new Set<Tool>(['auto', 'dig', 'chop', 'build', 'wall', 'furniture', 'priority']);
+const USES_PRIORITY: ReadonlySet<Tool> = new Set<Tool>(['auto', 'dig', 'chop', 'farm', 'build', 'wall', 'furniture', 'priority']);
 
 export function Toolbar() {
   const commands = useCommands();
@@ -105,6 +107,7 @@ export function Toolbar() {
       )}
 
       {isBuildTool(tool) && <Palette tool={tool} />}
+      {tool === 'farm' && <CropPalette />}
     </nav>
   );
 }
@@ -141,6 +144,45 @@ function Palette({ tool }: { tool: BuildTool }) {
           >
             <img class="item-icon" src={entry.icon} alt="" width={30} height={30} />
             <span class="name">{entry.name}</span>
+            <span class="count">{count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** What the Farm tool grows: each crop, with how many of its seeds are in storage. */
+function CropPalette() {
+  const commands = useCommands();
+  const catalogue = useStore(uiState, (s) => s.catalogue);
+  const choice = useStore(uiState, (s) => s.farmCrop);
+  const resources = useStore(uiState, (s) => s.colony?.resources ?? null);
+  if (!catalogue) return null;
+  const stock = new Map((resources ?? []).map((entry) => [entry.id, entry.count]));
+
+  return (
+    <div class="palette panel" role="listbox" aria-label={t('tool.farm.palette')} data-testid="crop-palette">
+      <h4>{t('tool.farm.palette')}</h4>
+      {catalogue.crops.map((crop) => {
+        const count = stock.get(crop.seed.id) ?? 0;
+        const selected = crop.id === choice;
+        return (
+          <button
+            key={crop.id}
+            type="button"
+            role="option"
+            aria-selected={selected}
+            class={`palette-entry${selected ? ' selected' : ''}${count === 0 ? ' empty' : ''}`}
+            title={`${crop.name}: ${count > 0 ? t('tool.farm.seeds', { count }) : t('tool.farm.noSeeds')}`}
+            data-testid={`crop-${crop.id}`}
+            onClick={() => {
+              commands.playSound('uiClick');
+              commands.setFarmCrop(crop.id);
+            }}
+          >
+            <img class="item-icon" src={crop.seed.icon} alt="" width={30} height={30} />
+            <span class="name">{crop.name}</span>
             <span class="count">{count}</span>
           </button>
         );

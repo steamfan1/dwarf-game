@@ -183,29 +183,30 @@ const MISSING_COLOUR = '#f2a33a';
  * to take apart) or, on the other cells of a large piece of planned furniture, just the
  * border.
  */
-export type MarkKind = 'dig' | 'chop' | 'build' | 'dismantle' | 'plain';
+export type MarkKind = 'dig' | 'chop' | 'build' | 'dismantle' | 'plain' | 'farm';
 
-const MARK_BASE: Record<MarkKind, number> = { dig: 0, chop: 4, build: 10, dismantle: 14, plain: 18 };
-const BLOCKED_FRAME: Record<MarkKind, number> = { dig: 8, chop: 9, build: 23, dismantle: 23, plain: 23 };
+const MARK_BASE: Record<MarkKind, number> = { dig: 0, chop: 4, build: 10, dismantle: 14, plain: 18, farm: 24 };
+const BLOCKED_FRAME: Record<MarkKind, number> = { dig: 8, chop: 9, build: 23, dismantle: 23, plain: 23, farm: 23 };
 /** Planned building waiting for materials that aren't in storage. */
 const MISSING_FRAME = 22;
 
 /**
  * Frame of the marks texture for a job: dig 0-3, chop 4-7 (by priority), blocked dig 8,
- * blocked chop 9, build 10-13, dismantle 14-17, plain 18-21, missing materials 22 and
- * blocked (anything else) 23.
+ * blocked chop 9, build 10-13, dismantle 14-17, plain 18-21, missing materials 22,
+ * blocked (anything else) 23, and farm work (till, sow, pick) 24-27.
  */
 export function markFrame(kind: MarkKind, priority: Priority, blocked: boolean, missing = false): number {
   if (blocked) return BLOCKED_FRAME[kind];
   if (missing && kind !== 'plain') return MISSING_FRAME;
   return MARK_BASE[kind] + priority - 1;
 }
-export const MARK_FRAMES = 24;
+export const MARK_FRAMES = 28;
 
 const PICK = ['.mmm.', 'm.h.m', '..h..', '..h..', '..h..'];
 const AXE = ['.mm..', 'mmh..', '.mh..', '..h..', '..h..'];
 const HAMMER = ['mmmm.', 'mmmmh', '..h..', '..h..', '..h..'];
 const CROSS = ['m...m', '.m.m.', '..m..', '.m.m.', 'm...m'];
+const SPROUT = ['.m.m.', 'mm.mm', '..h..', '..h..', 'hhhhh'];
 const WARNING = ['.rrr.', 'rrwrr', 'rrwrr', 'rrwrr', 'rrrrr', 'rrwrr', '.rrr.'];
 const QUESTION = ['.qqq.', 'q...q', '....q', '...q.', '..q..', '.....', '..q..'];
 
@@ -239,6 +240,7 @@ export function paintMarks(ctx: CanvasRenderingContext2D): void {
     paintMark(ctx, markFrame('build', priority, false) * 16, PRIORITY_COLOURS[priority], HAMMER, priority, iconColours);
     paintMark(ctx, markFrame('dismantle', priority, false) * 16, PRIORITY_COLOURS[priority], CROSS, priority, iconColours);
     paintMark(ctx, markFrame('plain', priority, false) * 16, PRIORITY_COLOURS[priority], [], 0, iconColours);
+    paintMark(ctx, markFrame('farm', priority, false) * 16, PRIORITY_COLOURS[priority], SPROUT, priority, { m: '#9be36b', h: '#d7b98e' });
   });
   const warning: Palette = { r: BLOCKED_COLOUR, w: '#fff6f0' };
   paintMark(ctx, markFrame('dig', 2, true) * 16, BLOCKED_COLOUR, WARNING, 0, warning);

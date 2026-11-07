@@ -1,7 +1,8 @@
 /**
- * New world: pick a seed (the same seed always makes the same world) and a biome.
- * In the full campaign, biomes unlock as the colony passes through the World Gate
- * (Milestone 6); until then both can be chosen here for testing.
+ * New world: pick a seed (the same seed always makes the same world) and a biome. The
+ * campaign starts in the forest; each World Gate a colony builds opens the next biome (a
+ * biome named in the page address can always be picked, for testing). Dwarves who came
+ * through a gate are listed: they are the new world's colony.
  */
 import { useState } from 'preact/hooks';
 import { randomSeed } from '../../app/worldOptions';
@@ -9,7 +10,7 @@ import { t } from '../../core/strings';
 import { BIOMES } from '../../sim/content';
 import { useCommands } from '../commands';
 import { useStore } from '../hooks';
-import { uiState } from '../state';
+import { uiState, type NewWorldPreset } from '../state';
 import { Modal } from './Modal';
 
 const SEED_MAX_LENGTH = 40;
@@ -19,10 +20,12 @@ export function NewWorldDialog() {
   return preset ? <NewWorldForm key={preset.seed} preset={preset} /> : null;
 }
 
-function NewWorldForm({ preset }: { preset: { seed: string; biome: string; reveal: boolean; hour: number | null } }) {
+function NewWorldForm({ preset }: { preset: NewWorldPreset }) {
   const commands = useCommands();
+  const unlocked = useStore(uiState, (s) => s.unlockedBiomes);
+  const open = (id: string): boolean => unlocked.includes(id) || id === preset.forcedBiome;
   const [seed, setSeed] = useState(preset.seed);
-  const [biome, setBiome] = useState(preset.biome);
+  const [biome, setBiome] = useState(open(preset.biome) ? preset.biome : (BIOMES.list.find((b) => open(b.id))?.id ?? preset.biome));
 
   const close = (): void => {
     commands.playSound('uiClose');
@@ -30,12 +33,12 @@ function NewWorldForm({ preset }: { preset: { seed: string; biome: string; revea
   };
   const create = (): void => {
     commands.playSound('uiClick');
-    commands.createWorld({ seed: seed.trim() || randomSeed(), biome, reveal: preset.reveal, hour: preset.hour });
+    commands.createWorld({ seed: seed.trim() || randomSeed(), biome, reveal: preset.reveal, hour: preset.hour, travellers: preset.travellers });
   };
 
   return (
     <Modal
-      title={t('newWorld.title')}
+      title={t(preset.travellers.length > 0 ? 'newWorld.travelTitle' : 'newWorld.title')}
       onClose={close}
       wide
       testId="new-world"
@@ -81,20 +84,26 @@ function NewWorldForm({ preset }: { preset: { seed: string; biome: string; revea
         <fieldset class="biome-choice">
           <legend class="field-label">{t('newWorld.biome')}</legend>
           {BIOMES.list.map((b) => (
-            <label key={b.id} class={`biome-option${biome === b.id ? ' selected' : ''}`}>
+            <label key={b.id} class={`biome-option${biome === b.id ? ' selected' : ''}${open(b.id) ? '' : ' locked'}`} title={open(b.id) ? undefined : t('newWorld.locked')}>
               <input
                 type="radio"
                 name="biome"
                 value={b.id}
                 checked={biome === b.id}
+                disabled={!open(b.id)}
                 onChange={() => setBiome(b.id)}
                 data-testid={`biome-${b.id}`}
               />
               <span class="biome-name">{b.name}</span>
-              <span class="biome-description">{b.description}</span>
+              <span class="biome-description">{open(b.id) ? b.description : t('newWorld.locked')}</span>
             </label>
           ))}
         </fieldset>
+        {preset.travellers.length > 0 && (
+          <p class="travellers-note" data-testid="travellers-note">
+            {t('newWorld.travellers', { names: preset.travellers.map((traveller) => traveller.name).join(', ') })}
+          </p>
+        )}
         <p class="settings-hint">{t('newWorld.campaignNote')}</p>
       </form>
     </Modal>

@@ -34,6 +34,7 @@ export const FURNITURE_STYLES = [
   'chair',
   'trap',
   'turret',
+  'gate',
 ] as const;
 export type FurnitureStyle = (typeof FURNITURE_STYLES)[number];
 
@@ -73,6 +74,8 @@ export interface FurnitureDef {
   use: FurnitureUse | null;
   trap: TrapStats | null;
   turret: TurretStats | null;
+  /** Finishing it wins the world (the World Gate). */
+  wins: boolean;
   mapColor: string;
   art: FurnitureArt;
 }
@@ -151,6 +154,7 @@ function parseFurniture(v: Validator, raw: unknown, path: string): FurnitureDef 
           cooldownTicks: Math.round(v.number(turret.cooldownTicks, `${path}.turret.cooldownTicks`, 1, 10000)),
         }
       : null,
+    wins: o?.wins === undefined ? false : v.boolean(o.wins, `${path}.wins`),
     mapColor: v.color(o?.mapColor, `${path}.mapColor`),
     art: {
       style: v.oneOf(art?.style, FURNITURE_STYLES, `${path}.art.style`) ?? 'chest',

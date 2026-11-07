@@ -122,6 +122,43 @@ export interface Dwarf {
 }
 
 /**
+ * A dwarf going through the World Gate to the next world: who it is, what it has learned
+ * and the gear it carries (by items.json id).
+ */
+export interface Traveller {
+  name: string;
+  looks: { skin: number; beard: number; tunic: number };
+  skills: Record<Skill, SkillState>;
+  equipment: Partial<Record<EquipmentSlot, string>>;
+}
+
+/** A dwarf as it would step through the gate. */
+export function travellerOf(dwarf: Dwarf, itemId: (item: number) => string): Traveller {
+  const equipment: Partial<Record<EquipmentSlot, string>> = {};
+  for (const slot of EQUIPMENT_SLOTS) {
+    const item = dwarf.equipment[slot];
+    if (item !== null) equipment[slot] = itemId(item);
+  }
+  const skills = Object.fromEntries(SKILLS.map((skill) => [skill, { ...dwarf.skills[skill] }])) as Record<Skill, SkillState>;
+  return { name: dwarf.name, looks: { ...dwarf.looks }, skills, equipment };
+}
+
+/**
+ * A new world's dwarf who came through the gate: its name, looks, skills and gear are the
+ * traveller's (gear no longer in the game is left behind); everything else is fresh.
+ */
+export function arrivedTraveller(fresh: Dwarf, traveller: Traveller, itemNumber: (id: string) => number | undefined): Dwarf {
+  const equipment = { ...fresh.equipment };
+  for (const slot of EQUIPMENT_SLOTS) {
+    const id = traveller.equipment[slot];
+    const item = id === undefined ? undefined : itemNumber(id);
+    if (item !== undefined) equipment[slot] = item;
+  }
+  const skills = Object.fromEntries(SKILLS.map((skill) => [skill, { ...(traveller.skills[skill] ?? fresh.skills[skill]) }])) as Record<Skill, SkillState>;
+  return { ...fresh, name: traveller.name, looks: { ...traveller.looks }, skills, equipment };
+}
+
+/**
  * Create a dwarf with a name no other dwarf in `takenNames` has; first names are kept
  * distinct too while the list allows, so the roster never shows two Runas.
  */

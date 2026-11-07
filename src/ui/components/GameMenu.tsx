@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 export function GameMenu() {
   const commands = useCommands();
   const world = useStore(uiState, (s) => s.world);
+  const saving = useStore(uiState, (s) => s.saving);
   const close = (): void => {
     commands.playSound('uiClose');
     commands.closeMenu();
@@ -18,6 +19,19 @@ export function GameMenu() {
       <div class="menu-buttons">
         <button type="button" class="btn btn-primary" data-autofocus onClick={close}>
           {t('menu.resume')}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          title={t('menu.saveTip')}
+          disabled={saving}
+          data-testid="save-game"
+          onClick={() => {
+            commands.playSound('uiClick');
+            commands.saveGame();
+          }}
+        >
+          {t('menu.save')}
         </button>
         <button
           type="button"

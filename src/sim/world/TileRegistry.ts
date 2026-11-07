@@ -9,10 +9,10 @@
  */
 import { Validator } from '../../core/validate';
 
-export type ArtStyle = 'none' | 'soil' | 'rock' | 'ore' | 'crystal' | 'ice' | 'log' | 'leaves' | 'planks' | 'bricks' | 'glass' | 'sprite';
-const ART_STYLES: readonly ArtStyle[] = ['none', 'soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass', 'sprite'];
+export type ArtStyle = 'none' | 'soil' | 'furrows' | 'rock' | 'ore' | 'crystal' | 'ice' | 'log' | 'leaves' | 'planks' | 'bricks' | 'glass' | 'sprite';
+const ART_STYLES: readonly ArtStyle[] = ['none', 'soil', 'furrows', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass', 'sprite'];
 /** Styles painted from base, dark and light colours, which must all be given. */
-const SHADED_STYLES: readonly ArtStyle[] = ['soil', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass'];
+const SHADED_STYLES: readonly ArtStyle[] = ['soil', 'furrows', 'rock', 'ore', 'crystal', 'ice', 'log', 'leaves', 'planks', 'bricks', 'glass'];
 
 /** A layer drawn on a block's top edge when nothing sits on top of it (grass, snow). */
 export interface CapArt {

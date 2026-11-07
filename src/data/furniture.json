@@ -97,6 +97,15 @@
       "turret": { "range": 8, "damage": 9, "cooldownTicks": 40 },
       "mapColor": "#8a6a4a",
       "art": { "style": "turret", "base": "#a87a4b", "dark": "#6b4628", "light": "#9aa1ab", "accent": "#5d636c" }
+    },
+    {
+      "id": "world_gate",
+      "name": "World Gate",
+      "size": [3, 4],
+      "light": 10,
+      "wins": true,
+      "mapColor": "#7cf2e6",
+      "art": { "style": "gate", "base": "#5a6272", "dark": "#33394a", "light": "#8a92a6", "accent": "#7cf2e6" }
     }
   ]
 }

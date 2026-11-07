@@ -14,6 +14,7 @@ import { NewWorldDialog } from './components/NewWorldDialog';
 import { FatalScreen, StorageWarning, Toasts } from './components/Notices';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TitleMenu } from './components/TitleMenu';
+import { WonDialog } from './components/WonDialog';
 import { useStore } from './hooks';
 import { uiState } from './state';
 
@@ -23,6 +24,7 @@ function UiRoot() {
   const settingsOpen = useStore(uiState, (s) => s.settingsOpen);
   const debugOpen = useStore(uiState, (s) => s.debugOpen);
   const colonyLost = useStore(uiState, (s) => s.colonyLost);
+  const won = useStore(uiState, (s) => s.won);
 
   // Exposed for CSS and for the browser smoke test.
   useEffect(() => {
@@ -38,6 +40,7 @@ function UiRoot() {
       {screen === 'fatal' && <FatalScreen />}
       {screen === 'game' && menuOpen && !settingsOpen && <GameMenu />}
       {screen === 'game' && colonyLost && !menuOpen && !settingsOpen && <LostDialog />}
+      {screen === 'game' && won && !colonyLost && !menuOpen && !settingsOpen && <WonDialog won={won} />}
       {settingsOpen && <SettingsPanel />}
       {(debugOpen || screen === 'game') && (
         // The right-hand column: the debug panel above the colony panels, never overlapping.

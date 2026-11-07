@@ -92,4 +92,14 @@ export type GameEvents = {
   DwarfStarving: { dwarf: number; name: string };
   /** A dwarf ran out of energy and fell asleep where it stood. */
   DwarfCollapsed: { dwarf: number; name: string };
+  /** An item was made for the first time: `points` research towards the tier in progress. */
+  ResearchGained: { item: number; points: number; total: number; needed: number; tier: number };
+  /** A new tier of the tech tree was reached: its recipes unlock, and `dwarves` new dwarves come. */
+  TierReached: { tier: number; name: string; dwarves: number };
+  /** A new dwarf came to join the colony (a tier of the tech tree brought it). */
+  DwarfArrived: { dwarf: number; name: string };
+  /** A crop ripened in a farm plot. */
+  CropRipe: { x: number; y: number; crop: number };
+  /** The World Gate is built: this world is won. */
+  WorldWon: { day: number };
 };

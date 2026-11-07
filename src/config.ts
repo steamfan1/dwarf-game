@@ -6,7 +6,7 @@
 export const GAME_TITLE = 'Gatewright';
 
 /** Shown on the title screen so testers know which build they are playing. */
-export const MILESTONE = 2;
+export const MILESTONE = 6;
 
 // ---- Simulation clock -------------------------------------------------------------
 

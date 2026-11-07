@@ -7,15 +7,17 @@ home from monsters at night, and finally build a gate to the next world.
 All names, art, sound and text are original to this project. Art and sound are generated
 at runtime as placeholders, so the game currently needs no image or audio files.
 
-**Status: Milestone 5 (monsters, combat, invasions, defences).** Worlds are generated from
-a seed in a background worker (hills, caves, lakes, lava, ores, trees, two biomes) and
-drawn with chunked tilemaps. Three dwarves start beside the Hearth. You mark blocks to
-dig, trees to fell, plants to pick and animals to hunt, plan blocks, walls, ladders, doors
-and furniture, and queue crafts; the dwarves do all of it, fetching materials from storage
-(the Hearth and any chests). They eat, sleep through the night, and fight: monsters creep
-out of the dark at night and smash their way through doors and walls, and every fifth
-night an invasion pours through a portal. Light, doors, traps, bolt throwers, weapons and
-armour keep the colony alive. See [Roadmap](#roadmap) for what each milestone adds.
+**Status: Milestone 6 (tech tree, farming and cooking, new dwarves, the World Gate,
+saving).** Worlds are generated from a seed in a background worker (hills, caves, lakes,
+lava, ores, trees, two biomes) and drawn with chunked tilemaps. Three dwarves start beside
+the Hearth. You mark blocks to dig, trees to fell, fields to farm and animals to hunt,
+plan blocks, walls, ladders, doors and furniture, and queue crafts; the dwarves do all of
+it, fetching materials from storage (the Hearth and any chests). They eat, sleep through
+the night, and fight: monsters creep out of the dark at night and slowly smash their way
+through doors and walls, and every fifth night an invasion pours through a portal. Making
+new things climbs a six-tier tech tree that unlocks recipes and brings new dwarves (up to
+twelve); its last tier unlocks the World Gate, and building it wins the world. The game
+saves itself every dawn. See [Roadmap](#roadmap) for what each milestone adds.
 
 ## Requirements
 
@@ -41,7 +43,7 @@ Then open http://localhost:5173.
 | `npm run smoke` | Browser smoke tests against the build (run `npx playwright install chromium` once first) |
 | `npm run check` | Build, unit tests and smoke tests in one go |
 
-## Controls (Milestone 5)
+## Controls (Milestone 6)
 
 You never move dwarves or change the world yourself: you plan work, and idle dwarves
 take it on. Pick a tool from the toolbar on the left (or press its key), then click or
@@ -53,6 +55,7 @@ drag over the world.
 | Select | Q | Click a dwarf to see its details (also: click a name in the roster on the right) |
 | Dig | F | Mark blocks (and, with a click, ladders, doors and furniture) to dig out or take apart |
 | Fell trees | C | Mark a tree for felling (click any part of it) |
+| Farm | G | Mark farm plots for the crop picked in the palette (wheat or sunroot): click or drag along open ground over dirt or clay. Dwarves till, sow, and bring in every harvest, again and again |
 | Build | B | Plan blocks, ladders and doors from the material picked in the palette beside the toolbar |
 | Walls | V | Plan background walls, which dwarves can climb, from the picked material |
 | Furniture | T | Click where a chest, torch, crafting station, bed, table... should stand |
@@ -72,12 +75,13 @@ it can, red where it can't, and the readout in the top-left corner says why. Rig
 | Screen edges | Pan the camera when the pointer rests there (can be turned off in Settings) |
 | Middle-drag | Drag the map around |
 | Mouse wheel, + and - | Zoom between 1x and 4x, towards the pointer |
-| K | Crafting panel: every recipe, by station, and the queue of orders |
+| K | Crafting panel: every unlocked recipe, by station, and the queue of orders |
+| R | Tech tree: every tier, what it unlocks, what has been made, and the research bar |
 | I | Show or hide the list of stored goods (the storage panel on the right) |
 | M | Show or hide the minimap (click it to jump there) |
 | Space | Pause / resume |
 | 1, 2, 3 | Normal, double, triple speed |
-| Esc | Close a dialog or the crafting panel, put the tool down, deselect the dwarf, or open the in-game menu |
+| Esc | Close a dialog, the crafting panel or the tech tree, put the tool down, deselect the dwarf, or open the in-game menu (with Save game) |
 | ` (backtick) | Debug overlay: timing, jobs, paths, chunk borders, light levels |
 
 The top bar shows the day, the time and a sun or a moon, and, when an invasion is coming,
@@ -183,8 +187,8 @@ mark work while paused too.
 - **Invasions.** Every fifth night a portal opens on the surface, some way off to one
   side. The colony is warned a minute and a half before dusk (a horn, and a countdown in
   the top bar), and the portal's place shows as a faint shimmer. At nightfall invaders
-  pour through it, more each time: their number grows with the day and with the best
-  gear the colony owns. At dawn the portal draws any survivors back.
+  pour through it, more each time: their number grows with the day and with the tier the
+  colony has reached in the tech tree. At dawn the portal draws any survivors back.
 - **Defences.** Spike traps stab any creature that steps on them; bolt throwers (a
   crossbow on a post) shoot monsters up to 8 tiles away by themselves. Both are built
   like any furniture. Doors are the weak point: plank walls outlast them, and brick and
@@ -198,6 +202,35 @@ mark work while paused too.
   a crystal and mushrooms, brings it back: click the fallen dwarf with Auto and a dwarf
   pours one on it. Nothing brings back a dwarf lost in lava. If every dwarf dies, the
   colony has fallen.
+- **The tech tree.** Recipes come in six tiers: Campfire, Homestead, Smithy, Forge,
+  Delving and the World Gate. A colony starts with the first; every item made for the
+  first time earns research (more in later tiers), and a full research bar unlocks the
+  next tier. The crafting panel lists only what's unlocked; the tech tree panel (R) shows
+  every tier, what it unlocks, and a tick on each item already made.
+- **New dwarves.** Each tier from the second on brings new dwarves to the Hearth (one, then
+  two at a time), up to twelve in all. They need food and beds like everyone else.
+- **Farming.** The Farm tool marks plots along open ground over dirt or clay (grass and
+  flowers are cleared away). A dwarf tills the soil into farmland, another sows a seed
+  fetched from storage, and the crop grows while its cell has light: sunlight by day, or
+  a torch nearby, so a lit cellar farm grows day and night. Wheat takes three days of
+  daylight, sunroot two; ripe crops are picked by themselves and give the crop and two
+  seeds, and the plot is sown again. A colony starts with six wheat and four sunroot
+  seeds. Hovering a plot shows how far it has grown, or that it's too dark to grow.
+- **Cooking.** Raw food is edible, but the kitchen stove makes far more of it: raw meat
+  fills 15, cooked meat 45; a sunroot 10, baked 32; three handfuls of wheat (5 each) make
+  a loaf of bread worth 40. Dwarves eat the most filling food in storage first.
+- **The World Gate.** The last tier unlocks the World Gate, an arch of runestones (cut at
+  the anvil from deep stone and crystal) built with gold and iron. Once it stands, the
+  world is won: the next biome opens for new worlds, and up to three dwarves can step
+  through it into a fresh world, keeping their names, skills and gear (or the colony can
+  stay and keep playing). The campaign starts in the temperate forest; the snowy north
+  opens with the first gate.
+- **Saving.** The game saves itself every dawn, and **Save game** in the menu (Esc) saves
+  at any time; **Continue** on the title screen picks up the latest save, even after the
+  browser is closed. There is one save slot for now (Milestone 7 adds slots, export and
+  import). Saves are compressed and kept in the browser's IndexedDB; if the browser
+  blocks storage (some private windows), the game says so and saves last only until the
+  tab closes.
 - **Walls are for climbing.** Every block in the ground has a background wall behind it,
   and a dug-out block leaves its wall behind, so dwarves can climb straight up and down
   the shafts and caves they open (as they climb ladders).
@@ -220,7 +253,7 @@ can preset the dialog, which is handy for testing and sharing:
 | Address | Effect |
 | --- | --- |
 | `?seed=mossy-cavern-17` | Preset the seed |
-| `?biome=snow` | Preset the biome (`temperate` or `snow`) |
+| `?biome=snow` | Preset the biome (`temperate` or `snow`), even one the campaign hasn't opened yet |
 | `?reveal=1` | Start with the fog of war lifted over the whole map |
 | `?hour=22` | Start at that hour (0 to 23) instead of 8 in the morning: 22 is night |
 
@@ -247,8 +280,12 @@ src/
     items/         the item registry, items lying in the world, and the colony's storage
     furniture/     the furniture registry and the furniture standing in the world
     crafting/      recipes and the queue of crafting orders
+    tech/          the tech tree and the colony's research
+    farming/       crops, and the colony's farm plots
+    save/          save files: the simulation's state, run-length encoding, versions
   workers/         the world-generation Web Worker
-  platform/        browser APIs with graceful failure: storage, keyboard, input guards
+  platform/        browser APIs with graceful failure: storage, saved games (IndexedDB and
+                   gzip), keyboard, input guards
   render/          Phaser: scenes, camera, asset manifest, viewport sizing, audio
     world/         chunked tilemaps, terrain atlas and tile art, fog of war, dwarf, item and
                    furniture sprites, designation marks, planned-work ghosts, selection box,
@@ -256,7 +293,8 @@ src/
   ui/              HTML/CSS overlay in Preact: menus, HUD, settings, debug panel
   debug/           window.debug helpers (dev builds only)
   data/            game content as JSON: tiles, biomes, world generation, items, furniture,
-                   recipes, dwarves, time of day, creatures, threats, strings
+                   recipes, the tech tree, crops, dwarves, time of day, creatures, threats,
+                   strings
 e2e/               browser smoke tests (Playwright)
 .github/workflows/ CI and GitHub Pages deployment
 ```
@@ -328,6 +366,22 @@ e2e/               browser smoke tests (Playwright)
   live in a pool (`Projectiles`) and are reused, as are their sprites and the puffs and
   sparks on screen, so a long siege doesn't churn the garbage collector. Damage to doors
   and blocks is kept per cell (`TileDamage`) and drawn as cracks.
+- **The tech tree** (`sim/tech/`) knows which tier every recipe belongs to; `Research`
+  keeps the tier reached, the research towards the next, and the items made so far.
+  Crafting reports each finished item to it, and a tier reached brings its dwarves.
+- **Farm plots** (`sim/farming/`) are standing orders: each plot goes untilled, empty,
+  growing, ripe and round again, and the simulation posts the till, sow and pick jobs as
+  they come due (checked three times a second, along with the light each crop gets).
+- **Saving** (`sim/save/`): `captureState` writes down everything the simulation can't
+  work out again from the world's cells, naming items, tiles, furniture, creatures,
+  recipes and crops by id; `encodeSave` packs that as JSON with the world's grids
+  run-length encoded chunk by chunk (`rle.ts`), behind a format version; the platform layer
+  (`platform/saves.ts`) gzips the bytes with CompressionStream and keeps them in
+  IndexedDB, falling back to memory if storage is blocked. Loading maps every saved id
+  onto today's content files, so saves survive the files growing or being reordered, and
+  refuses (with a clear message) a save from a newer format, or a damaged one. What a save
+  leaves out on purpose: paths, light, rooms, missiles in flight, and what each dwarf and
+  creature was in the middle of; a loaded colony simply picks its work up again.
 - **Pathfinding** is A* over the moves a dwarf can make (`sim/nav/`): walking, jumping,
   dropping, swimming and climbing ladders or background walls. The moves are worked out
   from the tile grid on the fly, so terrain changes never leave a stale graph. At most 4 searches run
@@ -479,7 +533,7 @@ in tiles.json and an ore rule here.
 | --- | --- |
 | `id` | snake_case, unique. Tiles' `drops`, walls' `material` and recipes refer to items by this id. |
 | `name`, `description` | Shown in the HUD. |
-| `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food`, `potion` or `furniture`. |
+| `category` | `block`, `material`, `ore`, `tool`, `weapon`, `armor`, `food`, `seed`, `potion` or `furniture`. |
 | `stack` | Most of the item in one pile on the ground or in a dwarf's arms, and in one storage slot (default 50). |
 | `icon` | The placeholder icon: a `style` (`lump`, `pile`, `ore`, `log`, `plank`, `bar`, `pickaxe`, `chest`, `torch`... see `ICON_STYLES` in `sim/items/ItemRegistry.ts`) with `base`, `dark` and `light` colours and an optional `accent`. |
 | `builds` | Optional. What building with it puts in the world: `{ "tile": "plank" }` (the Build tool's palette) or `{ "furniture": "chest" }` (the Furniture tool's). Items that are a wall's `material` appear in the Walls palette. |
@@ -513,6 +567,7 @@ ore takes three entries: the tile, its ore rule in worldgen.json, and the item i
 | `use` | `bed` (a dwarf sleeps in it) or `table` (dwarves eat at it). |
 | `trap` | `{ "damage": 14, "cooldownTicks": 30 }`: it stabs any creature standing on it, then needs that long to reset. |
 | `turret` | `{ "range": 8, "damage": 9, "cooldownTicks": 40 }`: it shoots bolts at the nearest monster in range it has a clear shot at. |
+| `wins` | `true` for the World Gate: building it wins the world. |
 | `art` | Placeholder sprite: a `style` (see `FURNITURE_STYLES` in `sim/furniture/FurnitureRegistry.ts`) and colours. |
 
 Each piece of furniture is built from exactly one item whose `builds` names it, and that
@@ -532,7 +587,58 @@ item is what comes back when the piece is taken apart.
 
 `station` is `none` for recipes made by hand (at the Hearth or a chest), or a station some
 furniture provides. `time` is in ticks (20 per second) for a beginner; crafting skill
-makes it quicker. Items and stations are checked at start-up.
+makes it quicker. Items and stations are checked at start-up. Every recipe must also be
+in one tier of the tech tree.
+
+### The tech tree: `src/data/tech.json`
+
+```json
+{
+  "id": "smithy",
+  "name": "Smithy",
+  "description": "An anvil: copper tools and arms, iron smelting, the first traps.",
+  "research": 120,
+  "newItemResearch": 20,
+  "dwarves": 2,
+  "recipes": ["anvil", "copper_pickaxe", "copper_sword", "iron_bar"]
+}
+```
+
+`tiers` lists the tiers in order; the colony starts with the first. `recipes` are the
+recipes a tier unlocks (every recipe in exactly one tier). Making an item from one of a
+tier's recipes for the first time earns `newItemResearch`; `research` is what fills the
+tier and unlocks the next (the last tier has nothing after it). `dwarves` is how many new
+dwarves come when the tier is reached. A unit test checks that every tier can be made
+from what earlier tiers unlock, that there is enough research to fill each tier, and that
+the tiers' dwarves bring the colony to `maxDwarves`.
+
+### Crops: `src/data/crops.json`
+
+```json
+{
+  "soil": ["dirt", "grass", "clay"],
+  "farmland": "farmland",
+  "tillTicks": 50,
+  "plantTicks": 24,
+  "crops": [
+    {
+      "id": "wheat",
+      "name": "Wheat",
+      "seed": "wheat_seeds",
+      "growDays": 3,
+      "minLight": 7,
+      "stages": ["wheat_sprout", "wheat_young", "wheat_ripe"],
+      "harvest": [{ "item": "wheat", "count": 3 }, { "item": "wheat_seeds", "count": 2 }]
+    }
+  ]
+}
+```
+
+`soil` lists the blocks the Farm tool can plant over; tilling turns them into the
+`farmland` block. A crop grows from its `seed` item while its cell has at least `minLight`
+light (0 to 15: full sun is 15, a torch 12), and ripens after `growDays` days' worth of
+daylight. `stages` are its tiles from sprout to ripe (neither solid nor replaceable); a
+ripe crop gives `harvest`. `tillTicks` and `plantTicks` are a beginner's work time.
 
 ### Dwarves: `src/data/dwarves.json`
 
@@ -620,7 +726,7 @@ the second), `restHealPerDay` (mending by the Hearth), `damagePerLevel` (combat 
 - `waves`: an invasion every `every` nights, announced `warningSeconds` before dusk;
   `base + perDay * day + perTier * tier` invaders (at most `max`), one every
   `spawnSeconds`, through a portal `portalDistance` tiles from the Hearth. The tier is the
-  best tier of gear the colony owns, until Milestone 6's tech tree takes over.
+  tech tier the colony has reached (0 for the first).
 - `scaling`: health and damage grow by these fractions per day, up to `maxFactor`.
 - `projectiles`: missile speeds in tiles per tick; `tileHpPerHardness` (the durability of a
   block without an `hp` of its own: hardness times this); `armorScale` (the `s` in the
@@ -646,15 +752,19 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
 
 ## Testing
 
-- `npm test` runs the unit tests in `src/**/*.test.ts`.
+- `npm test` runs the unit tests in `src/**/*.test.ts`, among them save and load round
+  trips (a busy colony saved, loaded and compared, saves surviving reordered content
+  files, refused newer or damaged saves) and the tech tree's consistency.
 - `npm run smoke` drives the game in headless Chromium twice, once on the production build
   and once on the dev server (`npm run dev`): creating worlds in both biomes, checking the
   picture and that the sunlit surface is visible, marking blocks and a tree and watching
   the dwarves dig, fell and haul, crafting planks and a chest from the felled tree and
   setting the chest down (storage grows), building a block and a wall, the dwarf panel,
   a world started at night (dark sky, the Hearth's light, the clock's moon), dwarves
-  fighting off a monster and an invasion portal opening (dev server, through
-  `window.debug`),
+  fighting off a monster and an invasion portal opening, the tech tree, a farm tilled,
+  sown, ripened and harvested, new dwarves arriving, and the World Gate won with three
+  dwarves stepping through into a snowy world (dev server, through `window.debug`), the
+  locked snowy biome, saving from the menu and Continue after a page reload,
   zooming and panning, the minimap, the simulation ticking at the right rate, pause, menu,
   settings, right-click and mouse-wheel blocking, and high-DPI canvas sizing. Any console error fails the test. Screenshots and
   each test's browser console log go to `test-results/`. `e2e/perf.spec.ts` also records
@@ -684,8 +794,11 @@ work the same way (`kind: 'file'`). The manifest's header comment has a worked e
   trying things out quickly. `debug.skipToNight()` brings nightfall forward to now,
   `debug.spawnCreature('gloomling', 10)` puts a creature on the ground 10 tiles right of
   the Hearth (negative: left), `debug.startWave()` brings an invasion on tonight (the
-  warning now, the portal at dusk) and `debug.killMonsters()` clears them all away. To
-  start a world at night, add `?hour=22` to the address.
+  warning now, the portal at dusk) and `debug.killMonsters()` clears them all away.
+  `debug.techTier(3)` jumps to tier 3 of the tech tree (its new dwarves come too),
+  `debug.ripenCrops()` ripens every growing crop, `debug.placeGate()` stands a World Gate
+  beside the Hearth (the world is won) and `debug.save()` saves. To start a world at
+  night, add `?hour=22` to the address.
 
 ## Deploying
 
@@ -731,8 +844,8 @@ static host works the same way: upload the contents of `dist/`.
 | 3 | Items, storage, crafting stations, building blocks, walls, ladders, doors | Done |
 | 4 | Hunger and sleep, day/night, lighting overlay, room detection | Done |
 | 5 | Monsters, combat, invasion waves, defences | Done |
-| 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | Next |
-| 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | |
+| 6 | Tech tree, farming and cooking, new dwarves, the World Gate, basic save/load | Done |
+| 7 | Magic (including spells that reshape the world: the only way the player changes it directly), full save system (slots, export/import), UI polish, balance | Next |
 | 8 | Release: bundle optimisation, cross-browser testing, publishing guides | |
 
 ## Tech

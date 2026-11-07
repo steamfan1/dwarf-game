@@ -1,0 +1,32 @@
+{
+  "soil": ["dirt", "grass", "clay"],
+  "farmland": "farmland",
+  "tillTicks": 50,
+  "plantTicks": 24,
+  "crops": [
+    {
+      "id": "wheat",
+      "name": "Wheat",
+      "seed": "wheat_seeds",
+      "growDays": 3,
+      "minLight": 7,
+      "stages": ["wheat_sprout", "wheat_young", "wheat_ripe"],
+      "harvest": [
+        { "item": "wheat", "count": 3 },
+        { "item": "wheat_seeds", "count": 2 }
+      ]
+    },
+    {
+      "id": "sunroot",
+      "name": "Sunroot",
+      "seed": "sunroot_seeds",
+      "growDays": 2,
+      "minLight": 7,
+      "stages": ["sunroot_sprout", "sunroot_young", "sunroot_ripe"],
+      "harvest": [
+        { "item": "sunroot", "count": 2 },
+        { "item": "sunroot_seeds", "count": 2 }
+      ]
+    }
+  ]
+}

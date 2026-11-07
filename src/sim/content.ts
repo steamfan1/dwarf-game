@@ -9,10 +9,12 @@
  */
 import biomesJson from '../data/biomes.json';
 import creaturesJson from '../data/creatures.json';
+import cropsJson from '../data/crops.json';
 import dwarvesJson from '../data/dwarves.json';
 import furnitureJson from '../data/furniture.json';
 import itemsJson from '../data/items.json';
 import recipesJson from '../data/recipes.json';
+import techJson from '../data/tech.json';
 import threatsJson from '../data/threats.json';
 import tilesJson from '../data/tiles.json';
 import timeJson from '../data/time.json';
@@ -21,8 +23,10 @@ import { RecipeBook } from './crafting/Recipes';
 import { CreatureRegistry } from './creatures/CreatureRegistry';
 import { parseThreatSettings, type ThreatSettings } from './creatures/threats';
 import { parseColonySettings, type ColonySettings } from './dwarves/settings';
+import { CropRegistry } from './farming/Crops';
 import { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ItemRegistry } from './items/ItemRegistry';
+import { TechTree } from './tech/TechTree';
 import { parseTimeSettings, type TimeSettings } from './time/TimeOfDay';
 import { TileRegistry } from './world/TileRegistry';
 import { parseBiomes, parseWorldgenSettings } from './worldgen/settings';
@@ -37,6 +41,8 @@ export const COLONY = parseColonySettings(dwarvesJson);
 export const TIME = parseTimeSettings(timeJson);
 export const CREATURES = CreatureRegistry.fromJson(creaturesJson);
 export const THREATS = parseThreatSettings(threatsJson);
+export const TECH = TechTree.fromJson(techJson, RECIPES);
+export const CROPS = CropRegistry.fromJson(cropsJson, TILES, ITEMS);
 
 checkLinks(TILES, ITEMS, FURNITURE, COLONY, CREATURES, BIOMES.ids);
 
@@ -50,6 +56,8 @@ export interface GameContent {
   time: TimeSettings;
   creatures: CreatureRegistry;
   threats: ThreatSettings;
+  tech: TechTree;
+  crops: CropRegistry;
 }
 
 export const CONTENT: GameContent = {
@@ -61,6 +69,8 @@ export const CONTENT: GameContent = {
   time: TIME,
   creatures: CREATURES,
   threats: THREATS,
+  tech: TECH,
+  crops: CROPS,
 };
 
 /**

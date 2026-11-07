@@ -3,7 +3,8 @@
  * workbench, the furnace...), and the queue of orders. Queuing a recipe only asks for it:
  * a free dwarf fetches the materials from storage, walks to a station of the right kind
  * and makes it, then puts what it made away. Recipes whose station hasn't been built yet
- * say so; materials the colony is short of are shown in red.
+ * say so; materials the colony is short of are shown in red. Only recipes the tech tree has
+ * unlocked are listed.
  *
  * The game keeps running while the panel is open.
  */
@@ -21,10 +22,12 @@ export function CraftingPanel() {
   const commands = useCommands();
   const catalogue = useStore(uiState, (s) => s.catalogue);
   const colony = useStore(uiState, (s) => s.colony);
+  const tier = useStore(uiState, (s) => s.research?.tier ?? 0);
   const bindings = useStore(useSettingsStore(), (s) => s.bindings);
   if (!catalogue || !colony) return null;
   const stock = new Map(colony.resources.map((entry) => [entry.id, entry.count]));
   const key = keyLabel(bindings.toggleCrafting[0]);
+  const locked = catalogue.recipes.filter((recipe) => recipe.tier > tier).length;
 
   return (
     <section class="crafting panel" aria-label={t('crafting.title')} data-testid="crafting-panel">
@@ -49,7 +52,7 @@ export function CraftingPanel() {
 
       <div class="crafting-body">
         <div class="recipes">
-          {recipeGroups(catalogue).map(({ station, name, recipes }) => {
+          {recipeGroups(catalogue, tier).map(({ station, name, recipes }) => {
             const missing = station !== null && (colony.stations[station] ?? 0) === 0;
             return (
               <section key={station ?? 'hand'} class={`recipe-group${missing ? ' no-station' : ''}`}>
@@ -63,6 +66,7 @@ export function CraftingPanel() {
               </section>
             );
           })}
+          {locked > 0 && <p class="locked-note">{t('crafting.locked', { count: locked, key: keyLabel(bindings.toggleTech[0]) })}</p>}
         </div>
 
         <section class="queue" aria-label={t('crafting.queue')} data-testid="craft-queue">
@@ -82,10 +86,11 @@ export function CraftingPanel() {
   );
 }
 
-function recipeGroups(catalogue: Catalogue): Array<{ station: string | null; name: string; recipes: RecipeView[] }> {
+/** The unlocked recipes (tiers up to `tier`), grouped by where they're made. */
+function recipeGroups(catalogue: Catalogue, tier: number): Array<{ station: string | null; name: string; recipes: RecipeView[] }> {
   const groups = [{ station: null as string | null, name: t('crafting.byHand') }, ...catalogue.stations.map(({ id, name }) => ({ station: id as string | null, name }))];
   return groups
-    .map((group) => ({ ...group, recipes: catalogue.recipes.filter((recipe) => recipe.station === group.station) }))
+    .map((group) => ({ ...group, recipes: catalogue.recipes.filter((recipe) => recipe.station === group.station && recipe.tier <= tier) }))
     .filter((group) => group.recipes.length > 0);
 }
 

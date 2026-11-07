@@ -139,6 +139,15 @@ export class TimeOfDay {
     this.offset += Math.max(0, this.ticksUntilNight(tick) - before);
   }
 
+  /** Ticks from the dawn of day 1 to tick 0 (kept in saves: it holds the start hour and any skips). */
+  get offsetTicks(): number {
+    return this.offset;
+  }
+
+  set offsetTicks(offset: number) {
+    this.offset = Math.max(0, Math.round(offset));
+  }
+
   /** Move the clock forward so that `tick` falls at the start of the next night (debug). */
   skipToNight(tick: number): void {
     if (this.isNight(tick)) return;

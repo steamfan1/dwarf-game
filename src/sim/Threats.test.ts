@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTENT, CREATURES, ITEMS, TILES } from './content';
+import { CONTENT, CREATURES, TILES } from './content';
 import type { ThreatSettings } from './creatures/threats';
 import { newSim, PEACEFUL } from './testKit';
 import { AIR } from './world/TileRegistry';
@@ -92,12 +92,12 @@ describe('Invasions', () => {
     expect(sim.creatures.filter((c) => c.origin === 'wave')).toEqual([]);
   });
 
-  it('come bigger as the days go by and the colony arms itself', () => {
+  it('come bigger as the days go by and the colony climbs the tech tree', () => {
     const { sim } = newSim(undefined, { threats: T });
     const day5 = sim.spawner.waveSize(5);
     expect(sim.spawner.waveSize(10)).toBeGreaterThan(day5);
     expect(sim.techTier()).toBe(0);
-    sim.storage.add(ITEMS.item('iron_sword'), 1);
+    sim.reachTier(2);
     expect(sim.techTier()).toBe(2);
     expect(sim.spawner.waveSize(5)).toBe(day5 + 2 * T.waves.perTier);
     expect(sim.spawner.isWaveNight(5)).toBe(true);

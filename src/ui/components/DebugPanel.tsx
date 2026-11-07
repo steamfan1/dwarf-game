@@ -59,6 +59,7 @@ export function DebugPanel() {
             ? t('debug.jobsValue', {
                 dig: stats.jobs.dig,
                 chop: stats.jobs.chop,
+                farm: stats.jobs.till + stats.jobs.plant + stats.jobs.harvest,
                 build: stats.jobs.build + stats.jobs.wall + stats.jobs.place + stats.jobs.dismantle,
                 craft: stats.jobs.craft,
                 haul: stats.jobs.haul,

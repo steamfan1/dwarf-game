@@ -15,7 +15,7 @@
  *
  * Pure: no Phaser and no DOM. All randomness comes from the Rng it is given.
  */
-import type { Rng } from '../../core/Rng';
+import type { Rng, RngState } from '../../core/Rng';
 import type { Dwarf } from '../dwarves/Dwarf';
 import type { TimeOfDay } from '../time/TimeOfDay';
 import type { World } from '../world/World';
@@ -72,6 +72,18 @@ const RETRY_TICKS = 20;
 /** By day, creatures of the night that wander into the light are sent off this often (ticks). */
 const DAYLIGHT_CHECK_TICKS = 40;
 
+/** The spawner as a save keeps it. */
+export interface SpawnerState {
+  wave: Wave | null;
+  nightSpawned: number;
+  nextNightSpawn: number;
+  announcedNight: boolean;
+  wasNight: boolean;
+  nextAnimalCheck: number;
+  forcedWaveDay: number;
+  rng: number[];
+}
+
 export class Spawner {
   /** The latest invasion (the one under way or coming, or the last one). */
   wave: Wave | null = null;
@@ -91,6 +103,32 @@ export class Spawner {
     this.rng = rng;
     this.wasNight = ctx.time.isNight(ctx.tick);
     this.nextAnimalCheck = ctx.tick + ctx.threats.animals.checkTicks;
+  }
+
+  /** What a save keeps of the spawner: the invasion, tonight's tally and the timers. */
+  save(): SpawnerState {
+    const wave = this.wave ? { ...this.wave, portal: { ...this.wave.portal }, invaders: [...this.wave.invaders] } : null;
+    return {
+      wave,
+      nightSpawned: this.nightSpawned,
+      nextNightSpawn: this.nextNightSpawn,
+      announcedNight: this.announcedNight,
+      wasNight: this.wasNight,
+      nextAnimalCheck: this.nextAnimalCheck,
+      forcedWaveDay: this.forcedWaveDay,
+      rng: [...this.rng.getState()],
+    };
+  }
+
+  restore(state: SpawnerState): void {
+    this.wave = state.wave ? { ...state.wave, portal: { ...state.wave.portal }, invaders: [...state.wave.invaders] } : null;
+    this.nightSpawned = state.nightSpawned;
+    this.nextNightSpawn = state.nextNightSpawn;
+    this.announcedNight = state.announcedNight;
+    this.wasNight = state.wasNight;
+    this.nextAnimalCheck = state.nextAnimalCheck;
+    this.forcedWaveDay = state.forcedWaveDay;
+    this.rng.setState(state.rng as unknown as RngState);
   }
 
   /** Put the first animals out on the hills (when a world starts). */

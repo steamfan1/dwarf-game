@@ -9,7 +9,7 @@ import type { GameContent } from '../sim/content';
 import { HAND_CRAFTED } from '../sim/crafting/Recipes';
 import type { Catalogue, CatalogueItem } from '../ui/state';
 
-export function buildCatalogue({ items, tiles, furniture, recipes }: GameContent): Catalogue {
+export function buildCatalogue({ items, tiles, furniture, recipes, tech, crops }: GameContent): Catalogue {
   const entry = (item: number): CatalogueItem => {
     const def = items.get(item);
     return { id: def.id, name: def.name, icon: itemIconUrl(items, item) };
@@ -32,11 +32,21 @@ export function buildCatalogue({ items, tiles, furniture, recipes }: GameContent
     furniture: numbers.filter((item) => builds(item, 'furniture')).map(entry),
     recipes: recipes.recipes.map((recipe) => ({
       id: recipe.id,
+      tier: tech.recipeTier[recipe.index] ?? 0,
+      research: tech.researchFor(recipe.index),
       output: { ...entry(recipe.output.item), count: recipe.output.count },
       inputs: recipe.inputs.map((input) => ({ ...entry(input.item), count: input.count })),
       station: recipe.station === HAND_CRAFTED ? null : recipe.station,
       seconds: Math.round((recipe.time / TICKS_PER_SECOND) * 10) / 10,
     })),
     stations,
+    crops: crops.crops.map((crop) => ({ id: crop.id, name: crop.name, seed: entry(crop.seed) })),
+    tiers: tech.tiers.map((tier) => ({
+      name: tier.name,
+      description: tier.description,
+      research: tier.research,
+      dwarves: tier.dwarves,
+      recipes: tier.recipes.map((index) => recipes.recipes[index]!.id),
+    })),
   };
 }

@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import furnitureJson from '../data/furniture.json';
 import recipesJson from '../data/recipes.json';
-import { checkLinks, CREATURES, FURNITURE, ITEMS, RECIPES, TILES } from './content';
+import { checkLinks, COLONY, CREATURES, CROPS, FURNITURE, ITEMS, RECIPES, TECH, TILES } from './content';
 import { CraftQueue, MAX_ORDER } from './crafting/CraftQueue';
 import { HAND_CRAFTED, RecipeBook } from './crafting/Recipes';
 import { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ItemRegistry } from './items/ItemRegistry';
+
+/** Items found in the world: dug, felled, picked, farmed, hunted, or brought along at the start. */
+function naturalSources(): Set<string> {
+  const found = new Set<string>();
+  for (const tile of TILES.tiles) {
+    if (tile.drops) found.add(tile.drops);
+    if (tile.harvest) found.add(tile.harvest.item);
+  }
+  for (const crop of CROPS.crops) for (const { item } of crop.harvest) found.add(ITEMS.get(item).id);
+  for (const creature of CREATURES.defs) for (const drop of creature.drops) found.add(drop.item);
+  for (const start of COLONY.startingItems) found.add(start.item);
+  return found;
+}
 
 function problems(run: () => unknown): string {
   try {
@@ -17,19 +30,39 @@ function problems(run: () => unknown): string {
 }
 
 describe('shipped content', () => {
-  it('has around forty starter items, every one reachable by digging, felling, picking, hunting or crafting', () => {
+  it('has around forty starter items, every one reachable by digging, felling, picking, farming, hunting or crafting', () => {
     expect(ITEMS.items.length).toBeGreaterThanOrEqual(40);
-    const obtainable = new Set<string>();
-    for (const tile of TILES.tiles) {
-      if (tile.drops) obtainable.add(tile.drops);
-      if (tile.harvest) obtainable.add(tile.harvest.item);
+    const unreachable = ITEMS.items.filter((item) => !naturalSources().has(item.id) && !RECIPES.recipes.some((r) => r.output.item === ITEMS.item(item.id)));
+    expect(unreachable.map((item) => item.id)).toEqual([]);
+  });
+
+  it('unlocks every recipe in the tech tree, each tier makeable from what came before', () => {
+    // Everything a tier's recipes need comes from the world or from recipes of that tier or earlier,
+    // and the stations they're made at are built from them too.
+    const stationItem = new Map<string, string>();
+    for (const item of ITEMS.items) {
+      const kind = item.builds && 'furniture' in item.builds ? FURNITURE.get(FURNITURE.id(item.builds.furniture)) : null;
+      if (kind?.station) stationItem.set(kind.station, item.id);
     }
-    for (const recipe of RECIPES.recipes) obtainable.add(ITEMS.get(recipe.output.item).id);
-    for (const creature of CREATURES.defs) for (const drop of creature.drops) obtainable.add(drop.item);
-    // Wheat comes from farming (Milestone 6).
-    const later = new Set(['wheat']);
-    const unreachable = ITEMS.items.filter((item) => !obtainable.has(item.id) && !later.has(item.id)).map((item) => item.id);
-    expect(unreachable).toEqual([]);
+    const have = naturalSources();
+    for (const tier of TECH.tiers) {
+      for (const index of tier.recipes) have.add(ITEMS.get(RECIPES.recipes[index]!.output.item).id);
+      for (const index of tier.recipes) {
+        const recipe = RECIPES.recipes[index]!;
+        for (const input of recipe.inputs) expect(have.has(ITEMS.get(input.item).id), `${recipe.id} needs ${ITEMS.get(input.item).id}`).toBe(true);
+        if (recipe.station !== HAND_CRAFTED) expect(have.has(stationItem.get(recipe.station)!), `${recipe.id} needs a ${recipe.station}`).toBe(true);
+      }
+    }
+    // Each tier can be filled with first crafts of what's unlocked by then.
+    let available = 0;
+    let needed = 0;
+    for (const tier of TECH.tiers) {
+      available += tier.recipes.length * tier.newItemResearch;
+      needed += tier.research;
+      expect(available, `research to fill ${tier.id}`).toBeGreaterThan(needed);
+    }
+    // New dwarves bring the colony up to its most.
+    expect(COLONY.startingDwarves + TECH.tiers.reduce((sum, tier) => sum + tier.dwarves, 0)).toBe(COLONY.maxDwarves);
   });
 
   it('makes every recipe somewhere: by hand or at a station some furniture provides', () => {

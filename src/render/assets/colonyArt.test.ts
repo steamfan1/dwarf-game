@@ -7,7 +7,7 @@ import { validatePixelRows } from './pixelArt';
 describe('colony art', () => {
   it('gives every job state its own mark frame', () => {
     const frames = new Set<number>();
-    for (const kind of ['dig', 'chop', 'build', 'dismantle', 'plain'] as const) {
+    for (const kind of ['dig', 'chop', 'build', 'dismantle', 'plain', 'farm'] as const) {
       for (const priority of [1, 2, 3, 4] as const) frames.add(markFrame(kind, priority, false));
       frames.add(markFrame(kind, 2, true));
     }

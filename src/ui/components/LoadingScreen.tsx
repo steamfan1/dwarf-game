@@ -11,6 +11,7 @@ const STAGE_TEXT: Record<LoadingStage, StringKey> = {
   plants: 'loading.plants',
   finishing: 'loading.finishing',
   building: 'loading.building',
+  loading: 'loading.save',
 };
 
 export function LoadingScreen() {

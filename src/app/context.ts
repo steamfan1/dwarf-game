@@ -47,6 +47,8 @@ export interface GameContext {
   readonly priority: Priority;
   /** The item the current build tool builds with (an item number), or null for other tools. */
   readonly buildItem: number | null;
+  /** The crop the Farm tool plants (index in the CropRegistry), or null. */
+  readonly farmCrop: number | null;
   /** Use the current tool on a rectangle of cells (a click is a 1 x 1 rectangle). */
   applyTool(rect: CellRect): void;
   /** Right-click: put the current tool down (back to selecting). */

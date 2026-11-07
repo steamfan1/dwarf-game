@@ -8,6 +8,7 @@ import { useContext } from 'preact/hooks';
 import type { GameSpeed } from '../config';
 import type { Settings } from '../core/settings';
 import type { Store } from '../core/Store';
+import type { Traveller } from '../sim/dwarves/Dwarf';
 import type { Priority } from '../sim/jobs/JobBoard';
 import type { BuildTool, Tool } from './state';
 
@@ -21,6 +22,8 @@ export interface NewWorldChoice {
   reveal: boolean;
   /** Start at this hour instead of the morning (from ?hour=22, for testing), or null. */
   hour: number | null;
+  /** Dwarves who came through the World Gate from the last world (empty: a fresh colony). */
+  travellers: Traveller[];
 }
 
 export interface UiCommands {
@@ -54,6 +57,9 @@ export interface UiCommands {
   setBuildChoice(tool: BuildTool, item: string): void;
   toggleCrafting(): void;
   toggleStorage(): void;
+  toggleTech(): void;
+  /** Pick the crop the Farm tool plants (a crops.json id); also takes the Farm tool up. */
+  setFarmCrop(crop: string): void;
   /** Queue crafts of a recipe (recipes.json id). */
   queueCraft(recipe: string, count: number): void;
   /** Change how many crafts an order still wants (0 cancels it). */
@@ -67,6 +73,14 @@ export interface UiCommands {
   setDebugLight(on: boolean): void;
   /** Close the "colony has fallen" dialog and keep watching the world. */
   dismissColonyLost(): void;
+  /** The World Gate is built: these dwarves step through it into a new world. */
+  travel(dwarfIds: number[]): void;
+  /** The World Gate is built, but the colony stays to keep playing this world. */
+  stayInWorld(): void;
+  /** Save the running world now (the one save slot; Milestone 7 adds more). */
+  saveGame(): void;
+  /** Load the latest save and carry on playing it. */
+  continueGame(): void;
 }
 
 export const CommandsContext = createContext<UiCommands | null>(null);

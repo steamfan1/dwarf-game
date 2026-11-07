@@ -516,6 +516,58 @@ const SHAPES: Record<IconStyle, readonly string[]> = {
     '...kddk...',
     '....kk....',
   ],
+  /** A little cloth pouch, open, with seeds spilling out. */
+  seeds: [
+    '..........',
+    '...kkk....',
+    '..kaaak...',
+    '.kaddaak..',
+    '.kalblak..',
+    '.kaaaaak..',
+    '..kkkkk.lb',
+    '......b.l.',
+    '...l.b..bl',
+    '..........',
+  ],
+  /** A fat root with leaves on top. */
+  root: [
+    '...a.a....',
+    '..a.a.a...',
+    '...kak....',
+    '..klbbk...',
+    '.klbbbbk..',
+    '.kbbbbdk..',
+    '.kbbbddk..',
+    '..kbddk...',
+    '...kdk....',
+    '....k.....',
+  ],
+  /** A dressed stone with a glowing rune cut into it. */
+  rune: [
+    '..........',
+    '.kkkkkkkk.',
+    'kllllllldk',
+    'klbbabbbdk',
+    'klbaabbbdk',
+    'klbbaabbdk',
+    'klbbabbbdk',
+    'kdddddddkk',
+    '.kkkkkkkk.',
+    '..........',
+  ],
+  /** The World Gate: a stone arch around a swirl of light. */
+  gate: [
+    '...kkkk...',
+    '..kllllk..',
+    '.klkaakdk.',
+    '.lkaaaakd.',
+    '.lkalaakd.',
+    '.lkaaaakd.',
+    '.lkaalakd.',
+    '.lkaaaakd.',
+    'kllkkkkddk',
+    'kkkkkkkkkk',
+  ],
 };
 
 export function iconPalette(icon: ItemIcon): Palette {

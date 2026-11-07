@@ -424,7 +424,7 @@ export class GameScene extends Phaser.Scene {
 
     const tool = context.tool;
     const buildItem = context.buildItem;
-    const info = describeCell(sim, cell.x, cell.y, tool, context.priority, buildItem);
+    const info = describeCell(sim, cell.x, cell.y, tool, context.priority, buildItem, context.farmCrop);
     if (!info) {
       this.cursor.hide();
       context.reportHover(null);
@@ -605,6 +605,10 @@ function markKind(job: Job, x: number, y: number): MarkKind {
   switch (job.type) {
     case 'dig':
       return 'dig';
+    case 'till':
+    case 'plant':
+    case 'harvest':
+      return 'farm';
     case 'chop':
       return 'chop';
     case 'dismantle':

@@ -14,6 +14,7 @@ import { uiState } from '../state';
 import { CraftingPanel } from './CraftingPanel';
 import { Icon } from './Icon';
 import { Minimap } from './Minimap';
+import { TechPanel } from './TechPanel';
 import { Toolbar } from './Toolbar';
 
 /** The top bar shows this many kinds of stored item (the most plentiful); the colony panel lists them all. */
@@ -25,6 +26,9 @@ export function GameHud() {
   const minimapOpen = useStore(uiState, (s) => s.minimapOpen);
   const craftingOpen = useStore(uiState, (s) => s.craftingOpen);
   const storageOpen = useStore(uiState, (s) => s.storageOpen);
+  const techOpen = useStore(uiState, (s) => s.techOpen);
+  const research = useStore(uiState, (s) => s.research);
+  const tierName = useStore(uiState, (s) => (s.research && s.catalogue ? (s.catalogue.tiers[s.research.tier + 1]?.name ?? '') : ''));
   const bindings = useStore(useSettingsStore(), (s) => s.bindings);
   const paused = time?.paused ?? false;
   const speedKeys = [bindings.speed1, bindings.speed2, bindings.speed3];
@@ -90,6 +94,25 @@ export function GameHud() {
           </button>
           <button
             type="button"
+            class={`btn btn-icon btn-tech${techOpen ? ' active' : ''}`}
+            aria-pressed={techOpen}
+            title={`${t('hud.tech', { key: keyLabel(bindings.toggleTech[0]) })}\n${
+              research && research.needed > 0 ? t('hud.research', { points: research.points, needed: research.needed, tier: tierName }) : t('hud.researchDone')
+            }`}
+            aria-label={t('tech.title')}
+            data-testid="open-tech"
+            onClick={() => {
+              commands.playSound(techOpen ? 'uiClose' : 'uiOpen');
+              commands.toggleTech();
+            }}
+          >
+            <Icon name="tech" />
+            {research && research.needed > 0 && (
+              <span class="research-pip" style={`--fill: ${Math.min(100, Math.round((research.points / research.needed) * 100))}%`} aria-hidden="true" />
+            )}
+          </button>
+          <button
+            type="button"
             class={`btn btn-icon${storageOpen ? ' active' : ''}`}
             aria-pressed={storageOpen}
             title={t('hud.storage', { key: keyLabel(bindings.toggleStorage[0]) })}
@@ -120,6 +143,7 @@ export function GameHud() {
 
       <Toolbar />
       {craftingOpen && <CraftingPanel />}
+      {techOpen && <TechPanel />}
       {paused && (
         <div class="paused-banner" role="status">
           {t('hud.paused')}

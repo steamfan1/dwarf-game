@@ -10,7 +10,10 @@ import { EventBus } from '../core/EventBus';
 import { FixedTimestep } from '../core/FixedTimestep';
 import { TimeControl } from '../core/TimeControl';
 import type { GameContent } from './content';
+import type { Traveller } from './dwarves/Dwarf';
 import type { GameEvents } from './events';
+import { decodeSave, encodeSave, SaveError, type SaveMeta } from './save/SaveFile';
+import { captureState, restoreState } from './save/SimState';
 import { Simulation } from './Simulation';
 import type { World } from './world/World';
 
@@ -26,11 +29,42 @@ export class GameSession {
   private readonly now: () => number;
   private readonly unsubscribeTime: () => void;
 
-  /** `startHour` sets the clock for a new world (the morning, from time.json, by default). */
-  constructor(world: World, content: GameContent, now: () => number = () => performance.now(), startHour?: number) {
-    this.sim = new Simulation({ world, ...content, bus: this.bus, startHour });
+  /**
+   * `startHour` sets the clock for a new world (the morning, from time.json, by default);
+   * `travellers` came through a World Gate and are its first dwarves. With `fresh` false
+   * the world starts empty, for a save to be loaded into (see `fromSave`).
+   */
+  constructor(
+    world: World,
+    content: GameContent,
+    now: () => number = () => performance.now(),
+    startHour?: number,
+    travellers?: readonly Traveller[],
+    fresh = true,
+  ) {
+    this.sim = new Simulation({ world, ...content, bus: this.bus, startHour, travellers, fresh });
     this.now = now;
     this.unsubscribeTime = this.time.onChange((state) => this.bus.emit('TimeChanged', state));
+  }
+
+  /** A session for a saved game's bytes (see sim/save/SaveFile.ts). Throws SaveError. */
+  static fromSave(bytes: Uint8Array, content: GameContent, now: () => number = () => performance.now()): GameSession {
+    const { header, world } = decodeSave(bytes, content.tiles);
+    const session = new GameSession(world, content, now, undefined, undefined, false);
+    try {
+      restoreState(session.sim, header.state);
+    } catch (error) {
+      session.dispose();
+      throw new SaveError('damaged', (error as Error).message);
+    }
+    return session;
+  }
+
+  /** The running world packed into bytes, with what the title screen shows about it. */
+  save(savedAt: number): { bytes: Uint8Array; meta: SaveMeta } {
+    const { sim } = this;
+    const meta: SaveMeta = { day: sim.time.day(sim.tick), dwarves: sim.livingDwarves.length, seed: sim.world.seed, biome: sim.world.biome, savedAt };
+    return { bytes: encodeSave(sim.world, sim.tiles, meta, captureState(sim)), meta };
   }
 
   get world(): World {

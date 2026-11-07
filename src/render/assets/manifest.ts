@@ -416,6 +416,26 @@ export const SOUNDS = {
       { wave: 'sine', freq: 1568, start: 0.16, duration: 0.4, release: 0.36, volume: 0.35 },
     ],
   },
+  /** A tier of the tech tree reached: a rising three-note chime. */
+  research: {
+    kind: 'synth',
+    tones: [
+      { wave: 'sine', freq: 523, duration: 0.25, release: 0.2, volume: 0.32 },
+      { wave: 'sine', freq: 659, start: 0.14, duration: 0.25, release: 0.2, volume: 0.32 },
+      { wave: 'sine', freq: 784, start: 0.28, duration: 0.5, release: 0.45, volume: 0.34 },
+      { wave: 'triangle', freq: 1568, start: 0.28, duration: 0.5, release: 0.45, volume: 0.12 },
+    ],
+  },
+  /** The World Gate wakes: a deep swell and a bright ring. */
+  gateOpen: {
+    kind: 'synth',
+    tones: [
+      { wave: 'sine', freq: 65, freqEnd: 130, duration: 1.6, attack: 0.5, release: 0.9, volume: 0.35 },
+      { wave: 'noise', freq: 0, duration: 1.2, attack: 0.6, release: 0.6, volume: 0.18 },
+      { wave: 'sine', freq: 784, start: 0.8, duration: 1.2, attack: 0.1, release: 1.0, volume: 0.25 },
+      { wave: 'sine', freq: 1175, start: 0.95, duration: 1.1, attack: 0.1, release: 0.9, volume: 0.18 },
+    ],
+  },
 } satisfies Record<string, SoundSource>;
 
 export type SoundKey = keyof typeof SOUNDS;

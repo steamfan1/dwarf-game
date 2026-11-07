@@ -1,0 +1,98 @@
+{
+  "tiers": [
+    {
+      "id": "campfire",
+      "name": "Campfire",
+      "description": "Wood, stone and fire: the first tools of a colony.",
+      "research": 40,
+      "newItemResearch": 10,
+      "dwarves": 0,
+      "recipes": [
+        "planks",
+        "torches",
+        "ladders",
+        "chest",
+        "workbench",
+        "wooden_door",
+        "table",
+        "chair",
+        "furnace",
+        "bricks",
+        "glass"
+      ]
+    },
+    {
+      "id": "homestead",
+      "name": "Homestead",
+      "description": "Cloth and beds, copper, and a kitchen stove for proper meals.",
+      "research": 80,
+      "newItemResearch": 15,
+      "dwarves": 1,
+      "recipes": [
+        "loom",
+        "cloth",
+        "bed",
+        "cloth_tunic",
+        "copper_bar",
+        "kitchen",
+        "cooked_meat",
+        "bread",
+        "baked_sunroot",
+        "leather"
+      ]
+    },
+    {
+      "id": "smithy",
+      "name": "Smithy",
+      "description": "An anvil: copper tools and arms, iron smelting, the first traps.",
+      "research": 120,
+      "newItemResearch": 20,
+      "dwarves": 2,
+      "recipes": [
+        "anvil",
+        "copper_pickaxe",
+        "copper_sword",
+        "copper_helmet",
+        "iron_bar",
+        "spike_trap",
+        "mushroom_stew",
+        "leather_jerkin"
+      ]
+    },
+    {
+      "id": "forge",
+      "name": "Forge",
+      "description": "Iron arms and armour, crossbows and bolt throwers, gold, and the rekindling draught.",
+      "research": 150,
+      "newItemResearch": 25,
+      "dwarves": 2,
+      "recipes": [
+        "iron_pickaxe",
+        "iron_sword",
+        "iron_helmet",
+        "crossbow",
+        "bolt_thrower",
+        "gold_bar",
+        "rekindling_draught"
+      ]
+    },
+    {
+      "id": "delving",
+      "name": "Delving",
+      "description": "Treasures of the deep: crystal picks, heavy armour and runestones.",
+      "research": 120,
+      "newItemResearch": 30,
+      "dwarves": 2,
+      "recipes": ["iron_armor", "crystal_pickaxe", "gold_amulet", "runestone"]
+    },
+    {
+      "id": "world_gate",
+      "name": "The World Gate",
+      "description": "Build the World Gate and step through it to a new world.",
+      "research": 0,
+      "newItemResearch": 40,
+      "dwarves": 2,
+      "recipes": ["world_gate"]
+    }
+  ]
+}

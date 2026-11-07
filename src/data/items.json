@@ -202,6 +202,19 @@
       }
     },
     {
+      "id": "runestone",
+      "name": "Runestone",
+      "category": "material",
+      "description": "Deep stone cut with glowing runes: the World Gate is built from them.",
+      "icon": {
+        "style": "rune",
+        "base": "#5a6272",
+        "dark": "#33394a",
+        "light": "#8a92a6",
+        "accent": "#7cf2e6"
+      }
+    },
+    {
       "id": "raw_meat",
       "name": "Raw meat",
       "category": "food",
@@ -221,9 +234,49 @@
       "id": "wheat",
       "name": "Wheat",
       "category": "food",
-      "description": "Grain for bread, or seeds for next year.",
+      "description": "Grain from the fields: three make a loaf of bread at the kitchen.",
       "food": { "hunger": 5 },
       "icon": { "style": "wheat", "base": "#e2c35c", "dark": "#a8872e", "light": "#f6e39c" }
+    },
+    {
+      "id": "wheat_seeds",
+      "name": "Wheat seeds",
+      "category": "seed",
+      "description": "Sown in tilled soil, they grow into wheat over a few days, given light.",
+      "icon": {
+        "style": "seeds",
+        "base": "#e2c35c",
+        "dark": "#8d6a22",
+        "light": "#f6e39c",
+        "accent": "#c9a648"
+      }
+    },
+    {
+      "id": "sunroot",
+      "name": "Sunroot",
+      "category": "food",
+      "description": "A sweet, starchy root. Edible raw, far better baked.",
+      "food": { "hunger": 10 },
+      "icon": {
+        "style": "root",
+        "base": "#e0a03a",
+        "dark": "#9a5e1c",
+        "light": "#f6d27a",
+        "accent": "#5e9a36"
+      }
+    },
+    {
+      "id": "sunroot_seeds",
+      "name": "Sunroot seeds",
+      "category": "seed",
+      "description": "Sown in tilled soil, they grow into sunroots in a couple of days, given light.",
+      "icon": {
+        "style": "seeds",
+        "base": "#c8823a",
+        "dark": "#7a4a1c",
+        "light": "#eab06a",
+        "accent": "#9a6a2c"
+      }
     },
     {
       "id": "bread",
@@ -232,6 +285,20 @@
       "description": "Filling and keeps well.",
       "food": { "hunger": 40, "heal": 4 },
       "icon": { "style": "bread", "base": "#c98f4a", "dark": "#8d5a26", "light": "#ecc387" }
+    },
+    {
+      "id": "baked_sunroot",
+      "name": "Baked sunroot",
+      "category": "food",
+      "description": "Baked at the kitchen stove: three times as filling as raw.",
+      "food": { "hunger": 32, "heal": 6 },
+      "icon": {
+        "style": "root",
+        "base": "#b8702a",
+        "dark": "#6e3e14",
+        "light": "#e6a85a",
+        "accent": "#3e2a14"
+      }
     },
     {
       "id": "berries",
@@ -437,6 +504,21 @@
         "accent": "#5d636c"
       },
       "builds": { "furniture": "bolt_thrower" }
+    },
+    {
+      "id": "world_gate",
+      "name": "World Gate",
+      "category": "furniture",
+      "description": "An arch of runestones that opens a way to another world. Building it wins this one.",
+      "stack": 1,
+      "icon": {
+        "style": "gate",
+        "base": "#5a6272",
+        "dark": "#33394a",
+        "light": "#8a92a6",
+        "accent": "#7cf2e6"
+      },
+      "builds": { "furniture": "world_gate" }
     },
     {
       "id": "copper_pickaxe",

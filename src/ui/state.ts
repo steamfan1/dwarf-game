@@ -5,7 +5,7 @@
  */
 import type { TimeState } from '../core/TimeControl';
 import { Store } from '../core/Store';
-import type { EquipmentSlot, Skill } from '../sim/dwarves/Dwarf';
+import type { EquipmentSlot, Skill, Traveller } from '../sim/dwarves/Dwarf';
 import type { JobType, Priority } from '../sim/jobs/JobBoard';
 import type { CraftStatus } from '../sim/Simulation';
 import type { WorldGenStage } from '../sim/worldgen/generateWorld';
@@ -75,7 +75,7 @@ export interface HoverInfo {
  * felling or taking furniture apart for whatever is clicked); Build, Walls and Furniture
  * plan things to build, from the material picked in their palette. Dwarves do all of it.
  */
-export type Tool = 'auto' | 'select' | 'dig' | 'chop' | 'build' | 'wall' | 'furniture' | 'cancel' | 'priority';
+export type Tool = 'auto' | 'select' | 'dig' | 'chop' | 'farm' | 'build' | 'wall' | 'furniture' | 'cancel' | 'priority';
 
 /** The tools that plan building, each from a material picked in its palette. */
 export type BuildTool = 'build' | 'wall' | 'furniture';
@@ -165,6 +165,10 @@ export interface CatalogueItem {
 
 export interface RecipeView {
   id: string;
+  /** The tech tier that unlocks it (0 is the first). */
+  tier: number;
+  /** Research its first craft earns. */
+  research: number;
   output: CatalogueItem & { count: number };
   inputs: Array<CatalogueItem & { count: number }>;
   /** Station kind (workbench, furnace...), or null for by hand. */
@@ -184,9 +188,64 @@ export interface Catalogue {
   recipes: RecipeView[];
   /** Crafting stations, in the order the crafting panel lists them, with their names. */
   stations: Array<{ id: string; name: string }>;
+  /** The Farm tool's palette: each crop, with the seeds it's grown from. */
+  crops: Array<{ id: string; name: string; seed: CatalogueItem }>;
+  /** The tech tree's tiers, first to last. */
+  tiers: Array<{ name: string; description: string; research: number; dwarves: number; recipes: string[] }>;
 }
 
-export type LoadingStage = WorldGenStage | 'building';
+/** Where the colony stands in the tech tree. */
+export interface ResearchView {
+  /** The tier reached (0 is the first). */
+  tier: number;
+  points: number;
+  /** Research the current tier needs (0 once the last is reached). */
+  needed: number;
+  /** Items made at least once (items.json ids). */
+  crafted: string[];
+}
+
+/** The latest save in this browser, for the title screen's Continue button. */
+export interface SaveSummary {
+  day: number;
+  dwarves: number;
+  seed: string;
+  biome: string;
+  savedAt: number;
+}
+
+/** A dwarf who could step through the World Gate. */
+export interface TravellerChoice {
+  id: number;
+  name: string;
+  /** Its best skill and level. */
+  skill: string;
+  level: number;
+}
+
+/** The World Gate is built: the victory dialog. */
+export interface WonView {
+  day: number;
+  /** A biome the win unlocked, by name (null if none was new). */
+  unlocked: string | null;
+  /** Living dwarves who could go, and how many may. */
+  dwarves: TravellerChoice[];
+  max: number;
+}
+
+export type LoadingStage = WorldGenStage | 'building' | 'loading';
+
+/** What the New world dialog starts from. */
+export interface NewWorldPreset {
+  seed: string;
+  biome: string;
+  reveal: boolean;
+  hour: number | null;
+  /** A biome named in the page address: it can be picked even if the campaign hasn't opened it. */
+  forcedBiome: string | null;
+  /** Dwarves coming through the World Gate. */
+  travellers: Traveller[];
+}
 
 export type ToastKind = 'info' | 'warning' | 'error';
 
@@ -202,7 +261,9 @@ export interface UiState {
   fatalMessage: string;
   loading: { stage: LoadingStage; progress: number } | null;
   /** Starting values for the New world dialog; the dialog is open while this is set. */
-  newWorld: { seed: string; biome: string; reveal: boolean; hour: number | null } | null;
+  newWorld: NewWorldPreset | null;
+  /** Biomes the campaign has opened (each World Gate built opens the next). */
+  unlockedBiomes: string[];
   /** The running world, for the menu. */
   world: { seed: string; biomeName: string } | null;
   /** null until storage has been probed; false means settings and saves won't persist. */
@@ -225,6 +286,9 @@ export interface UiState {
   buildChoice: Record<BuildTool, string | null>;
   craftingOpen: boolean;
   storageOpen: boolean;
+  techOpen: boolean;
+  /** The crop the Farm tool plants (a crops.json id), or null before the first pick. */
+  farmCrop: string | null;
   selectedDwarf: number | null;
   colony: ColonyView | null;
   catalogue: Catalogue | null;
@@ -232,6 +296,13 @@ export interface UiState {
   threat: ThreatView;
   /** Every dwarf has died: the "colony has fallen" dialog is up (until dismissed). */
   colonyLost: boolean;
+  research: ResearchView | null;
+  /** The World Gate was built: the victory dialog is up (until dismissed). */
+  won: WonView | null;
+  /** The latest save, if there is one (null: none, or not looked yet). */
+  save: SaveSummary | null;
+  /** A save or a load is under way. */
+  saving: boolean;
 }
 
 export const uiState = new Store<UiState>({
@@ -239,6 +310,7 @@ export const uiState = new Store<UiState>({
   fatalMessage: '',
   loading: null,
   newWorld: null,
+  unlockedBiomes: [],
   world: null,
   storagePersistent: null,
   storageWarningDismissed: false,
@@ -256,12 +328,18 @@ export const uiState = new Store<UiState>({
   buildChoice: { build: null, wall: null, furniture: null },
   craftingOpen: false,
   storageOpen: true,
+  techOpen: false,
+  farmCrop: null,
   selectedDwarf: null,
   colony: null,
   catalogue: null,
   clock: null,
   threat: null,
   colonyLost: false,
+  research: null,
+  won: null,
+  save: null,
+  saving: false,
 });
 
 let nextToastId = 1;

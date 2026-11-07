@@ -1639,3 +1639,255 @@ input[type='checkbox'] {
   min-width: 0;
   padding: 0.2em 0.3em;
 }
+
+/* ---- Tech tree panel ---------------------------------------------------------------- */
+
+.tech {
+  position: absolute;
+  top: 4em;
+  left: 11.6em;
+  right: 19.6em;
+  display: flex;
+  flex-direction: column;
+  max-width: 46em;
+  min-width: 28em;
+  max-height: calc(100% - 15em);
+}
+
+.tech > header {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 0.6em 0.4em 0.8em;
+  border-bottom: 1px solid var(--c-edge);
+}
+
+.tech h2 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1em;
+  letter-spacing: 0.05em;
+  color: #f6e3bf;
+}
+
+.tech h2 .icon {
+  color: var(--c-accent);
+}
+
+.tech h2 kbd {
+  font: 700 0.65em var(--font-mono);
+  color: var(--c-text-dim);
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--c-edge);
+  border-radius: 2px;
+}
+
+.tech-intro {
+  margin: 0.5em 0.8em 0.2em;
+  font-size: 0.9em;
+  color: var(--c-text-dim);
+}
+
+.tiers {
+  margin: 0;
+  padding: 0.3em 0.7em 0.7em;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tier {
+  margin-top: 0.45em;
+  padding: 0.45em 0.6em 0.5em;
+  border: 1px solid var(--c-edge);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tier.current {
+  border-color: var(--c-accent);
+  background: rgba(242, 163, 58, 0.07);
+}
+
+.tier.locked {
+  opacity: 0.62;
+}
+
+.tier-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55em;
+}
+
+.tier-number {
+  font: 700 0.75em var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-text-dim);
+}
+
+.tier-name {
+  font-family: var(--font-display);
+  font-size: 1.05em;
+  color: #f6e3bf;
+}
+
+.tier-reward {
+  padding: 0.05em 0.45em;
+  border-radius: 999px;
+  background: rgba(124, 242, 230, 0.12);
+  color: #9ff4ea;
+  font-size: 0.8em;
+}
+
+.tier-state {
+  margin-left: auto;
+  font-size: 0.8em;
+  color: var(--c-text-dim);
+}
+
+.tier.current .tier-state {
+  color: var(--c-accent-bright);
+}
+
+.tier-description {
+  margin: 0.15em 0 0.3em;
+  font-size: 0.88em;
+  color: var(--c-text-dim);
+}
+
+.tier-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin: 0.1em 0 0.35em;
+}
+
+.tier-progress .meter {
+  flex: 1;
+}
+
+.tier-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tier-item {
+  position: relative;
+  padding: 0.15em;
+  border: 1px solid var(--c-edge);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  line-height: 0;
+}
+
+.tier-item:not(.made):not(.locked) .item-icon {
+  opacity: 0.55;
+}
+
+.tier-item.locked .item-icon {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.tier-item.made {
+  border-color: #6fb848;
+}
+
+.tier-item .tick {
+  position: absolute;
+  right: -0.25em;
+  bottom: -0.25em;
+  width: 0.75em;
+  height: 0.75em;
+  border-radius: 50%;
+  background: #6fb848;
+  box-shadow: 0 0 0 2px var(--c-panel);
+}
+
+.crafting .locked-note {
+  margin: 0.6em 0 0;
+  font-size: 0.88em;
+  color: var(--c-text-dim);
+}
+
+/* ---- Victory dialog ---------------------------------------------------------------- */
+
+.won-text {
+  margin: 0 0 0.8em;
+  line-height: 1.45;
+}
+
+.won-unlocked {
+  margin: 0 0 0.8em;
+  color: #9ff4ea;
+}
+
+.traveller-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13em, 1fr));
+  gap: 0.35em;
+  margin: 0.3em 0 0.6em;
+  padding: 0;
+  list-style: none;
+}
+
+.traveller {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.35em 0.5em;
+  border: 1px solid var(--c-edge);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.traveller.chosen {
+  border-color: var(--c-accent);
+  background: rgba(242, 163, 58, 0.1);
+}
+
+.traveller small {
+  display: block;
+  color: var(--c-text-dim);
+}
+
+.title-menu .continue-detail {
+  display: block;
+  margin-top: 0.15em;
+  font-size: 0.78em;
+  color: var(--c-text-dim);
+}
+
+/* The tech tree button shows the research bar along its bottom edge. */
+.btn-tech {
+  position: relative;
+}
+
+.research-pip {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #6fb848 var(--fill), rgba(255, 255, 255, 0.15) var(--fill));
+}
+
+.biome-option.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.travellers-note {
+  margin: 0.2em 0 0.6em;
+  color: #9ff4ea;
+}

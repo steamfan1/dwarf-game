@@ -10,6 +10,10 @@
  *   debug.spawnCreature('gloomling', 10)   a creature on the ground 10 tiles right of the Hearth
  *   debug.startWave()          an invasion tonight: the warning now, the portal at dusk
  *   debug.killMonsters()       every hostile creature drops dead
+ *   debug.techTier(3)          jump to tier 3 of the tech tree (its new dwarves come too)
+ *   debug.ripenCrops()         every growing crop ripens at once
+ *   debug.placeGate()          a World Gate appears beside the Hearth: the world is won
+ *   debug.save()               save now (as the menu's Save game does)
  *   debug.revealMap()
  */
 import type { App } from '../app/App';
@@ -22,6 +26,10 @@ export interface DebugApi {
   spawnCreature(id: string, dx?: number): void;
   startWave(): void;
   killMonsters(): void;
+  techTier(tier: number): void;
+  ripenCrops(): void;
+  placeGate(): void;
+  save(): void;
   revealMap(): void;
   setSpeed(multiplier: number): void;
   /** The running app, for poking around in the console. */
@@ -60,6 +68,8 @@ const STARTER_KIT: ReadonlyArray<[string, number]> = [
   ['spike_trap', 2],
   ['bolt_thrower', 1],
   ['rekindling_draught', 1],
+  ['wheat_seeds', 10],
+  ['sunroot_seeds', 10],
 ];
 
 export function installDebugApi(app: App): void {
@@ -145,6 +155,51 @@ export function installDebugApi(app: App): void {
         }
       }
       console.info(`${n} monster(s) dropped dead.`);
+    },
+    techTier: (tier) => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.techTier() needs a running game: start a new game first.');
+        return;
+      }
+      sim.reachTier(Math.round(tier) - 1);
+      app.reportColony();
+      console.info(`Tech tree: tier ${sim.research.tier + 1} (${sim.research.tree.tiers[sim.research.tier]!.name}).`);
+    },
+    ripenCrops: () => {
+      const sim = app.session?.sim;
+      if (!sim) return;
+      sim.ripenCrops();
+      console.info('Every growing crop will be ripe in a moment.');
+    },
+    placeGate: () => {
+      const sim = app.session?.sim;
+      if (!sim) {
+        console.info('debug.placeGate() needs a running game: start a new game first.');
+        return;
+      }
+      const gate = sim.items.items.findIndex((item) => item.builds !== null && 'furniture' in item.builds && sim.furnitureKinds.get(sim.furnitureKinds.id(item.builds.furniture)).wins);
+      for (let dx = 3; dx < 40; dx++) {
+        for (const side of [1, -1]) {
+          const x = sim.hearth.x + side * dx;
+          for (let y = sim.hearth.y - 3; y <= sim.hearth.y + 3; y++) {
+            if (sim.furnitureStatus(gate, x, y) !== 'ok') continue;
+            const builds = sim.items.get(gate).builds;
+            if (!builds || !('furniture' in builds)) return;
+            sim.placeFurniture(sim.furnitureKinds.id(builds.furniture), x, y);
+            console.info(`A World Gate stands at ${x}, ${y}.`);
+            return;
+          }
+        }
+      }
+      console.warn('No room for a World Gate near the Hearth.');
+    },
+    save: () => {
+      if (!app.session) {
+        console.info('debug.save() needs a running game: start a new game first.');
+        return;
+      }
+      app.saveGame();
     },
     revealMap: () => {
       if (app.revealMap()) console.info('Fog of war lifted over the whole map.');

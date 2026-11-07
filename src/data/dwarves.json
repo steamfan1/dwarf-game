@@ -3,7 +3,9 @@
   "maxDwarves": 12,
   "startingItems": [
     { "item": "bread", "count": 12 },
-    { "item": "berries", "count": 10 }
+    { "item": "berries", "count": 10 },
+    { "item": "wheat_seeds", "count": 6 },
+    { "item": "sunroot_seeds", "count": 4 }
   ],
   "names": {
     "first": [

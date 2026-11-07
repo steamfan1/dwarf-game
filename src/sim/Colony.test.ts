@@ -147,7 +147,7 @@ describe('Crafting', () => {
   it('makes planks by hand at the Hearth, and puts them away', () => {
     const { sim, runUntil } = newSim();
     sim.storage.add(item('log'), 2);
-    sim.queueCraft(recipe('planks'), 2);
+    sim.queueCraft(recipe('planks'), 2)!;
     expect(sim.crafting.orders).toHaveLength(1);
     runUntil(() => sim.storage.count(item('plank')) === 4);
     expect(sim.storage.count(item('log'))).toBe(0);
@@ -159,7 +159,7 @@ describe('Crafting', () => {
   it('crafts at a station, walking over to it; without one the order waits', () => {
     const { sim, bus, run, runUntil } = newSim();
     sim.storage.add(item('plank'), 6);
-    const order = sim.queueCraft(recipe('wooden_door'), 1);
+    const order = sim.queueCraft(recipe('wooden_door'), 1)!;
     run(100);
     expect(sim.craftStatus(order)).toBe('no-station');
     expect(sim.storage.count(item('plank'))).toBe(6);
@@ -180,7 +180,7 @@ describe('Crafting', () => {
   it('waits for more materials when they run out partway through an order', () => {
     const { sim, run, runUntil } = newSim();
     sim.storage.add(item('log'), 1);
-    const order = sim.queueCraft(recipe('planks'), 3);
+    const order = sim.queueCraft(recipe('planks'), 3)!;
     runUntil(() => sim.storage.count(item('plank')) === 2);
     run(60);
     expect(order.made).toBe(1);
@@ -194,7 +194,8 @@ describe('Crafting', () => {
     const { sim, runUntil } = newSim();
     sim.storage.add(item('iron_ore'), 2);
     const furnace = sim.placeFurniture(kind('furnace'), 28, 9);
-    const order = sim.queueCraft(recipe('iron_bar'), 1);
+    sim.research.reach(2); // iron is smelted from the Smithy tier on
+    const order = sim.queueCraft(recipe('iron_bar'), 1)!;
     runUntil(() => sim.dwarves.some((d) => d.carrying.some((c) => c.item === item('iron_ore'))));
     sim.cancelCraft(order.id);
     runUntil(() => sim.storage.count(item('iron_ore')) === 2 && sim.dwarves.every((d) => d.carrying.length === 0));
@@ -205,8 +206,8 @@ describe('Crafting', () => {
 
   it('adds to an order when the same recipe is queued again, and can be cut back', () => {
     const { sim } = newSim();
-    const first = sim.queueCraft(recipe('torches'), 2);
-    const again = sim.queueCraft(recipe('torches'), 3);
+    const first = sim.queueCraft(recipe('torches'), 2)!;
+    const again = sim.queueCraft(recipe('torches'), 3)!;
     expect(again).toBe(first);
     expect(first.count).toBe(5);
     sim.setCraftRemaining(first.id, 1);

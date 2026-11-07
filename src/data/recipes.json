@@ -108,7 +108,7 @@
       "output": { "item": "kitchen", "count": 1 },
       "inputs": [
         { "item": "brick", "count": 6 },
-        { "item": "iron_bar", "count": 1 }
+        { "item": "copper_bar", "count": 1 }
       ],
       "station": "workbench",
       "time": 140
@@ -182,7 +182,8 @@
       "id": "anvil",
       "output": { "item": "anvil", "count": 1 },
       "inputs": [
-        { "item": "iron_bar", "count": 4 }
+        { "item": "copper_bar", "count": 4 },
+        { "item": "stone", "count": 4 }
       ],
       "station": "furnace",
       "time": 140
@@ -295,6 +296,27 @@
       "time": 160
     },
     {
+      "id": "runestone",
+      "output": { "item": "runestone", "count": 1 },
+      "inputs": [
+        { "item": "deep_stone", "count": 2 },
+        { "item": "crystal", "count": 1 }
+      ],
+      "station": "anvil",
+      "time": 160
+    },
+    {
+      "id": "world_gate",
+      "output": { "item": "world_gate", "count": 1 },
+      "inputs": [
+        { "item": "runestone", "count": 8 },
+        { "item": "gold_bar", "count": 4 },
+        { "item": "iron_bar", "count": 6 }
+      ],
+      "station": "anvil",
+      "time": 400
+    },
+    {
       "id": "cloth",
       "output": { "item": "cloth", "count": 1 },
       "inputs": [
@@ -338,6 +360,15 @@
       ],
       "station": "kitchen",
       "time": 80
+    },
+    {
+      "id": "baked_sunroot",
+      "output": { "item": "baked_sunroot", "count": 1 },
+      "inputs": [
+        { "item": "sunroot", "count": 1 }
+      ],
+      "station": "kitchen",
+      "time": 50
     },
     {
       "id": "mushroom_stew",

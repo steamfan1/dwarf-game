@@ -7,8 +7,8 @@
  */
 import { Validator } from '../../core/validate';
 
-export type ItemCategory = 'block' | 'material' | 'ore' | 'tool' | 'weapon' | 'armor' | 'food' | 'potion' | 'furniture';
-const CATEGORIES: readonly ItemCategory[] = ['block', 'material', 'ore', 'tool', 'weapon', 'armor', 'food', 'potion', 'furniture'];
+export type ItemCategory = 'block' | 'material' | 'ore' | 'tool' | 'weapon' | 'armor' | 'food' | 'seed' | 'potion' | 'furniture';
+const CATEGORIES: readonly ItemCategory[] = ['block', 'material', 'ore', 'tool', 'weapon', 'armor', 'food', 'seed', 'potion', 'furniture'];
 
 /** How the placeholder icon is painted (see render/assets/itemArt.ts). */
 export const ICON_STYLES = [
@@ -54,6 +54,10 @@ export const ICON_STYLES = [
   'helmet',
   'chestplate',
   'amulet',
+  'seeds',
+  'root',
+  'rune',
+  'gate',
 ] as const;
 export type IconStyle = (typeof ICON_STYLES)[number];
 

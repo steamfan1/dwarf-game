@@ -97,6 +97,27 @@ function paintSoil(p: Pixels, art: TileArt, rng: Rng): void {
   }
 }
 
+/** Tilled soil: dark earth turned into ridges, a lit crest on each and a shadowed furrow between. */
+function paintFurrows(p: Pixels, art: TileArt, rng: Rng): void {
+  const base = rgb(art.base!);
+  const dark = rgb(art.dark!);
+  const light = rgb(art.light!);
+  for (let y = 0; y < FRAME; y++) {
+    // Ridges four pixels apart: crest, body, body, furrow.
+    const band = y % 4;
+    for (let x = 0; x < FRAME; x++) {
+      const r = rng.next();
+      let color = band === 0 ? light : band === 3 ? dark : base;
+      if (r < 0.1) color = band === 3 ? base : dark;
+      p.set(x, y, color);
+    }
+  }
+  if (art.pebble) {
+    const pebble = rgb(art.pebble);
+    for (let n = 0; n < 2; n++) p.set(rng.int(1, 14), 1 + 4 * rng.int(0, 3), pebble);
+  }
+}
+
 /** Cobbled rock: Voronoi cells with dark cracks between them and lit upper-left rims. */
 function paintRock(p: Pixels, art: TileArt, rng: Rng): void {
   const base = rgb(art.base!);
@@ -403,6 +424,9 @@ export function paintTile(art: TileArt, solid: boolean, mask: number, rng: Rng):
   switch (art.style) {
     case 'soil':
       paintSoil(p, art, rng);
+      break;
+    case 'furrows':
+      paintFurrows(p, art, rng);
       break;
     case 'rock':
       paintRock(p, art, rng);

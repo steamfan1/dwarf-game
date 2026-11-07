@@ -10,7 +10,7 @@ import type { FurnitureArt, FurnitureDef, FurnitureStyle } from '../../sim/furni
 import { mixColor } from './pixelArt';
 
 /** Animation frames per furniture style (others have one). */
-export const FURNITURE_FRAMES: Partial<Record<FurnitureStyle, number>> = { torch: 3 };
+export const FURNITURE_FRAMES: Partial<Record<FurnitureStyle, number>> = { torch: 3, gate: 4 };
 
 export function furnitureFrames(def: FurnitureDef): number {
   return FURNITURE_FRAMES[def.art.style] ?? 1;
@@ -154,6 +154,41 @@ const PAINTERS: Record<FurnitureStyle, Painter> = {
     rect(10, 3, 1, 1, c.outline);
     rect(10, 10, 1, 1, c.outline);
     rect(12, 6, 2, 1, c.accent); // bolt tip
+  },
+  /** The World Gate (48 x 64): a stone arch of runestones around a slowly turning swirl of light. */
+  gate: ({ rect, box, colors: c }, frame) => {
+    // The swirl: rings of light that drift inward, frame by frame.
+    for (let y = 9; y < 60; y++) {
+      for (let x = 12; x < 36; x++) {
+        // Sampled off the centre line, so the spiral has no seam.
+        const dx = (x - 23.5) / 12;
+        const dy = (y - 33.8) / 26;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) continue;
+        const ring = (((d * 4 + frame / 4 + Math.atan2(dy, dx) / Math.PI) % 1) + 1) % 1;
+        rect(x, y, 1, 1, ring < 0.18 ? c.light : ring < 0.5 ? c.accent : d < 0.35 ? '#e8fffc' : c.dark);
+      }
+    }
+    // The arch: two pillars of runestone and a rounded top.
+    box(3, 14, 8, 47, c.base);
+    box(37, 14, 8, 47, c.base);
+    for (let i = 0; i < 9; i++) {
+      const angle = Math.PI * (i / 8);
+      const x = Math.round(24 - Math.cos(angle) * 17 - 4);
+      const y = Math.round(14 - Math.sin(angle) * 11);
+      box(x, y, 8, 6, c.base);
+      rect(x, y, 8, 1, c.light);
+    }
+    for (const x of [3, 37]) {
+      rect(x, 14, 1, 47, c.light);
+      for (let y = 18; y < 58; y += 10) {
+        rect(x + 1, y, 6, 1, c.dark);
+        rect(x + 3, y + 3, 2, 3, (frame + y / 10) % 4 < 2 ? c.accent : c.light); // runes
+      }
+    }
+    // Steps in front.
+    box(1, 61, 46, 2, c.dark);
+    rect(1, 61, 46, 1, c.light);
   },
 };
 

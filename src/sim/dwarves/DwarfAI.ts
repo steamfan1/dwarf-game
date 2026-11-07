@@ -148,6 +148,10 @@ export interface ColonyContext {
   completeMeal(job: Job, by: Dwarf): boolean;
   /** A dwarf picked a plant. */
   harvestPlant(job: Job, by: Dwarf): void;
+  /** A dwarf tilled a farm plot's soil. */
+  completeTill(job: Job): void;
+  /** A dwarf sowed the seed it carries in a farm plot. False if it had none. */
+  completePlant(job: Job, by: Dwarf): boolean;
   /** A dwarf is starving (announced now and then). */
   starving(dwarf: Dwarf): void;
   /** A dwarf ran out of energy and fell asleep where it stood. */
@@ -931,6 +935,10 @@ export class DwarfAI {
       case 'harvest':
         this.pick(dwarf, job);
         break;
+      case 'till':
+      case 'plant':
+        this.farm(dwarf, job);
+        break;
       case 'revive':
         this.pourDraught(dwarf, job);
         break;
@@ -969,6 +977,24 @@ export class DwarfAI {
     if (!this.labour(dwarf, job)) return;
     this.toIdle(dwarf);
     this.ctx.harvestPlant(job, dwarf);
+    this.learn(dwarf, 'farming', this.ctx.colony.skills.xp.harvest);
+  }
+
+  /** Till a farm plot, or sow the seed in hand. */
+  private farm(dwarf: Dwarf, job: Job): void {
+    if (!this.ctx.siteValid(job)) {
+      // The plot went: the job goes too (a fetched seed goes back to storage).
+      this.ctx.jobs.remove(job.id);
+      this.toIdle(dwarf);
+      return;
+    }
+    if (!this.labour(dwarf, job)) return;
+    this.toIdle(dwarf);
+    if (job.type === 'till') this.ctx.completeTill(job);
+    else if (!this.ctx.completePlant(job, dwarf)) {
+      this.ctx.jobs.release(job.id, dwarf.id);
+      return;
+    }
     this.learn(dwarf, 'farming', this.ctx.colony.skills.xp.harvest);
   }
 

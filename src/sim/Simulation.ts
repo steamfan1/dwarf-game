@@ -43,10 +43,12 @@ import { CreatureNav, type Breaker } from './creatures/CreatureNav';
 import type { CreatureDef, CreatureRegistry } from './creatures/CreatureRegistry';
 import { Spawner, type SpawnerContext, type SpawnerEvent } from './creatures/Spawner';
 import type { ThreatSettings } from './creatures/threats';
-import { createDwarf, gainXp, skillSpeed, type Dwarf, type Skill } from './dwarves/Dwarf';
+import { arrivedTraveller, createDwarf, gainXp, skillSpeed, type Dwarf, type Skill, type Traveller } from './dwarves/Dwarf';
 import { DwarfAI, type ColonyContext, type NeedRates, type Weapon } from './dwarves/DwarfAI';
 import type { ColonySettings } from './dwarves/settings';
 import type { DeathCause, GameEvents } from './events';
+import type { CropRegistry } from './farming/Crops';
+import { Farms, growTicks, stageTile, type Plot } from './farming/Farms';
 import { FurnitureSet, type PlacedFurniture } from './furniture/Furniture';
 import type { FurnitureRegistry } from './furniture/FurnitureRegistry';
 import { ColonyStorage, GroundItems } from './items/Items';
@@ -58,6 +60,7 @@ import { NavGrid } from './nav/NavGrid';
 import { Pathfinder, type PathGoal } from './nav/Pathfinder';
 import { PathService } from './nav/PathService';
 import { RoomMap } from './rooms/RoomMap';
+import { Research, type TechTier, type TechTree } from './tech/TechTree';
 import { TimeOfDay, type TimeSettings } from './time/TimeOfDay';
 import { AIR, NO_LIQUID, type TileRegistry } from './world/TileRegistry';
 import { TreeFinder, type Tree } from './world/trees';
@@ -93,7 +96,9 @@ export type BuildStatus =
   /** It hangs on a background wall, or on a block beside it. */
   | 'needs-wall'
   /** The item doesn't build that kind of thing. */
-  | 'cannot-build';
+  | 'cannot-build'
+  /** Crops need soil to grow in (dirt or clay) under them. */
+  | 'needs-soil';
 
 /** Where a crafting order stands, for the crafting panel. */
 export type CraftStatus = 'working' | 'queued' | 'missing-materials' | 'no-station';
@@ -115,6 +120,8 @@ const STORAGE_FULL_NOTICE_TICKS = 400;
 const ROOM_REBUILD_TICKS = 10;
 /** Picked plants are checked for regrowth this often (ticks). */
 const REGROWTH_CHECK_TICKS = 20;
+/** Crops grow, and farm plots post their jobs, this often (ticks). */
+const FARM_CHECK_TICKS = 20;
 /** Creatures get their own path searches each tick, apart from the dwarves'. */
 export const CREATURE_SEARCHES_PER_TICK = 2;
 /** Cells one creature search may expand (they hunt nearby prey, or head for the Hearth). */
@@ -147,9 +154,27 @@ export interface SimulationOptions {
   time: TimeSettings;
   creatures: CreatureRegistry;
   threats: ThreatSettings;
+  tech: TechTree;
+  crops: CropRegistry;
   bus: EventBus<GameEvents>;
   /** The hour the world starts at, instead of time.json's (from the page address, for testing). */
   startHour?: number;
+  /** Dwarves who came through a World Gate from the last world: they are the starting dwarves. */
+  travellers?: readonly Traveller[];
+  /**
+   * False when the world is being loaded from a save: no starting dwarves, goods or
+   * animals (the save brings its own). True by default.
+   */
+  fresh?: boolean;
+}
+
+/** What a save keeps that only the simulation itself can see (see save/SimState.ts). */
+export interface SimInternals {
+  nextCreatureId: number;
+  worldWon: boolean;
+  colonyLost: boolean;
+  /** Picked plants growing back: the cell, the tile it is now and will be (tile numbers), and when. */
+  regrowth: Array<{ cell: number; from: number; to: number; at: number }>;
 }
 
 /** What the HUD shows of an invasion: coming (with ticks to go), or under way (invaders left). */
@@ -196,6 +221,11 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
   readonly creaturePaths: PathService;
   readonly creatureRng: Rng;
   readonly spawner: Spawner;
+  /** The colony's progress through the tech tree. */
+  readonly research: Research;
+  readonly cropKinds: CropRegistry;
+  /** Farm plots marked with the Farm tool. */
+  readonly farms = new Farms();
   /** Number of ticks simulated since the world began. */
   tick = 0;
   /** Bumped whenever a block appears or disappears (the home maps go out of date). */
@@ -235,8 +265,10 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
   private readonly hunts = new Map<number, number>();
   /** The item that brings fallen dwarves back (-1 if none does). */
   private readonly reviveItem: number;
+  /** The World Gate has been built. */
+  private worldWon = false;
 
-  constructor({ world, tiles, items, furniture, recipes, colony, time, creatures, threats, bus, startHour }: SimulationOptions) {
+  constructor({ world, tiles, items, furniture, recipes, colony, time, creatures, threats, tech, crops, bus, startHour, travellers, fresh = true }: SimulationOptions) {
     this.world = world;
     this.tiles = tiles;
     this.items = items;
@@ -245,6 +277,8 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     this.colony = colony;
     this.creatureKinds = creatures;
     this.threats = threats;
+    this.research = new Research(tech);
+    this.cropKinds = crops;
     this.bus = bus;
     this.rng = new Rng(`${world.seed}:simulation`);
     this.creatureRng = this.rng.fork('creatures');
@@ -282,7 +316,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     this.crafting = new CraftQueue();
     this.trees = new TreeFinder(world, tiles);
     this.rooms = new RoomMap(world, tiles);
-    for (const { item, count } of colony.startingItems) if (items.has(item)) this.storage.add(items.item(item), count);
+    if (fresh) for (const { item, count } of colony.startingItems) if (items.has(item)) this.storage.add(items.item(item), count);
 
     // Light the world. Whatever sunlight reaches (the whole surface and a few blocks
     // into the ground) counts as explored from the start.
@@ -290,7 +324,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     if (world.inBounds(this.hearth.x, this.hearth.y)) this.lighting.setPointLight(this.hearth.x, this.hearth.y, HEARTH_LIGHT);
     this.lighting.discover(this.lighting.computeAll());
 
-    this.spawnDwarves();
+    if (fresh) this.spawnDwarves(travellers ?? []);
     this.ai = new DwarfAI(this);
     this.rebuildMaps();
     this.rebuildRooms();
@@ -302,7 +336,39 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     });
     this.creatureAI = new CreatureAI(this);
     this.spawner = new Spawner(this, this.rng.fork('spawner'));
-    this.spawner.populate();
+    if (fresh) this.spawner.populate();
+  }
+
+  /** For saves: the private state (see save/SimState.ts). */
+  saveInternals(): SimInternals {
+    return {
+      nextCreatureId: this.nextCreatureId,
+      worldWon: this.worldWon,
+      colonyLost: this.colonyLost,
+      regrowth: this.regrowth.map((entry) => ({ ...entry })),
+    };
+  }
+
+  /**
+   * For loading a save, once its tick and clock are set: the private state comes back,
+   * and the day or night it is now is taken as known (no NightStarted for a loaded night).
+   */
+  loadInternals(internals: SimInternals): void {
+    this.nextCreatureId = Math.max(1, internals.nextCreatureId);
+    this.worldWon = internals.worldWon;
+    this.colonyLost = internals.colonyLost;
+    this.regrowth.length = 0;
+    this.regrowth.push(...internals.regrowth);
+    this.wasNight = this.time.isNight(this.tick);
+  }
+
+  /** For loading a save: relight everything and find the rooms and the ways home again. */
+  settleAfterLoad(): void {
+    this.lighting.computeAll();
+    this.terrainVersion++;
+    this.rebuildMaps();
+    this.rebuildRooms();
+    this.syncCraftJobs();
   }
 
   /** Advance the world by exactly one tick (1/20 s of game time at 1x). */
@@ -325,6 +391,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     if (this.tick % SUPPLY_CHECK_TICKS === 0) this.checkSupplies();
     if (this.roomsDirty && this.tick - this.roomsTick >= ROOM_REBUILD_TICKS) this.rebuildRooms();
     if (this.tick % REGROWTH_CHECK_TICKS === 0) this.regrow();
+    if (this.tick % FARM_CHECK_TICKS === 0) this.tendFarms();
     const night = this.time.isNight(this.tick);
     if (night !== this.wasNight) {
       this.wasNight = night;
@@ -465,14 +532,19 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
   cancelDesignations(rect: CellRect): number {
     const jobs = this.marksIn(rect);
     for (const job of jobs) this.jobs.remove(job.id);
-    return jobs.length;
+    // Farm plots stop being farmed: a crop growing there is dug up (its seed comes back).
+    const plots = this.plotsIn(rect);
+    for (const plot of plots) this.removePlot(plot, true);
+    return Math.max(jobs.length, plots.length);
   }
 
   /** Change the priority of the work marked in a rectangle. Returns how many jobs. */
   prioritize(rect: CellRect, priority: Priority): number {
     const jobs = this.marksIn(rect);
     for (const job of jobs) this.jobs.setPriority(job.id, priority);
-    return jobs.length;
+    const plots = this.plotsIn(rect);
+    for (const plot of plots) plot.priority = priority;
+    return Math.max(jobs.length, plots.length);
   }
 
   /** The player's marks in a rectangle: work on cells, animals to hunt and fallen dwarves to revive. */
@@ -491,7 +563,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     if (tile < 0) return 'cannot-build';
     const where = this.visibleCell(x, y);
     if (where !== 'ok') return where;
-    if (this.jobs.at(x, y)) return 'marked';
+    if (this.jobs.at(x, y) || this.farms.get(this.world.index(x, y))) return 'marked';
     if (!this.cellOpen(x, y)) return 'occupied';
     if (this.tiles.door[tile]) return this.floorAt(x, y + 1, true) ? 'ok' : 'needs-floor';
     return this.blockSupport(x, y, true) ? 'ok' : 'unsupported';
@@ -521,15 +593,16 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     }
     for (let cy = rect.y0; cy <= rect.y1; cy++) {
       for (let cx = rect.x0; cx <= rect.x1; cx++) {
-        if (this.jobs.at(cx, cy)) return 'marked';
+        if (this.jobs.at(cx, cy) || this.farms.get(this.world.index(cx, cy))) return 'marked';
         if (!this.cellOpen(cx, cy)) return 'occupied';
       }
     }
     return this.furnitureMounted(kind, rect, true) ?? 'ok';
   }
 
-  /** Queue `count` crafts of a recipe (added to its order if it's queued already). */
-  queueCraft(recipe: number, count: number): CraftOrder {
+  /** Queue `count` crafts of a recipe (added to its order if it's queued already). Null while the tech tree hasn't unlocked it. */
+  queueCraft(recipe: number, count: number): CraftOrder | null {
+    if (!this.research.unlocked(recipe)) return null;
     const order = this.crafting.add(recipe, count);
     this.syncCraftJobs();
     return order;
@@ -596,6 +669,10 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
         return this.recipes.recipes[job.target]!.time / speed('crafting');
       case 'harvest':
         return work.harvestTicks / speed('farming');
+      case 'till':
+        return this.cropKinds.tillTicks / speed('farming');
+      case 'plant':
+        return this.cropKinds.plantTicks / speed('farming');
       case 'eat':
         return colony.needs.eatTicks;
       case 'revive':
@@ -686,6 +763,11 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
         return this.furniture.get(job.furnitureId) !== undefined;
       case 'harvest':
         return this.world.fg[this.world.index(job.x, job.y)] === job.target;
+      case 'till':
+      case 'plant': {
+        const plot = this.farms.get(world.index(job.x, job.y));
+        return plot !== undefined && plot.state === (job.type === 'till' ? 'untilled' : 'empty') && this.plotValid(plot);
+      }
       case 'hunt':
       case 'fight':
         return this.creature(job.target) !== undefined;
@@ -719,7 +801,10 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
       case 'fight':
         return false;
       case 'harvest':
+      case 'till':
         return this.siteValid(job);
+      case 'plant':
+        return this.storage.hasAll(job.inputs) && this.siteValid(job);
       case 'hunt': {
         // Only a dwarf fit to fight goes hunting, after an animal the player can see.
         const creature = this.creature(job.target);
@@ -906,6 +991,11 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
   harvestPlant(job: Job, by: Dwarf): void {
     const { world, tiles } = this;
     const i = world.index(job.x, job.y);
+    const plot = this.farms.get(i);
+    if (plot?.state === 'ripe') {
+      this.harvestCrop(plot, job, by);
+      return;
+    }
     const plant = tiles.tiles[world.fg[i]!]!.harvest;
     this.jobs.remove(job.id);
     if (!plant) return;
@@ -992,7 +1082,249 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     this.syncCraftJobs();
     this.bus.emit('ItemCrafted', { item: recipe.output.item, count: recipe.output.count, dwarf: by.id, name: by.name });
     if (finished && order) this.bus.emit('CraftOrderDone', { item: recipe.output.item, count: order.count * recipe.output.count });
+    this.recordResearch(recipe);
     return true;
+  }
+
+  // ---- The tech tree -------------------------------------------------------------------------
+
+  /** The first of an item earns research; a full tier unlocks the next, and may bring new dwarves. */
+  private recordResearch(recipe: Recipe): void {
+    const { earned, reached } = this.research.recordCraft(recipe.index, recipe.output.item);
+    if (earned > 0) {
+      const { research } = this;
+      this.bus.emit('ResearchGained', { item: recipe.output.item, points: earned, total: research.points, needed: research.needed, tier: research.tier });
+    }
+    this.tiersReached(reached);
+  }
+
+  private tiersReached(tiers: readonly TechTier[]): void {
+    for (const tier of tiers) {
+      this.bus.emit('TierReached', { tier: tier.index, name: tier.name, dwarves: tier.dwarves });
+      for (let n = 0; n < tier.dwarves; n++) this.welcomeDwarf();
+    }
+  }
+
+  /** Debug: jump to a tier of the tech tree; its new dwarves come as if it had been reached. */
+  reachTier(tier: number): void {
+    this.tiersReached(this.research.reach(tier));
+  }
+
+  /**
+   * A new dwarf walks up to the Hearth to join the colony, if there's room for one more
+   * (dwarves lost for good don't count). Returns it, or null.
+   */
+  welcomeDwarf(): Dwarf | null {
+    const counted = this.dwarves.filter((d) => d.phase !== 'dead' || d.deathCause !== 'lava').length;
+    if (counted >= this.colony.maxDwarves) return null;
+    const id = this.dwarves.reduce((max, d) => Math.max(max, d.id), 0) + 1;
+    const spot = this.standingSpotNear(this.hearth.x + this.rng.int(-3, 3), this.hearth.y);
+    const dwarf = createDwarf(id, spot.x, spot.y, this.rng, this.colony, new Set(this.dwarves.map((d) => d.name)));
+    this.dwarves.push(dwarf);
+    this.reveal(spot.x, spot.y, this.colony.vision.radius);
+    this.bus.emit('DwarfArrived', { dwarf: dwarf.id, name: dwarf.name });
+    return dwarf;
+  }
+
+  /** The World Gate has been built: this world is won. */
+  get won(): boolean {
+    return this.worldWon;
+  }
+
+  // ---- Farming ---------------------------------------------------------------------------------
+
+  /**
+   * Whether a farm plot can be marked in a cell (the open cell a plant grows in, over soil
+   * that can be tilled or already is), and if not, why.
+   */
+  farmStatus(x: number, y: number): BuildStatus {
+    const where = this.visibleCell(x, y);
+    if (where !== 'ok') return where;
+    const { world, cropKinds } = this;
+    const cell = world.index(x, y);
+    if (this.farms.get(cell) || this.jobs.at(x, y)) return 'marked';
+    if (!this.cellOpen(x, y) || cropKinds.stageTiles.has(world.fg[cell]!)) return 'occupied';
+    if (!world.inBounds(x, y + 1)) return 'needs-soil';
+    const below = world.fg[cell + world.width]!;
+    return cropKinds.soil.has(below) || below === cropKinds.farmland ? 'ok' : 'needs-soil';
+  }
+
+  /**
+   * Mark farm plots for a crop over a rectangle. They are standing orders: dwarves till each
+   * one, sow it, bring the harvest in and sow it again, for as long as the plot stays.
+   * Returns how many plots were marked.
+   */
+  designateFarm(crop: number, rect: CellRect, priority: Priority): number {
+    if (!this.cropKinds.crops[crop]) return 0;
+    const { world } = this;
+    const r = this.clampRect(rect);
+    let added = 0;
+    for (let y = r.y0; y <= r.y1; y++) {
+      for (let x = r.x0; x <= r.x1; x++) {
+        if (this.farmStatus(x, y) !== 'ok') continue;
+        const cell = world.index(x, y);
+        const tilled = world.fg[cell + world.width] === this.cropKinds.farmland;
+        this.postFarmJob(this.farms.add(cell, crop, tilled ? 'empty' : 'untilled', priority));
+        added++;
+      }
+    }
+    return added;
+  }
+
+  /** The plot of a cell, if it's farmed. */
+  plotAt(x: number, y: number): Plot | undefined {
+    return this.world.inBounds(x, y) ? this.farms.get(this.world.index(x, y)) : undefined;
+  }
+
+  /** How far a plot's crop has grown, 0 to 1 (1 once ripe). */
+  plotProgress(plot: Plot): number {
+    if (plot.state === 'ripe') return 1;
+    if (plot.state !== 'growing') return 0;
+    return Math.min(1, plot.growth / growTicks(this.cropKinds.crops[plot.crop]!, this.time.settings.dayTicks));
+  }
+
+  /** Debug: every growing crop ripens at the next check. */
+  ripenCrops(): void {
+    for (const plot of this.farms.all()) {
+      if (plot.state === 'growing') plot.growth = growTicks(this.cropKinds.crops[plot.crop]!, this.time.settings.dayTicks);
+    }
+  }
+
+  /** A dwarf tilled a plot's soil: farmland now, ready to sow. */
+  completeTill(job: Job): void {
+    const { world } = this;
+    this.jobs.remove(job.id);
+    const cell = world.index(job.x, job.y);
+    const plot = this.farms.get(cell);
+    if (!plot || plot.state !== 'untilled') return;
+    if (world.fg[cell] !== AIR) {
+      // Grass tufts and flowers in the plot are cleared away.
+      world.fg[cell] = AIR;
+      this.bus.emit('TileChanged', { x: job.x, y: job.y });
+    }
+    world.fg[cell + world.width] = this.cropKinds.farmland;
+    this.bus.emit('TileChanged', { x: job.x, y: job.y + 1 });
+    this.farms.setState(plot, 'empty');
+    this.postFarmJob(plot);
+  }
+
+  /** A dwarf sowed the seed it carried: a sprout appears. False if it had no seed. */
+  completePlant(job: Job, by: Dwarf): boolean {
+    if (!takeFrom(by.carrying, job.inputs)) return false;
+    this.jobs.remove(job.id);
+    const { world } = this;
+    const cell = world.index(job.x, job.y);
+    const plot = this.farms.get(cell);
+    if (!plot || plot.state !== 'empty') {
+      // The plot went while the seed was on its way: the seed stays where it would have gone.
+      for (const { item, count } of job.inputs) this.dropItems(item, count, job.x, job.y);
+      return true;
+    }
+    world.fg[cell] = this.cropKinds.crops[plot.crop]!.stages[0]!;
+    this.bus.emit('TileChanged', { x: job.x, y: job.y });
+    this.farms.setState(plot, 'growing');
+    return true;
+  }
+
+  /** A dwarf picked a ripe crop: the crop and its seeds drop where it grew, and the plot waits to be sown again. */
+  private harvestCrop(plot: Plot, job: Job, by: Dwarf): void {
+    const { world } = this;
+    this.jobs.remove(job.id);
+    world.fg[plot.cell] = AIR;
+    this.bus.emit('TileChanged', { x: job.x, y: job.y });
+    for (const { item, count } of this.cropKinds.crops[plot.crop]!.harvest) this.dropItems(item, count, job.x, job.y);
+    this.farms.setState(plot, 'empty');
+    this.bus.emit('Harvested', { x: job.x, y: job.y, dwarf: by.id });
+    this.postFarmJob(plot);
+  }
+
+  /** Crops grow where they get light enough, ripen, and every plot keeps its next job posted. */
+  private tendFarms(): void {
+    const { world, farms } = this;
+    for (const plot of [...farms.all()]) {
+      if (!this.plotValid(plot)) {
+        // Its soil was dug away, say, or something else took the spot.
+        this.removePlot(plot, false);
+        continue;
+      }
+      if (plot.state === 'growing') {
+        const crop = this.cropKinds.crops[plot.crop]!;
+        const x = plot.cell % world.width;
+        const y = (plot.cell - x) / world.width;
+        plot.lit = this.lightNow(x, y) >= crop.minLight;
+        if (plot.lit) plot.growth += FARM_CHECK_TICKS;
+        const total = growTicks(crop, this.time.settings.dayTicks);
+        const tile = stageTile(crop, plot.growth, total);
+        if (world.fg[plot.cell] !== tile) {
+          world.fg[plot.cell] = tile;
+          this.bus.emit('TileChanged', { x, y });
+        }
+        if (plot.growth >= total) {
+          farms.setState(plot, 'ripe');
+          this.bus.emit('CropRipe', { x, y, crop: crop.index });
+        }
+      }
+      this.postFarmJob(plot);
+    }
+  }
+
+  /** The job a plot needs next (tilling, sowing or harvesting), unless it has one already. */
+  private postFarmJob(plot: Plot): void {
+    const { world } = this;
+    const x = plot.cell % world.width;
+    const y = (plot.cell - x) / world.width;
+    if (this.jobs.at(x, y) || plot.state === 'growing') return;
+    const crop = this.cropKinds.crops[plot.crop]!;
+    const priority = plot.priority as Priority;
+    const base = { x, y, priority, tick: this.tick, cells: [plot.cell] };
+    const job =
+      plot.state === 'untilled'
+        ? this.jobs.add({ ...base, type: 'till', target: crop.index })
+        : plot.state === 'empty'
+          ? this.jobs.add({ ...base, type: 'plant', inputs: [{ item: crop.seed, count: 1 }], target: crop.index })
+          : this.jobs.add({ ...base, type: 'harvest', target: world.fg[plot.cell]! });
+    this.flagIfBlocked(job);
+  }
+
+  /** A plot still has what it needs: its soil (farmland once tilled), and its cell free or its crop in it. */
+  private plotValid(plot: Plot): boolean {
+    const { world, cropKinds } = this;
+    const below = world.fg[plot.cell + world.width];
+    if (below === undefined) return false;
+    if (below !== cropKinds.farmland && (plot.state !== 'untilled' || !cropKinds.soil.has(below))) return false;
+    const here = world.fg[plot.cell]!;
+    if (plot.state === 'growing' || plot.state === 'ripe') return cropKinds.stageTiles.has(here);
+    const x = plot.cell % world.width;
+    return this.cellOpen(x, (plot.cell - x) / world.width);
+  }
+
+  /** Stop farming a plot. Its jobs go; a crop in it is cleared away (with `refund`, its seed or its harvest drops). */
+  private removePlot(plot: Plot, refund: boolean): void {
+    const { world, cropKinds } = this;
+    this.farms.remove(plot.cell);
+    const x = plot.cell % world.width;
+    const y = (plot.cell - x) / world.width;
+    const job = this.jobs.at(x, y);
+    if (job && (job.type === 'till' || job.type === 'plant' || (job.type === 'harvest' && cropKinds.stageTiles.has(job.target)))) this.jobs.remove(job.id);
+    if (!cropKinds.stageTiles.has(world.fg[plot.cell]!)) return;
+    world.fg[plot.cell] = AIR;
+    this.bus.emit('TileChanged', { x, y });
+    if (!refund) return;
+    const crop = cropKinds.crops[plot.crop]!;
+    if (plot.state === 'ripe') for (const { item, count } of crop.harvest) this.dropItems(item, count, x, y);
+    else this.dropItems(crop.seed, 1, x, y);
+  }
+
+  private plotsIn(rect: CellRect): Plot[] {
+    const r = this.clampRect(rect);
+    const plots: Plot[] = [];
+    for (let y = r.y0; y <= r.y1; y++) {
+      for (let x = r.x0; x <= r.x1; x++) {
+        const plot = this.farms.get(this.world.index(x, y));
+        if (plot) plots.push(plot);
+      }
+    }
+    return plots;
   }
 
   /** A dwarf took a piece of furniture apart. */
@@ -1070,6 +1402,10 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     }
     this.roomsDirty = true;
     this.bus.emit('FurnitureChanged', { id: piece.id, placed: true });
+    if (piece.def.wins && !this.worldWon) {
+      this.worldWon = true;
+      this.bus.emit('WorldWon', { day: this.time.day(this.tick) });
+    }
     return piece;
   }
 
@@ -1196,24 +1532,9 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     return this.rooms.roomAt(x, y) !== undefined;
   }
 
-  /**
-   * How far along the colony is, for the size of invasions: the best tier of gear it owns
-   * (copper is 1, iron 2...). Milestone 6's tech tree takes this over.
-   */
+  /** How far along the colony is, for the size of invasions: the tech tier it has reached (0 is the first). */
   techTier(): number {
-    let tier = 0;
-    const consider = (item: number): void => {
-      tier = Math.max(tier, this.items.get(item).equip?.tier ?? 0);
-    };
-    for (const { item } of this.storage.entries()) consider(item);
-    for (const dwarf of this.dwarves) {
-      if (dwarf.phase === 'dead') continue;
-      for (const slot of EQUIP_SLOTS) {
-        const item = dwarf.equipment[slot];
-        if (item !== null) consider(item);
-      }
-    }
-    return tier;
+    return this.research.tier;
   }
 
   setPortalLight(at: { x: number; y: number } | null): void {
@@ -1607,7 +1928,9 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
   /** A plant that can be picked, seen by the player. */
   harvestable(x: number, y: number): boolean {
     const { world, tiles } = this;
-    return world.inBounds(x, y) && world.isVisible(x, y) && tiles.tiles[world.fg[world.index(x, y)]!]!.harvest !== null;
+    if (!world.inBounds(x, y) || !world.isVisible(x, y)) return false;
+    const cell = world.index(x, y);
+    return tiles.tiles[world.fg[cell]!]!.harvest !== null || this.farms.get(cell)?.state === 'ripe';
   }
 
   private markHarvest(x: number, y: number, priority: Priority): boolean {
@@ -1916,6 +2239,8 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
         job.type === 'place' ||
         job.type === 'dismantle' ||
         job.type === 'harvest' ||
+        job.type === 'till' ||
+        job.type === 'plant' ||
         job.type === 'hunt' ||
         job.type === 'revive';
       if (planned && job.claimedBy === 0 && !this.siteValid(job)) {
@@ -2034,14 +2359,20 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     };
   }
 
-  /** The starting dwarves stand on the ground either side of the Hearth. */
-  private spawnDwarves(): void {
+  /**
+   * The starting dwarves stand on the ground either side of the Hearth: travellers through
+   * a World Gate if any came, new dwarves otherwise.
+   */
+  private spawnDwarves(travellers: readonly Traveller[]): void {
     const rng = this.rng.fork('dwarves');
-    const names = new Set<string>();
+    const names = new Set<string>(travellers.map((traveller) => traveller.name));
     const offsets = [-2, 2, 4, -4, 6, -6, 8, -8, 3, -3, 5, -5];
-    for (let n = 0; n < this.colony.startingDwarves; n++) {
+    const itemNumber = (id: string): number | undefined => (this.items.has(id) ? this.items.item(id) : undefined);
+    for (let n = 0; n < Math.max(this.colony.startingDwarves, Math.min(travellers.length, this.colony.maxDwarves)); n++) {
       const spot = this.standingSpotNear(this.hearth.x + offsets[n % offsets.length]!, this.hearth.y);
-      const dwarf = createDwarf(n + 1, spot.x, spot.y, rng, this.colony, names);
+      const fresh = createDwarf(n + 1, spot.x, spot.y, rng, this.colony, names);
+      const traveller = travellers[n];
+      const dwarf = traveller ? arrivedTraveller(fresh, traveller, itemNumber) : fresh;
       names.add(dwarf.name);
       this.dwarves.push(dwarf);
       this.world.revealEllipse(spot.x, spot.y, this.colony.vision.radius, this.colony.vision.radius);

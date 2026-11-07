@@ -5,6 +5,7 @@
 import { EventBus } from '../core/EventBus';
 import { CONTENT, TILES } from './content';
 import type { ThreatSettings } from './creatures/threats';
+import type { Traveller } from './dwarves/Dwarf';
 import type { ColonySettings } from './dwarves/settings';
 import type { GameEvents } from './events';
 import { Simulation } from './Simulation';
@@ -50,7 +51,7 @@ export const PEACEFUL: ThreatSettings = {
  * otherwise); `threats` brings monsters, animals and invasions (none by default); `colony`
  * replaces dwarves.json's settings.
  */
-export function newSim(world = makeWorld(), options: { startHour?: number; threats?: ThreatSettings; colony?: ColonySettings } = {}) {
+export function newSim(world = makeWorld(), options: { startHour?: number; threats?: ThreatSettings; colony?: ColonySettings; travellers?: Traveller[] } = {}) {
   const bus = new EventBus<GameEvents>();
   const sim = new Simulation({
     world,
@@ -59,6 +60,7 @@ export function newSim(world = makeWorld(), options: { startHour?: number; threa
     threats: options.threats ?? PEACEFUL,
     bus,
     startHour: options.startHour,
+    travellers: options.travellers,
   });
   const run = (ticks: number): void => {
     for (let i = 0; i < ticks; i++) sim.step();

@@ -31,7 +31,15 @@ export function priorityName(priority: Priority): string {
  * `buildItem` is what the current build tool builds with (an item number), for the
  * Build, Walls and Furniture tools.
  */
-export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, priority: Priority, buildItem: number | null = null): HoverInfo | null {
+export function describeCell(
+  sim: Simulation,
+  x: number,
+  y: number,
+  tool: Tool,
+  priority: Priority,
+  buildItem: number | null = null,
+  crop: number | null = null,
+): HoverInfo | null {
   const { world, tiles, hearth } = sim;
   if (!world.inBounds(x, y)) return null;
   if (!world.isVisible(x, y)) return { title: t('hover.unexplored'), detail: t('hover.unexploredDetail'), action: 'none' };
@@ -71,6 +79,13 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
     details.push(t('hover.caveDetail', { wall: tiles.walls[wall]!.name }));
   } else title = tiles.tiles[AIR]!.name;
 
+  const plot = sim.farms.get(i);
+  if (plot) {
+    const cropDef = sim.cropKinds.crops[plot.crop]!;
+    if (tile === AIR) title = t('hover.farmPlot', { crop: cropDef.name });
+    details.push(describePlot(plot.state, cropDef.name, Math.round(sim.plotProgress(plot) * 100), plot.lit));
+  }
+
   const damage = sim.tileDamage.get(i);
   if (damage > 0 && tile !== AIR) details.push(t('hover.damaged', { percent: Math.min(99, Math.round((damage / sim.tileHp(tile)) * 100)) }));
 
@@ -85,9 +100,23 @@ export function describeCell(sim: Simulation, x: number, y: number, tool: Tool, 
   if (job) details.push(describeMark(sim, job));
   if (wallJob) details.push(describeMark(sim, wallJob));
 
-  const { action, hint } = toolHint(sim, x, y, tool, priority, job ?? wallJob, buildItem);
+  const { action, hint } = toolHint(sim, x, y, tool, priority, job ?? wallJob, buildItem, crop);
   if (hint) details.push(hint);
   return { title, detail: details.join(' · '), action };
+}
+
+/** Where a farm plot's crop is at. */
+function describePlot(state: 'untilled' | 'empty' | 'growing' | 'ripe', crop: string, percent: number, lit: boolean): string {
+  switch (state) {
+    case 'untilled':
+      return t('hover.plotUntilled', { crop: crop.toLowerCase() });
+    case 'empty':
+      return t('hover.plotEmpty', { crop: crop.toLowerCase() });
+    case 'growing':
+      return lit ? t('hover.plotGrowing', { percent }) : t('hover.plotDark', { percent });
+    default:
+      return t('hover.plotRipe');
+  }
 }
 
 function isBuildTool(tool: Tool): boolean {
@@ -122,6 +151,9 @@ function markStatus(sim: Simulation, job: Job): string {
   if (job.type === 'dismantle') return t('mark.dismantle', { priority: priorityName(job.priority) });
   if (job.type === 'hunt') return t('mark.hunt', { priority: priorityName(job.priority) });
   if (job.type === 'revive') return job.missing ? t('mark.missing', { item: sim.items.get(job.inputs[0]!.item).name.toLowerCase() }) : t('mark.revive', { priority: priorityName(job.priority) });
+  if (job.type === 'plant') return job.missing ? t('mark.noSeeds', { item: sim.items.get(job.inputs[0]!.item).name.toLowerCase() }) : t('mark.plant', { priority: priorityName(job.priority) });
+  if (job.type === 'till') return t('mark.till', { priority: priorityName(job.priority) });
+  if (job.type === 'harvest') return t('mark.harvest', { priority: priorityName(job.priority) });
   return t(job.type === 'dig' ? 'mark.dig' : 'mark.chop', { priority: priorityName(job.priority) });
 }
 
@@ -135,6 +167,7 @@ const BUILD_REASONS: Record<Exclude<BuildStatus, 'ok'>, StringKey> = {
   'needs-floor': 'build.needs-floor',
   'needs-wall': 'build.needs-wall',
   'cannot-build': 'build.cannot-build',
+  'needs-soil': 'build.needs-soil',
 };
 
 function toolHint(
@@ -145,9 +178,12 @@ function toolHint(
   priority: Priority,
   job: Job | undefined,
   buildItem: number | null,
+  crop: number | null,
 ): { action: HoverAction; hint: string } {
+  const plot = sim.plotAt(x, y);
   switch (tool) {
     case 'auto': {
+      if (plot) return { action: 'ok', hint: t('tool.auto.unfarm') };
       if (job) return { action: 'ok', hint: t('tool.auto.unmark') };
       const target = sim.autoTarget(x, y);
       if (target === 'chop') return { action: 'ok', hint: t('tool.auto.chop') };
@@ -179,10 +215,17 @@ function toolHint(
       if (status === 'ok') return { action: 'ok', hint: t(`tool.${tool}.hint`) };
       return { action: 'blocked', hint: t(BUILD_REASONS[status]) };
     }
+    case 'farm': {
+      if (crop === null) return { action: 'none', hint: '' };
+      const status = sim.farmStatus(x, y);
+      if (status === 'ok') return { action: 'ok', hint: t('tool.farm.hint', { crop: sim.cropKinds.crops[crop]!.name.toLowerCase() }) };
+      return { action: status === 'marked' ? 'none' : 'blocked', hint: status === 'marked' ? '' : t(BUILD_REASONS[status]) };
+    }
     case 'cancel':
+      if (plot) return { action: 'ok', hint: t('tool.cancel.farm') };
       return job ? { action: 'ok', hint: t('tool.cancel.hint') } : { action: 'none', hint: '' };
     case 'priority':
-      return job ? { action: 'ok', hint: t('tool.priority.hint', { priority: priorityName(priority) }) } : { action: 'none', hint: '' };
+      return job || plot ? { action: 'ok', hint: t('tool.priority.hint', { priority: priorityName(priority) }) } : { action: 'none', hint: '' };
     default:
       return { action: 'none', hint: '' };
   }
@@ -264,8 +307,15 @@ export function describeActivity(sim: Simulation, dwarf: Dwarf, stranded: boolea
           return t(working ? 'activity.reviving' : 'activity.toRevive', { name: sim.dwarf(job.target)?.name ?? '' });
         case 'harvest': {
           const crop = sim.tiles.tiles[job.target]?.harvest?.item;
-          const item = crop && sim.items.has(crop) ? sim.items.get(sim.items.item(crop)).name.toLowerCase() : '';
+          const grown = sim.cropKinds.cropOfTile(job.target)?.name;
+          const item = grown ? grown.toLowerCase() : crop && sim.items.has(crop) ? sim.items.get(sim.items.item(crop)).name.toLowerCase() : '';
           return t(working ? 'activity.picking' : 'activity.toPick', { item });
+        }
+        case 'till':
+          return t(working ? 'activity.tilling' : 'activity.toTill');
+        case 'plant': {
+          const crop = sim.cropKinds.crops[job.target]?.name.toLowerCase() ?? '';
+          return t(working ? 'activity.sowing' : 'activity.toSow', { crop });
         }
         case 'build':
         case 'wall':

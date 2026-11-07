@@ -23,6 +23,7 @@ export const ACTIONS = [
   'toolSelect',
   'toolDig',
   'toolChop',
+  'toolFarm',
   'toolBuild',
   'toolWall',
   'toolFurniture',
@@ -30,6 +31,7 @@ export const ACTIONS = [
   'toolPriority',
   'toggleCrafting',
   'toggleStorage',
+  'toggleTech',
   'toggleMinimap',
   'toggleDebug',
 ] as const;
@@ -56,6 +58,7 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   toolSelect: ['KeyQ'],
   toolDig: ['KeyF'],
   toolChop: ['KeyC'],
+  toolFarm: ['KeyG'],
   toolBuild: ['KeyB'],
   toolWall: ['KeyV'],
   toolFurniture: ['KeyT'],
@@ -63,6 +66,7 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   toolPriority: ['KeyP'],
   toggleCrafting: ['KeyK'],
   toggleStorage: ['KeyI'],
+  toggleTech: ['KeyR'],
   toggleMinimap: ['KeyM'],
   toggleDebug: ['Backquote'],
 };
