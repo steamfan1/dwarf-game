@@ -1,4 +1,5 @@
 /** The in-game menu (Esc). The game is paused while it is open. */
+import { useState } from 'preact/hooks';
 import { t } from '../../core/strings';
 import { useCommands } from '../commands';
 import { useStore } from '../hooks';
@@ -9,6 +10,10 @@ export function GameMenu() {
   const commands = useCommands();
   const world = useStore(uiState, (s) => s.world);
   const saving = useStore(uiState, (s) => s.saving);
+  const savedAt = useStore(uiState, (s) => s.save?.savedAt ?? 0);
+  // When Save game was last pressed here: the button says "Saved" once that save is done.
+  const [pressedAt, setPressedAt] = useState(0);
+  const justSaved = pressedAt > 0 && !saving && savedAt >= pressedAt;
   const close = (): void => {
     commands.playSound('uiClose');
     commands.closeMenu();
@@ -28,10 +33,11 @@ export function GameMenu() {
           data-testid="save-game"
           onClick={() => {
             commands.playSound('uiClick');
+            setPressedAt(Date.now());
             commands.saveGame();
           }}
         >
-          {t('menu.save')}
+          {justSaved ? t('menu.saved') : t('menu.save')}
         </button>
         <button
           type="button"

@@ -50,6 +50,7 @@
   "won.stay": "Stay in this world",
   "won.quit": "Quit to title",
   "won.skills": "Best at {skill} (level {level})",
+  "won.novice": "Still learning every trade",
   "won.hint": "The new world takes this one's place in your save slot when it first saves (at its first dawn, or when you save).",
   "hud.pause": "Pause or resume ({key})",
   "hud.speed": "{speed}× speed ({key})",

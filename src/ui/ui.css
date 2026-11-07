@@ -1154,6 +1154,8 @@ body {
 .modal-backdrop {
   position: absolute;
   inset: 0;
+  /* Above the toasts, so a pile of news never hides a dialog. */
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1769,6 +1771,14 @@ input[type='checkbox'] {
 
 .tier-progress .meter {
   flex: 1;
+  height: 0.75em;
+}
+
+.tier-progress-text {
+  font-size: 0.85em;
+  color: var(--c-text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .tier-items {
@@ -1835,9 +1845,12 @@ input[type='checkbox'] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13em, 1fr));
   gap: 0.35em;
+  max-height: 14em;
   margin: 0.3em 0 0.6em;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
+  scrollbar-width: thin;
 }
 
 .traveller {

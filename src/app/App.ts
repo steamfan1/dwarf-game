@@ -40,6 +40,7 @@ import type { Simulation } from '../sim/Simulation';
 import { World, type CellRect } from '../sim/world/World';
 import type { NewWorldChoice, UiCommands, UiSound } from '../ui/commands';
 import {
+  clearToasts,
   DEFAULT_TOOL,
   isBuildTool,
   pushToast,
@@ -301,6 +302,7 @@ export class App implements UiCommands, GameContext {
     this.endSession();
     game.scene.start(SceneKeys.title);
     uiState.set({ screen: 'title', menuOpen: false, settingsOpen: false, time: null, debug: null, hover: null, world: null, ...FRESH_COLONY_UI });
+    clearToasts();
     void this.saves.meta(SAVE_SLOT).then((save) => uiState.set({ save }));
   }
 

@@ -351,6 +351,11 @@ export function pushToast(text: string, kind: ToastKind = 'info', durationMs = 5
   setTimeout(() => dismissToast(toast.id), durationMs);
 }
 
+/** Clear every notification (when a world ends: its news no longer matters). */
+export function clearToasts(): void {
+  uiState.set({ toasts: [] });
+}
+
 export function dismissToast(id: number): void {
   uiState.update((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
 }

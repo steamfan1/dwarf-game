@@ -21,8 +21,40 @@ export function WonDialog({ won }: { won: WonView }) {
     setChosen((current) => (current.includes(id) ? current.filter((other) => other !== id) : current.length < won.max ? [...current, id] : current));
   };
 
+  const footer = (
+    <>
+      <button
+        type="button"
+        class="btn btn-danger"
+        onClick={() => {
+          commands.playSound('uiClick');
+          commands.stayInWorld();
+          commands.quitToTitle();
+        }}
+      >
+        {t('won.quit')}
+      </button>
+      <button type="button" class="btn" onClick={stay} data-testid="stay">
+        {t('won.stay')}
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        data-autofocus
+        disabled={chosen.length === 0}
+        data-testid="travel"
+        onClick={() => {
+          commands.playSound('uiClick');
+          commands.travel(chosen);
+        }}
+      >
+        {t('won.travel')}
+      </button>
+    </>
+  );
+
   return (
-    <Modal title={t('won.title')} onClose={stay} wide testId="world-won">
+    <Modal title={t('won.title')} onClose={stay} wide testId="world-won" footer={footer}>
       <p class="won-text">{t('won.text', { day: won.day })}</p>
       {won.unlocked && <p class="won-unlocked">{t('won.unlocked', { biome: won.unlocked })}</p>}
       {won.dwarves.length > 0 && (
@@ -37,7 +69,7 @@ export function WonDialog({ won }: { won: WonView }) {
                     <input type="checkbox" checked={picked} disabled={!picked && chosen.length >= won.max} onChange={() => toggle(dwarf.id)} />
                     <span>
                       <strong>{dwarf.name}</strong>
-                      <small>{t('won.skills', { skill: dwarf.skill.toLowerCase(), level: dwarf.level })}</small>
+                      <small>{dwarf.level > 1 ? t('won.skills', { skill: dwarf.skill.toLowerCase(), level: dwarf.level }) : t('won.novice')}</small>
                     </span>
                   </label>
                 </li>
@@ -47,35 +79,6 @@ export function WonDialog({ won }: { won: WonView }) {
         </>
       )}
       <p class="settings-hint">{t('won.hint')}</p>
-      <div class="menu-buttons">
-        <button
-          type="button"
-          class="btn btn-primary"
-          data-autofocus
-          disabled={chosen.length === 0}
-          data-testid="travel"
-          onClick={() => {
-            commands.playSound('uiClick');
-            commands.travel(chosen);
-          }}
-        >
-          {t('won.travel')}
-        </button>
-        <button type="button" class="btn" onClick={stay} data-testid="stay">
-          {t('won.stay')}
-        </button>
-        <button
-          type="button"
-          class="btn btn-danger"
-          onClick={() => {
-            commands.playSound('uiClick');
-            commands.stayInWorld();
-            commands.quitToTitle();
-          }}
-        >
-          {t('won.quit')}
-        </button>
-      </div>
     </Modal>
   );
 }

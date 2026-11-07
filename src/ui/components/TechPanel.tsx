@@ -64,7 +64,7 @@ export function TechPanel() {
                     <span class="meter meter-xp" role="meter" aria-valuemin={0} aria-valuemax={research.needed} aria-valuenow={research.points}>
                       <span class="meter-fill" style={`width: ${Math.min(100, Math.round((research.points / research.needed) * 100))}%`} />
                     </span>
-                    <span class="meter-value">{t('tech.progress', { points: research.points, needed: research.needed })}</span>
+                    <span class="tier-progress-text">{t('tech.progress', { points: research.points, needed: research.needed })}</span>
                   </div>
                 ) : (
                   <p class="note">{t('tech.complete')}</p>
