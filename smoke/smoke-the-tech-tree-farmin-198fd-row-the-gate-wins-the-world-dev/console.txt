@@ -1,0 +1,11 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[info] World "smoke-test" (temperate) generated in 75 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}
+[info] Simulation speed multiplier: 4x
+[info] Simulation speed multiplier: 1x
+[info] Every growing crop will be ripe in a moment.
+[info] Put 2 × Wood into storage.
+[info] Tech tree: tier 6 (The World Gate).
+[info] A World Gate stands at 232, 48.
+[info] World "deep-knoll-89" (snow) generated in 83 ms {caves: 127, caveCells: 15565, tunnels: 3, lakes: 16, lavaPools: 7}

@@ -1,0 +1,5 @@
+[warning] [.WebGL-0x3ce4001cc800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3ce4001cc800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3ce4001cc800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3ce4001cc800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[info] World "smoke-test" (temperate) generated in 90 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}

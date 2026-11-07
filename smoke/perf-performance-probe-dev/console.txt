@@ -1,0 +1,9 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[warning] [.WebGL-0x3b74001c9800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3b74001c9800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3b74001c9800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[warning] [.WebGL-0x3b74001c9800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[info] World "smoke-test" (temperate) generated in 100 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}
+[info] 40 monster(s) dropped dead.

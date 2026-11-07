@@ -1,0 +1,72 @@
+{
+  "project": "build",
+  "renderer": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "windows": [
+    {
+      "label": "title screen",
+      "fps": 38.4,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.4,
+      "taskMs": 2078.4,
+      "scriptMs": 39.1,
+      "layoutMs": 0,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still",
+      "fps": 26.8,
+      "p50": 33.4,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2110.9,
+      "scriptMs": 48.9,
+      "layoutMs": 0.3,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, panning",
+      "fps": 22,
+      "p50": 50,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2187.9,
+      "scriptMs": 56.5,
+      "layoutMs": 0.9,
+      "styleMs": 0.1
+    },
+    {
+      "label": "game, zoom 2, still, minimap closed",
+      "fps": 23.1,
+      "p50": 49.9,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2111.7,
+      "scriptMs": 50.5,
+      "layoutMs": 0.4,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 1, still",
+      "fps": 22.4,
+      "p50": 50,
+      "p90": 50.1,
+      "max": 50.1,
+      "taskMs": 2134.4,
+      "scriptMs": 84.5,
+      "layoutMs": 0.4,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, panning (profiled)",
+      "fps": 27.1,
+      "p50": 33.3,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2148.9,
+      "scriptMs": 50.4,
+      "layoutMs": 0.5,
+      "styleMs": 0
+    }
+  ]
+}

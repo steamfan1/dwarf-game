@@ -1,0 +1,2 @@
+[info] World "save-test" (temperate) generated in 82 ms {caves: 120, caveCells: 11894, tunnels: 3, lakes: 10, lavaPools: 7}
+[info] Loaded the save of world "save-test", day 1

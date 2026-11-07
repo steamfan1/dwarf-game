@@ -1,0 +1,1 @@
+[info] World "smoke-test" (temperate) generated in 83 ms {caves: 103, caveCells: 14312, tunnels: 3, lakes: 20, lavaPools: 9}

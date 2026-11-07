@@ -1,0 +1,3 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).

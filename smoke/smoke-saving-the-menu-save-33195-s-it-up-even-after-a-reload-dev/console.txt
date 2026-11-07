@@ -1,0 +1,8 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[info] World "save-test" (temperate) generated in 74 ms {caves: 120, caveCells: 11894, tunnels: 3, lakes: 10, lavaPools: 7}
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] Gatewright dev build: helpers are on window.debug (spawnItem, give, stockUp, skipToNight, spawnCreature, startWave, killMonsters, revealMap, setSpeed).
+[info] Loaded the save of world "save-test", day 1

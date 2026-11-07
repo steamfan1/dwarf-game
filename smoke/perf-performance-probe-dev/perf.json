@@ -1,0 +1,138 @@
+{
+  "project": "dev",
+  "renderer": "Google Inc. (Google) | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "windows": [
+    {
+      "label": "title screen",
+      "fps": 36.7,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.4,
+      "taskMs": 2055.1,
+      "scriptMs": 38.6,
+      "layoutMs": 0,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still",
+      "fps": 26.3,
+      "p50": 33.4,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2094.4,
+      "scriptMs": 55.2,
+      "layoutMs": 0.3,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, panning",
+      "fps": 26.8,
+      "p50": 33.4,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2123.7,
+      "scriptMs": 66.4,
+      "layoutMs": 0.6,
+      "styleMs": 0.1
+    },
+    {
+      "label": "game, zoom 2, still, without fog",
+      "fps": 38.7,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.5,
+      "taskMs": 2100.7,
+      "scriptMs": 73,
+      "layoutMs": 0.4,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still, without blocks",
+      "fps": 33.7,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.5,
+      "taskMs": 2061.1,
+      "scriptMs": 45.3,
+      "layoutMs": 0.4,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still, without walls",
+      "fps": 31.5,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.5,
+      "taskMs": 2091.6,
+      "scriptMs": 45.5,
+      "layoutMs": 0.5,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still, without sky",
+      "fps": 38.7,
+      "p50": 33.3,
+      "p90": 33.4,
+      "max": 33.4,
+      "taskMs": 2062.8,
+      "scriptMs": 54.8,
+      "layoutMs": 0.4,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, still, without overlay",
+      "fps": 27.8,
+      "p50": 33.3,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2084.4,
+      "scriptMs": 43.4,
+      "layoutMs": 0.3,
+      "styleMs": 0.1
+    },
+    {
+      "label": "game, zoom 2, still, minimap closed",
+      "fps": 27.5,
+      "p50": 33.4,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2100.2,
+      "scriptMs": 51,
+      "layoutMs": 0.2,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 1, still",
+      "fps": 24.6,
+      "p50": 33.4,
+      "p90": 50,
+      "max": 66.6,
+      "taskMs": 2110.5,
+      "scriptMs": 98.2,
+      "layoutMs": 0.7,
+      "styleMs": 0
+    },
+    {
+      "label": "game, zoom 2, 40 monsters",
+      "fps": 27.3,
+      "p50": 33.3,
+      "p90": 50,
+      "max": 66.7,
+      "taskMs": 2129.9,
+      "scriptMs": 75.7,
+      "layoutMs": 1.2,
+      "styleMs": 0.5
+    },
+    {
+      "label": "game, zoom 2, panning (profiled)",
+      "fps": 26.8,
+      "p50": 33.3,
+      "p90": 50,
+      "max": 50.1,
+      "taskMs": 2129.6,
+      "scriptMs": 62.2,
+      "layoutMs": 1.4,
+      "styleMs": 0.1
+    }
+  ]
+}
