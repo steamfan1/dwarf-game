@@ -198,7 +198,49 @@ describe('Monsters breaking in', () => {
     expect(gloomling.gone || Math.abs(gloomling.x - dwarf.x) <= 1).toBe(true);
   });
 
-  it('a burrowmaw tunnels through earth to reach a dwarf underground', () => {
+  it('monsters battering the same door together break it far sooner', () => {
+    const ticksToBreakIn = (gloomlings: number): number => {
+      const { sim, bus, run, runUntil } = newSim(undefined, { colony: STAY_PUT });
+      buildHouse(sim);
+      sim.dwarves.splice(1);
+      const dwarf = sim.dwarves[0]!;
+      dwarf.x = 30;
+      dwarf.restTicks = 1e9;
+      runUntil(() => sim.inRoom(30, 8), 20);
+      for (let i = 0; i < gloomlings; i++) sim.spawnCreatureNear('gloomling', 2);
+      const strikers = new Set<number>();
+      bus.on('TileDamaged', ({ x, y }) => {
+        if (x !== 26 || y !== 9) return;
+        for (const c of sim.creatures) if (c.phase === 'breaking') strikers.add(c.id);
+      });
+      let broken = false;
+      bus.on('TileBroken', () => (broken = true));
+      let ticks = 0;
+      while (!broken && ticks < 4000) {
+        run(1);
+        ticks++;
+      }
+      expect(broken).toBe(true);
+      expect(strikers.size).toBe(gloomlings);
+      return ticks;
+    };
+    const alone = ticksToBreakIn(1);
+    const together = ticksToBreakIn(3);
+    expect(alone).toBeGreaterThan(1000); // a lone gloomling needs most of a minute for a door
+    expect(together).toBeLessThan(alone * 0.5);
+  });
+
+  it('wood and stone hold out far longer than dirt or sand', () => {
+    const { sim } = newSim();
+    const hp = (id: string): number => sim.tileHp(TILES.tile(id));
+    for (const strong of ['plank', 'stone', 'brick']) {
+      for (const weak of ['dirt', 'grass', 'sand', 'snow']) expect(hp(strong)).toBeGreaterThan(2 * hp(weak));
+    }
+    expect(hp('brick')).toBeGreaterThan(hp('stone'));
+    expect(hp('wooden_door')).toBeLessThan(hp('plank')); // the door is the weak point
+  });
+
+  it('a burrowmaw tunnels through earth to reach a dwarf underground, slowly', () => {
     const { sim, bus, runUntil } = newSim(undefined, { colony: STAY_PUT });
     const { world } = sim;
     sim.dwarves.splice(1);
@@ -210,10 +252,20 @@ describe('Monsters breaking in', () => {
     const maw = sim.spawnCreatureNear('burrowmaw', 10)!;
     expect(maw).toMatchObject({ x: 30, y: 9 });
     const broken: number[] = [];
-    bus.on('TileBroken', ({ x, y }) => broken.push(world.index(x, y)));
-    runUntil(() => Math.max(Math.abs(maw.x - dwarf.x), Math.abs(maw.y - dwarf.y)) <= 1, 3000);
+    const brokenAt: number[] = [];
+    let firstBlow = -1;
+    bus.on('TileDamaged', () => {
+      if (firstBlow < 0) firstBlow = sim.tick;
+    });
+    bus.on('TileBroken', ({ x, y }) => {
+      broken.push(world.index(x, y));
+      brokenAt.push(sim.tick);
+    });
+    runUntil(() => Math.max(Math.abs(maw.x - dwarf.x), Math.abs(maw.y - dwarf.y)) <= 1, 4000);
     expect(broken.length).toBeGreaterThanOrEqual(2);
     for (const cell of broken) expect(world.fg[cell]).toBe(AIR);
+    // Each block of earth takes it a good quarter of a minute (20 ticks a second).
+    expect(brokenAt[0]! - firstBlow).toBeGreaterThanOrEqual(300);
   });
 
   it('a cragskitter climbs the sides of blocks and leaps up two tiles; a gloomling only one', () => {

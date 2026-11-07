@@ -69,8 +69,9 @@ export interface TileDef {
   /** Relative time to dig; 1 is dirt. */
   hardness: number;
   /**
-   * Damage a monster must do to break it, or null for the usual: its hardness times
-   * threats.json's tileHpPerHardness.
+   * Durability: the damage monsters must do to break it (wood and stone hold out far
+   * longer than dirt or sand). Null for the fallback: its hardness times threats.json's
+   * tileHpPerHardness.
    */
   hp: number | null;
   /** Item id dropped when dug or chopped (see items.json). */

@@ -12,6 +12,7 @@
       "name": "Dirt",
       "solid": true,
       "hardness": 1,
+      "hp": 100,
       "drops": "dirt",
       "mapColor": "#7a5236",
       "art": {
@@ -27,6 +28,7 @@
       "name": "Grassy dirt",
       "solid": true,
       "hardness": 1,
+      "hp": 100,
       "drops": "dirt",
       "mapColor": "#5ea33e",
       "art": {
@@ -43,6 +45,7 @@
       "name": "Clay",
       "solid": true,
       "hardness": 1.2,
+      "hp": 120,
       "drops": "clay",
       "mapColor": "#9a5c43",
       "art": { "style": "soil", "base": "#9a5c43", "dark": "#7d4733", "light": "#b0705a" }
@@ -52,6 +55,7 @@
       "name": "Sand",
       "solid": true,
       "hardness": 0.8,
+      "hp": 80,
       "drops": "sand",
       "mapColor": "#d7c28a",
       "art": { "style": "soil", "base": "#d7c28a", "dark": "#bfa86e", "light": "#ead9a5" }
@@ -61,6 +65,7 @@
       "name": "Packed snow",
       "solid": true,
       "hardness": 0.7,
+      "hp": 60,
       "drops": "snowball",
       "mapColor": "#e8f0f8",
       "art": {
@@ -76,6 +81,7 @@
       "name": "Ice",
       "solid": true,
       "hardness": 1.2,
+      "hp": 110,
       "drops": "ice",
       "mapColor": "#a9d6ee",
       "art": { "style": "ice", "base": "#a9d6ee", "dark": "#86bcd9", "light": "#d6f0fb" }
@@ -85,6 +91,7 @@
       "name": "Stone",
       "solid": true,
       "hardness": 2,
+      "hp": 300,
       "drops": "stone",
       "mapColor": "#7c7f87",
       "art": { "style": "rock", "base": "#7c7f87", "dark": "#5c5f66", "light": "#9a9da5" }
@@ -94,6 +101,7 @@
       "name": "Deep stone",
       "solid": true,
       "hardness": 3,
+      "hp": 450,
       "drops": "deep_stone",
       "mapColor": "#545a6e",
       "art": { "style": "rock", "base": "#545a6e", "dark": "#3c4152", "light": "#6a7187" }
@@ -103,6 +111,7 @@
       "name": "Basalt",
       "solid": true,
       "hardness": 4,
+      "hp": 600,
       "drops": "basalt",
       "mapColor": "#3c3335",
       "art": { "style": "rock", "base": "#3e3537", "dark": "#2a2224", "light": "#54484a" }
@@ -120,6 +129,7 @@
       "name": "Copper ore",
       "solid": true,
       "hardness": 2.5,
+      "hp": 330,
       "drops": "copper_ore",
       "mapColor": "#d47a3c",
       "art": {
@@ -135,6 +145,7 @@
       "name": "Iron ore",
       "solid": true,
       "hardness": 3,
+      "hp": 400,
       "drops": "iron_ore",
       "mapColor": "#c09078",
       "art": {
@@ -150,6 +161,7 @@
       "name": "Gold ore",
       "solid": true,
       "hardness": 3.5,
+      "hp": 420,
       "drops": "gold_ore",
       "mapColor": "#f0c33c",
       "art": {
@@ -165,6 +177,7 @@
       "name": "Glow crystal",
       "solid": true,
       "hardness": 4,
+      "hp": 500,
       "drops": "crystal",
       "light": 8,
       "mapColor": "#55e0d4",
@@ -397,6 +410,7 @@
       "name": "Plank block",
       "solid": true,
       "hardness": 1,
+      "hp": 250,
       "drops": "plank",
       "mapColor": "#a87a4b",
       "art": { "style": "planks", "base": "#a87a4b", "dark": "#74512f", "light": "#c69866" }
@@ -406,6 +420,7 @@
       "name": "Brick block",
       "solid": true,
       "hardness": 2.5,
+      "hp": 500,
       "drops": "brick",
       "mapColor": "#a5523e",
       "art": { "style": "bricks", "base": "#a5523e", "dark": "#6e3326", "light": "#cdbba6" }
@@ -416,6 +431,7 @@
       "solid": true,
       "transparent": true,
       "hardness": 0.5,
+      "hp": 60,
       "drops": "glass",
       "connect": "self",
       "mapColor": "#bfe6f2",
@@ -427,7 +443,7 @@
       "solid": false,
       "door": true,
       "hardness": 1,
-      "hp": 70,
+      "hp": 200,
       "drops": "wooden_door",
       "connect": "none",
       "mapColor": "#8a5a32",

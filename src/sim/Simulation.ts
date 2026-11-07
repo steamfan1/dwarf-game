@@ -119,6 +119,8 @@ const REGROWTH_CHECK_TICKS = 20;
 export const CREATURE_SEARCHES_PER_TICK = 2;
 /** Cells one creature search may expand (they hunt nearby prey, or head for the Hearth). */
 const CREATURE_SEARCH_LIMIT = 5000;
+/** The most steps that breaking one block adds to a monster's path (see breakerFor). */
+const BREAK_COST_CAP = 40;
 /** A door or block being smashed wakes dwarves asleep within this many tiles... */
 const NOISE_RADIUS = 8;
 /** ...for this many ticks after each blow. */
@@ -1379,7 +1381,11 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     if (gainXp(dwarf, 'combat', xp, this.colony.skills.levels)) this.skillUp(dwarf, 'combat');
   }
 
-  /** A creature strikes a door or block: it breaks once its damage reaches its hit points. */
+  /**
+   * A creature strikes a door or block. The damage stays with the block, whoever struck
+   * it, so monsters battering the same block together break it all the sooner; it breaks
+   * once the damage reaches its durability.
+   */
   damageTile(x: number, y: number, damage: number, _by: Creature): void {
     const i = this.world.index(x, y);
     const total = this.tileDamage.add(i, damage);
@@ -1388,7 +1394,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     if (total >= this.tileHp(this.world.fg[i]!)) this.breakTile(x, y);
   }
 
-  /** How much damage a tile takes to break: its "hp", or its hardness times threats.json's tileHpPerHardness. */
+  /** How much damage a tile takes to break: its "hp" (durability), or failing that its hardness times threats.json's tileHpPerHardness. */
   tileHp(tile: number): number {
     const def = this.tiles.tiles[tile]!;
     return def.hp ?? def.hardness * this.threats.tileHpPerHardness;
@@ -1563,7 +1569,13 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
     return best;
   }
 
-  /** What each kind of creature can smash its way through (null: nothing). */
+  /**
+   * What each kind of creature can smash its way through (null: nothing). Breaking a block
+   * costs a path as many steps as the blows it still needs would take, so a block others
+   * have already battered is the cheaper way in and monsters pile onto it; but never more
+   * than BREAK_COST_CAP steps, so a monster would rather smash a door than walk a long way
+   * round (and searches stay small).
+   */
   private breakerFor(def: CreatureDef): Breaker | null {
     if (def.breaks === 'none' || def.breakDamage <= 0) return null;
     return {
@@ -1571,7 +1583,7 @@ export class Simulation implements ColonyContext, CreatureContext, SpawnerContex
       cost: (x, y) => {
         const i = this.world.index(x, y);
         const left = Math.max(1, this.tileHp(this.world.fg[i]!) - this.tileDamage.get(i));
-        return (Math.ceil(left / def.breakDamage) * def.breakTicks) / def.movement.walkTicks;
+        return Math.min(BREAK_COST_CAP, (Math.ceil(left / def.breakDamage) * def.breakTicks) / def.movement.walkTicks);
       },
     };
   }

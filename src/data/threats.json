@@ -25,6 +25,6 @@
   },
   "scaling": { "healthPerDay": 0.05, "damagePerDay": 0.03, "maxFactor": 2.5 },
   "projectiles": { "bolt": 0.8, "spit": 0.45 },
-  "tileHpPerHardness": 40,
+  "tileHpPerHardness": 100,
   "armorScale": 8
 }

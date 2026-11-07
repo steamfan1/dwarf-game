@@ -37,7 +37,7 @@ describe('hover descriptions in a fight', () => {
     const gloomling = sim.spawnCreatureNear('gloomling', 20)!;
     sim.world.revealAll();
     sim.placeBlock(30, 9, TILES.tile('plank'));
-    sim.damageTile(30, 9, 10, gloomling);
+    sim.damageTile(30, 9, sim.tileHp(TILES.tile('plank')) / 4, gloomling);
     expect(describeCell(sim, 30, 9, 'auto', 2)?.detail).toContain('25% broken');
   });
 });

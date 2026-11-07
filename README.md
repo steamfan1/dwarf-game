@@ -164,10 +164,15 @@ mark work while paused too.
 - **Four kinds of monster.** The Gloomling smashes doors and anything the dwarves built;
   the Cragskitter runs up walls and leaps two tiles but can only break doors; the
   Burrowmaw tunnels through earth and soft stone straight at its prey; the Bilespitter
-  can't break anything, but spits bile at dwarves it can see from seven tiles. Doors and
-  blocks have hit points: monsters weigh walking round to an open way in against
-  smashing the nearest door or wall, and cracks show how close they are to breaking it.
-  Monsters get a little tougher every day.
+  can't break anything, but spits bile at dwarves it can see from seven tiles. Monsters
+  weigh walking round to an open way in against smashing the nearest door or wall, and
+  cracks show how close they are to breaking it. Monsters get a little tougher every day.
+- **Breaking in takes time.** Every block has a durability: sand and dirt give way
+  soonest, wood holds out more than twice as long, stone longer still, brick longest. A
+  lone Gloomling needs about a minute for a wooden door, and a Burrowmaw a quarter of a
+  minute for each block of earth. The damage stays with the block, so a pack battering
+  the same door breaks it far sooner (three Gloomlings in about 20 seconds), and others
+  arriving go for the block that's already giving way.
 - **Dwarves fight by themselves.** A dwarf that sees a monster within 7 tiles drops what
   it's doing and fights it: with its fists, a sword, or a crossbow from a distance.
   Weapons set the damage, armour softens every blow, and combat skill grows with every
@@ -182,7 +187,8 @@ mark work while paused too.
   gear the colony owns. At dawn the portal draws any survivors back.
 - **Defences.** Spike traps stab any creature that steps on them; bolt throwers (a
   crossbow on a post) shoot monsters up to 8 tiles away by themselves. Both are built
-  like any furniture. Brick and stone walls take far longer to smash than planks.
+  like any furniture. Doors are the weak point: plank walls outlast them, and brick and
+  stone walls take far longer again.
 - **Hunting.** Mossbacks and Woolhorns graze on the hills by day. Click one with Auto and
   a dwarf goes after it: a hurt animal runs, but dwarves are faster. Each leaves raw meat
   (cook it at the kitchen stove) and hides (tan them into leather at a workbench, then
@@ -308,8 +314,10 @@ e2e/               browser smoke tests (Playwright)
   Each kind gets its own set of moves (`CreatureNav`, the creature counterpart of
   NavGrid): doors stop creatures, `jump` and `safeDrop` vary, climbers cling to walls,
   and a creature that breaks things may plan a path *through* a door or block it can
-  smash, at an extra cost worked out from how long smashing it would take. So a single A*
-  search decides between walking round and breaking in. Creature searches are greedy (a
+  smash, at an extra cost worked out from how long the blows it still needs would take
+  (capped at 40 steps, so monsters would rather smash a door than walk far round; and a
+  battered block is cheaper, so a pack converges on it). So a single A* search decides
+  between walking round and breaking in. Creature searches are greedy (a
   weighted heuristic: tunnelling makes costs high), capped at 5,000 cells, and have their
   own budget of 2 per tick, so a horde never slows the dwarves' planning.
 - **The Spawner** (`sim/creatures/Spawner.ts`) brings monsters out at night, animals by
@@ -414,7 +422,7 @@ walls) and `liquids`. The first tile must be `air` and the first wall `none`.
 | `door` | Dwarves walk through it, but it stops light, and monsters (they must break it down). |
 | `transparent` | A solid block that lets light through (glass). |
 | `light` | Light it gives off, 0 to 15 (15 is daylight). Liquids can glow too (lava is 12). |
-| `hp` | Optional. Damage a monster must do to break it (a wooden door has 70). Without it: hardness × `tileHpPerHardness` from threats.json. |
+| `hp` | Durability: the damage monsters must do to break it. Sand 80, dirt 100, wooden door 200, plank 250, stone 300, brick 500. Without it: hardness × `tileHpPerHardness` from threats.json. |
 | `harvest` | Optional. A plant the dwarves can pick: `{ "item": "berries", "count": 3, "becomes": "berry_bush_bare", "regrowDays": 2 }`. `becomes` is the tile left behind (nothing if left out), which turns back into this one `regrowDays` days later (never if left out). |
 | `connect` | What the tile visually joins with: `solid` (default for solid tiles), `self` or `none`. |
 | `mapColor` | Colour on the minimap. |
@@ -576,7 +584,7 @@ the second), `restHealPerDay` (mending by the Hearth), `damagePerLevel` (combat 
   "sight": 14,
   "movement": { "walkTicks": 7, "jump": 1, "safeDrop": 6, "climbs": "ladders" },
   "breaks": "built",
-  "breakDamage": 7,
+  "breakDamage": 4,
   "drops": [{ "item": "dusk_essence", "count": 1, "chance": 0.3 }],
   "xp": 12,
   "spawn": { "night": 10, "wave": 10, "fromDay": 1 },
@@ -592,7 +600,7 @@ the second), `restHealPerDay` (mending by the Hearth), `damagePerLevel` (combat 
 | `health`, `armor`, `damage`, `attackTicks` | Hit points, armour (as a dwarf's), damage per blow and ticks between blows. Monsters get tougher every day (threats.json `scaling`). |
 | `sight` | Monsters notice dwarves within this many tiles (invaders always know where the colony is). |
 | `movement` | `walkTicks` per tile (dwarves take 5), `jump` (tiles up onto a ledge), `safeDrop` (the longest drop it takes) and `climbs`: `none`, `ladders`, or `walls` (ladders, background walls and the sides of blocks). |
-| `breaks` | What it smashes through: `none`, `doors`, `built` (doors and blocks dwarves built) or `soft` (also natural blocks up to `digHardness`: it tunnels). `breakDamage` per blow, every `breakTicks` (default `attackTicks`). |
+| `breaks` | What it smashes through: `none`, `doors`, `built` (doors and blocks dwarves built) or `soft` (also natural blocks up to `digHardness`: it tunnels). `breakDamage` per blow, every `breakTicks` (default `attackTicks`), against the block's `hp` in tiles.json; several monsters on one block add up. |
 | `drops` | Items left where it dies, each with a `chance` (default 1). |
 | `xp` | Combat experience for the dwarf that kills it. |
 | `spawn` | Weights for night spawns and invasions (`night`, `wave`), the first day it appears (`fromDay`), and for animals, how common it is in each biome (`"animal": { "temperate": 6, "snow": 1 }`). |
@@ -614,8 +622,9 @@ the second), `restHealPerDay` (mending by the Hearth), `damagePerLevel` (combat 
   `spawnSeconds`, through a portal `portalDistance` tiles from the Hearth. The tier is the
   best tier of gear the colony owns, until Milestone 6's tech tree takes over.
 - `scaling`: health and damage grow by these fractions per day, up to `maxFactor`.
-- `projectiles`: missile speeds in tiles per tick; `tileHpPerHardness`; `armorScale` (the
-  `s` in the armour formula).
+- `projectiles`: missile speeds in tiles per tick; `tileHpPerHardness` (the durability of a
+  block without an `hp` of its own: hardness times this); `armorScale` (the `s` in the
+  armour formula).
 
 ### Day and night: `src/data/time.json`
 
